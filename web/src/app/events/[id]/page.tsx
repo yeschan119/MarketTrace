@@ -58,7 +58,7 @@ export default function EventDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
-                {event.entities[0]?.name ?? event.entities[0]?.ticker ?? "Unknown Instrument"}
+                {event.entities[0] ?? "Unknown Instrument"}
               </h1>
               <DirectionBadge direction={event.direction} />
             </div>
@@ -72,14 +72,13 @@ export default function EventDetailPage() {
             </p>
             {event.entities.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {event.entities.map((e) => (
-                  <Link
-                    key={e.id}
-                    href={`/instruments/${e.id}`}
-                    className="font-mono text-xs text-indigo-600 hover:underline"
+                {event.entities.map((e, idx) => (
+                  <span
+                    key={`${e}-${idx}`}
+                    className="rounded-full bg-indigo-50 px-2.5 py-0.5 font-mono text-xs text-indigo-700"
                   >
-                    {e.ticker}
-                  </Link>
+                    {e}
+                  </span>
                 ))}
               </div>
             )}
@@ -129,17 +128,7 @@ export default function EventDetailPage() {
           <ul className="space-y-3">
             {event.evidence.map((ev, idx) => (
               <li key={idx} className="rounded-md bg-gray-50 p-3 text-sm">
-                <p className="text-gray-700">{ev.text}</p>
-                {ev.url && (
-                  <a
-                    href={ev.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-xs text-indigo-500 hover:underline"
-                  >
-                    {ev.url}
-                  </a>
-                )}
+                <p className="text-gray-700">{ev}</p>
               </li>
             ))}
           </ul>

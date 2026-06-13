@@ -19,9 +19,9 @@ interface ScoreEntry {
 
 interface Props {
   confidence: number;
-  surprise_score: number;
-  novelty_score: number;
-  source_reliability: number;
+  surprise_score: number | null;
+  novelty_score: number | null;
+  source_reliability: number | null;
 }
 
 export function ScoreBars({
@@ -30,12 +30,16 @@ export function ScoreBars({
   novelty_score,
   source_reliability,
 }: Props) {
-  const scores: ScoreEntry[] = [
-    { label: "Confidence", value: confidence, color: "#6366f1" },
-    { label: "Surprise", value: surprise_score, color: "#f59e0b" },
-    { label: "Novelty", value: novelty_score, color: "#10b981" },
-    { label: "Source Reliability", value: source_reliability, color: "#3b82f6" },
-  ];
+  // Optional scores (surprise/novelty/source_reliability) may be null when the
+  // model omits them; drop those bars rather than rendering a misleading 0%.
+  const scores: ScoreEntry[] = (
+    [
+      { label: "Confidence", value: confidence, color: "#6366f1" },
+      { label: "Surprise", value: surprise_score, color: "#f59e0b" },
+      { label: "Novelty", value: novelty_score, color: "#10b981" },
+      { label: "Source Reliability", value: source_reliability, color: "#3b82f6" },
+    ] as { label: string; value: number | null; color: string }[]
+  ).filter((s): s is ScoreEntry => s.value != null);
 
   const data = scores.map((s) => ({
     ...s,

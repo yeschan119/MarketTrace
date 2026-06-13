@@ -11,17 +11,6 @@ export interface EventSummary {
   instrument_name: string;
 }
 
-export interface Entity {
-  id: string;
-  ticker: string;
-  name: string;
-}
-
-export interface Evidence {
-  text: string;
-  url?: string;
-}
-
 export interface Outcome {
   horizon_days: number;
   raw_return: number;
@@ -39,16 +28,16 @@ export interface Document {
 export interface EventDetail {
   id: string;
   event_type: string;
-  entities: Entity[];
+  entities: string[];
   industries: string[];
   channels: string[];
   direction: "positive" | "negative" | "neutral" | string;
   horizon_days: number;
   confidence: number;
-  surprise_score: number;
-  novelty_score: number;
-  source_reliability: number;
-  evidence: Evidence[];
+  surprise_score: number | null;
+  novelty_score: number | null;
+  source_reliability: number | null;
+  evidence: string[];
   model: string;
   model_version: string;
   document: Document;
