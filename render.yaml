@@ -48,7 +48,7 @@ services:
       - key: OBJECT_STORE_DIR
         value: /tmp/objectstore         # ephemeral; fine for the read API
       - key: CORS_ALLOW_ORIGINS
-        value: https://markettrace-web.onrender.com
+        value: https://miffy178.com,https://www.miffy178.com
 
   # ---- Next.js web frontend ----
   - type: web
@@ -61,4 +61,4 @@ services:
     envVars:
       # NEXT_PUBLIC_* is baked at BUILD time; Render provides it during build.
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://markettrace-backend.onrender.com
+        value: https://api.miffy178.com
