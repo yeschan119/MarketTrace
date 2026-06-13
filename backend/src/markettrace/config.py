@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     # Which price data backend the US market uses.
     price_provider: Literal["tiingo", "stooq"] = "tiingo"
     tiingo_api_key: str | None = None
+    # KR market-index proxy (KODEX 200 ETF) for abnormal-return computation.
+    kr_market_index_ticker: str = "069500"
     # Explicit model override. When None, the provider's default (above) is used.
     extraction_model: str | None = None
     # Comma-separated list of origins allowed by CORS (the deployed web URL).

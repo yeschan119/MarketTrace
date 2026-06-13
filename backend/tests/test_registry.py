@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from markettrace.config import get_settings
+from markettrace.providers.kr_naver import KrNaverPriceProvider
 from markettrace.providers.registry import get_price_provider
 from markettrace.providers.stooq import StooqPriceProvider
 from markettrace.providers.tiingo import TiingoPriceProvider
@@ -22,9 +23,12 @@ class TestGetPriceProvider:
         expected = TiingoPriceProvider if name == "tiingo" else StooqPriceProvider
         assert isinstance(get_price_provider("US"), expected)
 
+    def test_kr_returns_kr_naver_provider(self):
+        assert isinstance(get_price_provider("KR"), KrNaverPriceProvider)
+
     def test_unknown_market_raises(self):
         with pytest.raises(ValueError, match="Unknown price market"):
-            get_price_provider("KR")
+            get_price_provider("JP")
 
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown price provider"):

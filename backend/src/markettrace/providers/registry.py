@@ -59,23 +59,28 @@ def get_price_provider(market: str, *, provider: str | None = None, **kw) -> Pri
     ValueError
         When ``market`` or the resolved provider name is not supported.
     """
-    if market != "US":
-        raise ValueError(f"Unknown price market: {market!r}")
+    if market == "US":
+        from markettrace.config import get_settings
 
-    from markettrace.config import get_settings
+        settings = get_settings()
+        name = provider or settings.price_provider
 
-    settings = get_settings()
-    name = provider or settings.price_provider
+        if name == "tiingo":
+            from markettrace.providers.tiingo import TiingoPriceProvider
 
-    if name == "tiingo":
-        from markettrace.providers.tiingo import TiingoPriceProvider
+            kw.setdefault("api_key", settings.tiingo_api_key)
+            return TiingoPriceProvider(**kw)  # type: ignore[return-value]
 
-        kw.setdefault("api_key", settings.tiingo_api_key)
-        return TiingoPriceProvider(**kw)  # type: ignore[return-value]
+        if name == "stooq":
+            from markettrace.providers.stooq import StooqPriceProvider
 
-    if name == "stooq":
-        from markettrace.providers.stooq import StooqPriceProvider
+            return StooqPriceProvider(**kw)  # type: ignore[return-value]
 
-        return StooqPriceProvider(**kw)  # type: ignore[return-value]
+        raise ValueError(f"Unknown price provider: {name!r}")
 
-    raise ValueError(f"Unknown price provider: {name!r}")
+    if market == "KR":
+        from markettrace.providers.kr_naver import KrNaverPriceProvider
+
+        return KrNaverPriceProvider(**kw)  # type: ignore[return-value]
+
+    raise ValueError(f"Unknown price market: {market!r}")
