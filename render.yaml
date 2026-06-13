@@ -1,8 +1,8 @@
 # Render Blueprint for MarketTrace.
 # Deploy: push to GitHub, then in Render -> "New +" -> "Blueprint" -> pick this repo.
 #
-# Secrets (OPENAI_API_KEY) are marked `sync: false`: Render will prompt for them
-# in the dashboard and they are NEVER stored in this file / git.
+# Secrets (OPENAI_API_KEY, TIINGO_API_KEY) are marked `sync: false`: Render will
+# prompt for them in the dashboard and they are NEVER stored in this file / git.
 #
 # NOTE on URLs: Render assigns "https://<service-name>.onrender.com". The cross-
 # references below assume the service names stay as written. If Render appends a
@@ -38,6 +38,10 @@ services:
       - key: EXTRACTION_MODEL
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
+        sync: false                     # set in Render dashboard; never committed
+      - key: PRICE_PROVIDER
+        value: tiingo
+      - key: TIINGO_API_KEY
         sync: false                     # set in Render dashboard; never committed
       - key: SEC_USER_AGENT
         value: "MarketTrace gimg10737@gmail.com"
