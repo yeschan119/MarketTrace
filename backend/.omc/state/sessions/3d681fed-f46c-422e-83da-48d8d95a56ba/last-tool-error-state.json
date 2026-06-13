@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/data/MarketTrace/backend; .venv/bin/python -m ruff check src/ tests/ --output-format=concise 2>&1\",\"description\":\"Show remaining ruff error\"}",
-  "error": "Exit code 1\nsrc/markettrace/providers/sec_edgar.py:118:101: E501 Line too long (103 > 100)\nFound 1 error.",
-  "timestamp": "2026-06-12T13:37:17.652Z",
-  "retry_count": 1
-}

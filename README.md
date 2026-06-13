@@ -47,7 +47,10 @@ alembic upgrade head
 # 5. Run the tests (no postgres/network needed)
 pytest -q
 
-# 6. Run the end-to-end vertical slice (later phase)
+# 6. Seed instruments (idempotent; default watchlist, or a single --ticker)
+markettrace-seed --help
+
+# 7. Run the end-to-end vertical slice (later phase)
 markettrace-slice --help
 ```
 
@@ -64,3 +67,5 @@ Settings are read from environment variables (or a `.env` file) via
 - `DATABASE_URL` — SQLAlchemy URL (defaults to the local postgres compose service)
 - `SEC_USER_AGENT` — required by SEC EDGAR; identify yourself
 - `OBJECT_STORE_DIR` — local directory for raw disclosure storage
+- `PRICE_PROVIDER` — US price data backend: `tiingo` (default) or `stooq`
+- `TIINGO_API_KEY` — Tiingo API key (used when `PRICE_PROVIDER=tiingo`)

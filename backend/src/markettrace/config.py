@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     )
     sec_user_agent: str = "MarketTrace dev youremail@example.com"
     object_store_dir: str = "./_objectstore"
+    # Which price data backend the US market uses.
+    price_provider: Literal["tiingo", "stooq"] = "tiingo"
+    tiingo_api_key: str | None = None
     # Explicit model override. When None, the provider's default (above) is used.
     extraction_model: str | None = None
     # Comma-separated list of origins allowed by CORS (the deployed web URL).

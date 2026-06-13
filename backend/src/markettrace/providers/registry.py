@@ -34,25 +34,41 @@ def get_disclosure_provider(market: str, **kw) -> DisclosureProvider:
     raise ValueError(f"Unknown disclosure market: {market!r}")
 
 
-def get_price_provider(market: str, **kw) -> PriceProvider:
+def get_price_provider(market: str, *, provider: str | None = None, **kw) -> PriceProvider:
     """Return a ``PriceProvider`` for the given market.
 
     Parameters
     ----------
     market:
         Market identifier, e.g. ``"US"``.
+    provider:
+        Override the configured implementation (``"tiingo"`` or ``"stooq"``).
+        When ``None``, ``Settings.price_provider`` decides.
     **kw:
-        Forwarded to the provider constructor.  For ``"US"`` this may include
-        ``client``.
+        Forwarded to the provider constructor (e.g. ``client``, ``api_key``).
 
     Raises
     ------
     ValueError
-        When ``market`` is not supported.
+        When ``market`` or the resolved provider name is not supported.
     """
-    if market == "US":
+    if market != "US":
+        raise ValueError(f"Unknown price market: {market!r}")
+
+    from markettrace.config import get_settings
+
+    settings = get_settings()
+    name = provider or settings.price_provider
+
+    if name == "tiingo":
+        from markettrace.providers.tiingo import TiingoPriceProvider
+
+        kw.setdefault("api_key", settings.tiingo_api_key)
+        return TiingoPriceProvider(**kw)  # type: ignore[return-value]
+
+    if name == "stooq":
         from markettrace.providers.stooq import StooqPriceProvider
 
         return StooqPriceProvider(**kw)  # type: ignore[return-value]
 
-    raise ValueError(f"Unknown price market: {market!r}")
+    raise ValueError(f"Unknown price provider: {name!r}")

@@ -32,6 +32,7 @@ dev = [
 
 [project.scripts]
 markettrace-slice = "markettrace.pipeline.vertical_slice:main"
+markettrace-seed = "markettrace.pipeline.seed:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

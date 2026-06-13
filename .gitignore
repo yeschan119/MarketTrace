@@ -23,6 +23,14 @@ venv/
 *.sqlite3
 _objectstore/
 
+# ---- OMC transient session/run state (ralph PRD, progress, logs) ----
+# Matches .omc at any depth (e.g. backend/.omc). Keep .omc/plans/ tracked.
+**/.omc/state/
+**/.omc/logs/
+**/.omc/research/
+**/.omc/notepad.md
+**/.omc/project-memory.json
+
 # ---- Node / Next.js (web) ----
 node_modules/
 .next/
