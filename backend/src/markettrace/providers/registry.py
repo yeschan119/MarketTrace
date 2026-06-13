@@ -31,6 +31,13 @@ def get_disclosure_provider(market: str, **kw) -> DisclosureProvider:
 
         return SecEdgarProvider(**kw)  # type: ignore[return-value]
 
+    if market == "KR":
+        from markettrace.config import get_settings
+        from markettrace.providers.opendart import OpenDartProvider
+
+        kw.setdefault("api_key", get_settings().opendart_api_key)
+        return OpenDartProvider(**kw)  # type: ignore[return-value]
+
     raise ValueError(f"Unknown disclosure market: {market!r}")
 
 

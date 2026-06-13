@@ -29,3 +29,29 @@ class TestGetPriceProvider:
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown price provider"):
             get_price_provider("US", provider="bogus")
+
+
+class TestGetDisclosureProvider:
+    def test_us_returns_sec_edgar_provider(self):
+        from markettrace.providers.registry import get_disclosure_provider
+        from markettrace.providers.sec_edgar import SecEdgarProvider
+
+        assert isinstance(
+            get_disclosure_provider("US", user_agent="test x@example.com"),
+            SecEdgarProvider,
+        )
+
+    def test_kr_returns_opendart_provider(self):
+        from markettrace.providers.opendart import OpenDartProvider
+        from markettrace.providers.registry import get_disclosure_provider
+
+        assert isinstance(
+            get_disclosure_provider("KR", api_key="testkey"),
+            OpenDartProvider,
+        )
+
+    def test_unknown_market_raises(self):
+        from markettrace.providers.registry import get_disclosure_provider
+
+        with pytest.raises(ValueError, match="Unknown disclosure market"):
+            get_disclosure_provider("XX")

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://markettrace:markettrace@localhost:5432/markettrace"
     )
     sec_user_agent: str = "MarketTrace dev youremail@example.com"
+    opendart_api_key: str | None = None
     object_store_dir: str = "./_objectstore"
     # Which price data backend the US market uses.
     price_provider: Literal["tiingo", "stooq"] = "tiingo"

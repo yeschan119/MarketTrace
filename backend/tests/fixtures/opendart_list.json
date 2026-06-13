@@ -1,0 +1,40 @@
+{
+  "status": "000",
+  "message": "정상",
+  "page_no": 1,
+  "page_count": 100,
+  "total_count": 3,
+  "total_page": 1,
+  "list": [
+    {
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "stock_code": "005930",
+      "report_nm": "사업보고서",
+      "rcept_no": "20240330000123",
+      "rcept_dt": "20240330",
+      "flr_nm": "삼성전자",
+      "rm": ""
+    },
+    {
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "stock_code": "005930",
+      "report_nm": "분기보고서",
+      "rcept_no": "20240115000456",
+      "rcept_dt": "20240115",
+      "flr_nm": "삼성전자",
+      "rm": ""
+    },
+    {
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "stock_code": "005930",
+      "report_nm": "반기보고서",
+      "rcept_no": "20230510000789",
+      "rcept_dt": "20230510",
+      "flr_nm": "삼성전자",
+      "rm": ""
+    }
+  ]
+}

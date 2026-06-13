@@ -67,7 +67,12 @@ def upgrade() -> None:
         "events",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("document_id", sa.Integer(), sa.ForeignKey("documents.id"), nullable=False),
-        sa.Column("primary_instrument_id", sa.Integer(), sa.ForeignKey("instruments.id"), nullable=True),
+        sa.Column(
+            "primary_instrument_id",
+            sa.Integer(),
+            sa.ForeignKey("instruments.id"),
+            nullable=True,
+        ),
         sa.Column("event_type", sa.String(), nullable=False),
         sa.Column("entities", sa.JSON(), nullable=True),
         sa.Column("industries", sa.JSON(), nullable=True),
