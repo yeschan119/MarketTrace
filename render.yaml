@@ -43,12 +43,20 @@ services:
         value: tiingo
       - key: TIINGO_API_KEY
         sync: false                     # set in Render dashboard; never committed
+      - key: OPENDART_API_KEY
+        sync: false                     # KR disclosures; set in Render dashboard
       - key: SEC_USER_AGENT
         value: "MarketTrace gimg10737@gmail.com"
       - key: OBJECT_STORE_DIR
         value: /tmp/objectstore         # ephemeral; fine for the read API
       - key: CORS_ALLOW_ORIGINS
         value: https://miffy178.com,https://www.miffy178.com
+      - key: ADMIN_USERNAME
+        sync: false                     # login-gated ingest; set in Render dashboard
+      - key: ADMIN_PASSWORD
+        sync: false                     # login-gated ingest; set in Render dashboard
+      - key: AUTH_SECRET
+        sync: false                     # token signing secret; set in Render dashboard
 
   # ---- Next.js web frontend ----
   - type: web
