@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { AuthControls } from "@/components/AuthControls";
 
 export const metadata: Metadata = {
   title: "MarketTrace",
@@ -27,6 +28,9 @@ export default function RootLayout({
               >
                 Events
               </a>
+              <div className="ml-auto">
+                <AuthControls />
+              </div>
             </nav>
           </header>
           <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>

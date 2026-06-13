@@ -17,6 +17,27 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function apiPost<T>(
+  path: string,
+  body?: unknown,
+  token?: string
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   health(): Promise<HealthResponse> {
     return apiFetch<HealthResponse>("/health");
@@ -32,5 +53,13 @@ export const api = {
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {
     return apiFetch<InstrumentTimeline>(`/instruments/${id}/timeline`);
+  },
+
+  login(username: string, password: string): Promise<{ token: string }> {
+    return apiPost<{ token: string }>("/auth/login", { username, password });
+  },
+
+  ingest(token: string): Promise<{ status: string }> {
+    return apiPost<{ status: string }>("/ingest", undefined, token);
   },
 };
