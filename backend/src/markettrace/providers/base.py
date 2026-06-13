@@ -34,6 +34,14 @@ class DisclosureProvider(Protocol):
 
     def list_recent(self, since: datetime) -> list[DocumentRef]: ...
 
+    def list_for_issuer(
+        self,
+        issuer_id: str,
+        since: datetime,
+        *,
+        primary_ticker: str | None = None,
+    ) -> list[DocumentRef]: ...
+
     def fetch_raw(self, ref: DocumentRef) -> RawDocument: ...
 
 

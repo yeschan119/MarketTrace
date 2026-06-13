@@ -149,3 +149,15 @@ class TestDisclosureProviderContract:
         raw = provider.fetch_raw(ref)
         assert raw.fetched_at.tzinfo is not None
         assert raw.fetched_at.utcoffset().total_seconds() == 0
+
+
+@pytest.mark.parametrize("market,issuer_id", [("US", "320193"), ("KR", "00126380")])
+def test_list_for_issuer_returns_document_refs(market: str, issuer_id: str) -> None:
+    if market == "US":
+        provider, since = _make_us_provider()
+    else:
+        provider, since = _make_kr_provider()
+    refs = provider.list_for_issuer(issuer_id, since)
+    assert isinstance(refs, list)
+    assert len(refs) > 0
+    assert all(isinstance(r, DocumentRef) for r in refs)

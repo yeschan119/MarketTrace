@@ -17,7 +17,13 @@ from sqlalchemy.orm import Session
 
 from markettrace.db.models import Instrument
 
-__all__ = ["DEFAULT_WATCHLIST", "seed_instrument", "seed_watchlist", "main"]
+__all__ = [
+    "DEFAULT_WATCHLIST",
+    "KR_WATCHLIST",
+    "seed_instrument",
+    "seed_watchlist",
+    "main",
+]
 
 # Minimal starter universe: a couple of large caps plus the SPY benchmark used
 # by the impact module as the market index.
@@ -25,6 +31,16 @@ DEFAULT_WATCHLIST: list[dict[str, str]] = [
     {"market": "US", "ticker": "AAPL", "name": "Apple Inc.", "industry": "Technology"},
     {"market": "US", "ticker": "MSFT", "name": "Microsoft Corporation", "industry": "Technology"},
     {"market": "US", "ticker": "SPY", "name": "SPDR S&P 500 ETF Trust", "industry": "Index"},
+]
+
+# KR starter universe so ``markettrace-seed --market KR`` works with no flags.
+KR_WATCHLIST: list[dict[str, str]] = [
+    {
+        "market": "KR",
+        "ticker": "005930",
+        "name": "Samsung Electronics Co., Ltd.",
+        "industry": "Technology",
+    },
 ]
 
 
@@ -80,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for the ``markettrace-seed`` console script.
 
     With ``--ticker`` (and ``--name``) seeds a single instrument; otherwise
-    seeds :data:`DEFAULT_WATCHLIST`.  Always idempotent.
+    seeds the per-market watchlist (:data:`DEFAULT_WATCHLIST` for US,
+    :data:`KR_WATCHLIST` for KR).  Always idempotent.
     """
     parser = argparse.ArgumentParser(
         prog="markettrace-seed",
@@ -113,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
                     "industry": args.industry,
                 }
             ]
+        elif args.market == "KR":
+            items = KR_WATCHLIST
         else:
             items = DEFAULT_WATCHLIST
 

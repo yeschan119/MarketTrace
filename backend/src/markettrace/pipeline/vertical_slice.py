@@ -165,19 +165,35 @@ def main(argv: list[str] | None = None) -> int:
         description="Run the MarketTrace vertical-slice pipeline for one filing.",
     )
     parser.add_argument("--market", default="US", help="Market identifier (default: US).")
-    parser.add_argument("--cik", required=True, help="Issuer CIK.")
+    parser.add_argument(
+        "--issuer-id",
+        default=None,
+        help="Issuer id: CIK for US, corp_code for KR. Preferred over --cik.",
+    )
+    parser.add_argument(
+        "--cik",
+        default=None,
+        help="Back-compat alias for --issuer-id (US CIK).",
+    )
     parser.add_argument("--ticker", required=True, help="Primary ticker symbol.")
     parser.add_argument(
         "--accession",
         default=None,
-        help="Specific filing accession number; newest filing is used when omitted.",
+        help=(
+            "Specific filing id (US accession number / KR rcept_no); "
+            "newest filing is used when omitted."
+        ),
     )
     parser.add_argument(
         "--market-index",
-        default="spy",
-        help="Benchmark index ticker (default: spy).",
+        default=None,
+        help="Benchmark index ticker (default: US 'spy', KR settings.kr_market_index_ticker).",
     )
     args = parser.parse_args(argv)
+
+    issuer_id = args.issuer_id if args.issuer_id is not None else args.cik
+    if issuer_id is None:
+        parser.error("one of --issuer-id or --cik is required")
 
     from markettrace.config import get_settings
     from markettrace.db.session import make_engine, make_session_factory
@@ -199,20 +215,31 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    disclosure_provider = get_disclosure_provider(
-        args.market, user_agent=settings.sec_user_agent
-    )
+    if args.market == "US":
+        disclosure_provider = get_disclosure_provider(
+            args.market, user_agent=settings.sec_user_agent
+        )
+    else:
+        disclosure_provider = get_disclosure_provider(args.market)
     price_provider = get_price_provider(args.market)
     extractor = EventExtractor()
 
-    # Resolve the chosen DocumentRef (newest filing, or a specific accession).
+    # Default benchmark index depends on the market unless overridden.
+    if args.market_index is not None:
+        market_index_ticker = args.market_index
+    elif args.market == "KR":
+        market_index_ticker = settings.kr_market_index_ticker
+    else:
+        market_index_ticker = "spy"
+
+    # Resolve the chosen DocumentRef (newest filing, or a specific filing id).
     since = datetime(1970, 1, 1, tzinfo=UTC)
-    refs = disclosure_provider.list_for_cik(
-        args.cik, since, primary_ticker=args.ticker
+    refs = disclosure_provider.list_for_issuer(
+        issuer_id, since, primary_ticker=args.ticker
     )
     if not refs:
         print(
-            f"error: no filings found for CIK {args.cik!r}.",
+            f"error: no filings found for issuer {issuer_id!r}.",
             file=sys.stderr,
         )
         return 1
@@ -221,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         ref = next((r for r in refs if r.external_id == args.accession), None)
         if ref is None:
             print(
-                f"error: accession {args.accession!r} not found for CIK {args.cik!r}.",
+                f"error: filing {args.accession!r} not found for issuer {issuer_id!r}.",
                 file=sys.stderr,
             )
             return 1
@@ -242,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
             price_provider=price_provider,
             extractor=extractor,
             ticker=args.ticker,
-            market_index_ticker=args.market_index,
+            market_index_ticker=market_index_ticker,
         )
     finally:
         session.close()

@@ -230,3 +230,80 @@ def test_run_slice_dedups_document_on_rerun(db_session, tmp_object_store) -> Non
     # Same content -> deduped to a single Document row.
     assert db_session.query(Document).count() == 1
     assert second.document_id == first.document_id
+
+
+# ---------------------------------------------------------------------------
+# KR market path
+# ---------------------------------------------------------------------------
+
+_KR_DISCLOSURE_TEXT = "삼성전자 분기 실적이 예상치를 상회했습니다."
+
+
+class _FakeKRDisclosureProvider:
+    market = "KR"
+
+    def fetch_raw(self, ref: DocumentRef) -> RawDocument:
+        return RawDocument(
+            ref=ref,
+            content=_KR_DISCLOSURE_TEXT,
+            fetched_at=datetime.now(UTC),
+        )
+
+
+class _FakeKRPriceProvider:
+    market = "KR"
+
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        if ticker.lower() in ("kospi", "spy"):
+            return _MARKET_FRAME.clone()
+        return _STOCK_FRAME.clone()
+
+
+def _make_kr_ref() -> DocumentRef:
+    return DocumentRef(
+        source="opendart",
+        external_id="20240330000001",
+        url="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240330000001",
+        market="KR",
+        published_at=_PUBLISHED_AT,
+        title="사업보고서",
+        primary_ticker="005930",
+    )
+
+
+def _seed_kr_instrument(session) -> Instrument:
+    instrument = Instrument(market="KR", ticker="005930", name="Samsung Electronics Co., Ltd.")
+    session.add(instrument)
+    session.commit()
+    return instrument
+
+
+def test_run_slice_kr_end_to_end(db_session, tmp_object_store) -> None:
+    """KR-flavored ref (market='KR', opendart source) flows through run_slice correctly."""
+    instrument = _seed_kr_instrument(db_session)
+
+    result = run_slice(
+        db_session,
+        tmp_object_store,
+        ref=_make_kr_ref(),
+        disclosure_provider=_FakeKRDisclosureProvider(),
+        price_provider=_FakeKRPriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="005930",
+        market_index_ticker="kospi",
+        horizons=(1, 5, 20),
+    )
+
+    assert isinstance(result, SliceResult)
+    assert result.instrument_id == instrument.id
+
+    events = db_session.query(Event).all()
+    assert len(events) == 1
+    assert events[0].primary_instrument_id == instrument.id
+
+    outcomes = db_session.query(Outcome).order_by(Outcome.horizon_days).all()
+    assert [o.horizon_days for o in outcomes] == [1, 5, 20]
+    by_h = {o.horizon_days: o for o in outcomes}
+    assert by_h[1].abnormal_return == pytest.approx(0.02)
+    assert by_h[5].abnormal_return == pytest.approx(0.10)
+    assert by_h[20].abnormal_return == pytest.approx(0.30)

@@ -152,3 +152,16 @@ class TestFetchRaw:
         raw = provider.fetch_raw(ref)
         assert raw.fetched_at.tzinfo is not None
         assert raw.fetched_at.utcoffset().total_seconds() == 0
+
+
+# ---------------------------------------------------------------------------
+# list_for_issuer
+# ---------------------------------------------------------------------------
+
+
+class TestListForIssuer:
+    def test_delegates_to_list_for_cik(self, provider: SecEdgarProvider):
+        since = datetime(2024, 1, 1, tzinfo=UTC)
+        via_issuer = provider.list_for_issuer(CIK, since, primary_ticker="AAPL")
+        via_cik = provider.list_for_cik(CIK, since, primary_ticker="AAPL")
+        assert via_issuer == via_cik

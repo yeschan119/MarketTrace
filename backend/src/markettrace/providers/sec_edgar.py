@@ -123,6 +123,19 @@ class SecEdgarProvider:
 
         return refs
 
+    def list_for_issuer(
+        self,
+        issuer_id: str,
+        since: datetime,
+        *,
+        primary_ticker: str | None = None,
+    ) -> list[DocumentRef]:
+        """Market-agnostic alias for :meth:`list_for_cik`.
+
+        ``issuer_id`` is the issuer's CIK for the US market.
+        """
+        return self.list_for_cik(issuer_id, since, primary_ticker=primary_ticker)
+
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all CIKs in the configured watchlist since ``since``.
 

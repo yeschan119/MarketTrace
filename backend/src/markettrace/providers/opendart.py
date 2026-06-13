@@ -130,6 +130,19 @@ class OpenDartProvider:
 
         return refs
 
+    def list_for_issuer(
+        self,
+        issuer_id: str,
+        since: datetime,
+        *,
+        primary_ticker: str | None = None,
+    ) -> list[DocumentRef]:
+        """Market-agnostic alias for :meth:`list_for_corp`.
+
+        ``issuer_id`` is the issuer's 8-digit DART ``corp_code`` for the KR market.
+        """
+        return self.list_for_corp(issuer_id, since, primary_ticker=primary_ticker)
+
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all corps in the configured watchlist since ``since``.
 

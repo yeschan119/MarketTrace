@@ -189,3 +189,16 @@ class TestFetchRaw:
         raw = provider.fetch_raw(ref)
         assert raw.fetched_at.tzinfo is not None
         assert raw.fetched_at.utcoffset().total_seconds() == 0
+
+
+# ---------------------------------------------------------------------------
+# list_for_issuer
+# ---------------------------------------------------------------------------
+
+
+class TestListForIssuer:
+    def test_delegates_to_list_for_corp(self, provider: OpenDartProvider):
+        since = datetime(2024, 1, 1, tzinfo=UTC)
+        via_issuer = provider.list_for_issuer(CORP_CODE, since, primary_ticker="005930")
+        via_corp = provider.list_for_corp(CORP_CODE, since, primary_ticker="005930")
+        assert via_issuer == via_corp

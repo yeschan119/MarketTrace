@@ -7,6 +7,8 @@ from sqlalchemy import func, select
 from markettrace.db.models import Instrument
 from markettrace.pipeline.seed import (
     DEFAULT_WATCHLIST,
+    KR_WATCHLIST,
+    main,
     seed_instrument,
     seed_watchlist,
 )
@@ -64,3 +66,48 @@ class TestSeedWatchlist:
     def test_default_watchlist_includes_spy_benchmark(self):
         tickers = {item["ticker"] for item in DEFAULT_WATCHLIST}
         assert "SPY" in tickers
+
+
+class TestSeedKRWatchlist:
+    def test_seeds_kr_watchlist(self, db_session):
+        created, skipped = seed_watchlist(db_session, KR_WATCHLIST)
+        assert created == len(KR_WATCHLIST)
+        assert skipped == 0
+        assert _count(db_session, "KR", "005930") == 1
+
+    def test_kr_watchlist_idempotent(self, db_session):
+        seed_watchlist(db_session, KR_WATCHLIST)
+        created, skipped = seed_watchlist(db_session, KR_WATCHLIST)
+        assert created == 0
+        assert skipped == len(KR_WATCHLIST)
+        assert _count(db_session, "KR", "005930") == 1
+
+    def test_kr_watchlist_samsung_fields(self, db_session):
+        seed_watchlist(db_session, KR_WATCHLIST)
+        stmt = select(Instrument).where(
+            Instrument.market == "KR",
+            Instrument.ticker == "005930",
+        )
+        inst = db_session.scalars(stmt).first()
+        assert inst is not None
+        assert inst.name == "Samsung Electronics Co., Ltd."
+        assert inst.industry == "Technology"
+
+
+def test_main_market_kr_selects_kr_watchlist() -> None:
+    """--market KR passes KR_WATCHLIST to seed_watchlist."""
+    from unittest.mock import MagicMock, patch
+
+    session_mock = MagicMock()
+    factory_mock = MagicMock(return_value=session_mock)
+
+    with (
+        patch("markettrace.config.get_settings"),
+        patch("markettrace.db.session.make_engine"),
+        patch("markettrace.db.session.make_session_factory", return_value=factory_mock),
+        patch("markettrace.pipeline.seed.seed_watchlist", return_value=(1, 0)) as mock_sw,
+    ):
+        rc = main(["--market", "KR"])
+
+    assert rc == 0
+    mock_sw.assert_called_once_with(session_mock, KR_WATCHLIST)
