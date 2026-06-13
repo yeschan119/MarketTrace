@@ -13,7 +13,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from markettrace.config import get_settings
+from markettrace.config import get_settings, normalize_db_url
 from markettrace.db.models import Base
 
 config = context.config
@@ -25,7 +25,9 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    return os.environ.get("DATABASE_URL") or get_settings().database_url
+    # Normalize so a host-provided postgres(ql):// URL gets the psycopg3 driver
+    # scheme (postgresql+psycopg://); otherwise SQLAlchemy defaults to psycopg2.
+    return normalize_db_url(os.environ.get("DATABASE_URL") or get_settings().database_url)
 
 
 def run_migrations_offline() -> None:

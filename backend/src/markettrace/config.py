@@ -21,6 +21,20 @@ _DEFAULT_EXTRACTION_MODEL: dict[str, str] = {
 }
 
 
+def normalize_db_url(url: str) -> str:
+    """Coerce ``postgres(ql)://`` URLs to the psycopg3 driver scheme.
+
+    Managed hosts (Render, Heroku, etc.) hand out ``postgres://`` or
+    ``postgresql://`` connection strings, but SQLAlchemy with psycopg3 requires
+    the explicit ``postgresql+psycopg://`` driver prefix. Shared by both the
+    Settings validator and Alembic's env so migrations and the app agree.
+    """
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 class Settings(BaseSettings):
     """Runtime configuration for the MarketTrace backend."""
 
@@ -50,16 +64,7 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _normalize_db_scheme(cls, v: str) -> str:
-        """Coerce ``postgres(ql)://`` URLs to the psycopg3 driver scheme.
-
-        Managed hosts (Render, Heroku, etc.) hand out ``postgres://`` or
-        ``postgresql://`` connection strings, but SQLAlchemy with psycopg3
-        requires the explicit ``postgresql+psycopg://`` driver prefix.
-        """
-        for prefix in ("postgresql://", "postgres://"):
-            if v.startswith(prefix):
-                return "postgresql+psycopg://" + v[len(prefix):]
-        return v
+        return normalize_db_url(v)
 
     @property
     def cors_origins_list(self) -> list[str]:
