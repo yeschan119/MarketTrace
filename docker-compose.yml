@@ -1,0 +1,48 @@
+# MarketTrace local infrastructure.
+# See .omc/plans/market-trace-roadmap.md for the full roadmap.
+#
+# Slice scope: a single PostgreSQL service. The backend/web application
+# services are scaffolded here (commented out) for a later phase.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: markettrace-postgres
+    environment:
+      POSTGRES_DB: markettrace
+      POSTGRES_USER: markettrace
+      POSTGRES_PASSWORD: markettrace
+    ports:
+      - "5432:5432"
+    volumes:
+      - markettrace_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U markettrace -d markettrace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Enabled in a later phase ---
+  #
+  # backend:
+  #   build: ./backend
+  #   environment:
+  #     DATABASE_URL: postgresql+psycopg://markettrace:markettrace@postgres:5432/markettrace
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   ports:
+  #     - "8000:8000"
+  #   command: uvicorn markettrace.api.main:app --host 0.0.0.0 --port 8000
+  #
+  # web:
+  #   build: ./web
+  #   environment:
+  #     NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+  #   depends_on:
+  #     - backend
+  #   ports:
+  #     - "3000:3000"
+
+volumes:
+  markettrace_pgdata:

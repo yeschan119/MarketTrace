@@ -1,0 +1,38 @@
+{
+  "cik": "0000320193",
+  "entityType": "operating",
+  "sic": "3571",
+  "sicDescription": "Electronic Computers",
+  "name": "Apple Inc.",
+  "tickers": ["AAPL"],
+  "exchanges": ["Nasdaq"],
+  "filings": {
+    "recent": {
+      "accessionNumber": [
+        "0000320193-24-000123",
+        "0000320193-24-000099",
+        "0000320193-23-000088"
+      ],
+      "filingDate": [
+        "2024-05-15",
+        "2024-02-02",
+        "2023-11-03"
+      ],
+      "form": [
+        "10-Q",
+        "10-Q",
+        "10-K"
+      ],
+      "primaryDocument": [
+        "aapl-20240330.htm",
+        "aapl-20231230.htm",
+        "aapl-20230930.htm"
+      ],
+      "primaryDocDescription": [
+        "Form 10-Q",
+        "Form 10-Q",
+        "Form 10-K"
+      ]
+    }
+  }
+}

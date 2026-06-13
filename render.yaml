@@ -1,0 +1,60 @@
+# Render Blueprint for MarketTrace.
+# Deploy: push to GitHub, then in Render -> "New +" -> "Blueprint" -> pick this repo.
+#
+# Secrets (OPENAI_API_KEY) are marked `sync: false`: Render will prompt for them
+# in the dashboard and they are NEVER stored in this file / git.
+#
+# NOTE on URLs: Render assigns "https://<service-name>.onrender.com". The cross-
+# references below assume the service names stay as written. If Render appends a
+# suffix (because the name is taken), update CORS_ALLOW_ORIGINS and
+# NEXT_PUBLIC_API_BASE_URL in the dashboard to the real URLs after first deploy.
+
+databases:
+  - name: markettrace-db
+    databaseName: markettrace
+    user: markettrace
+    plan: free
+
+services:
+  # ---- FastAPI backend (read API + extraction) ----
+  - type: web
+    name: markettrace-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    buildCommand: pip install .
+    # Apply migrations on each boot (idempotent), then serve.
+    startCommand: alembic upgrade head && uvicorn markettrace.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: markettrace-db
+          property: connectionString   # postgres:// -> normalized to +psycopg in config.py
+      - key: LLM_PROVIDER
+        value: openai
+      - key: EXTRACTION_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_API_KEY
+        sync: false                     # set in Render dashboard; never committed
+      - key: SEC_USER_AGENT
+        value: "MarketTrace gimg10737@gmail.com"
+      - key: OBJECT_STORE_DIR
+        value: /tmp/objectstore         # ephemeral; fine for the read API
+      - key: CORS_ALLOW_ORIGINS
+        value: https://markettrace-web.onrender.com
+
+  # ---- Next.js web frontend ----
+  - type: web
+    name: markettrace-web
+    runtime: node
+    rootDir: web
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      # NEXT_PUBLIC_* is baked at BUILD time; Render provides it during build.
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://markettrace-backend.onrender.com

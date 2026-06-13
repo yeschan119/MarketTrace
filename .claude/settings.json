@@ -1,0 +1,44 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(ping *)",
+      "PowerShell(Get-Content *)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git branch:*)",
+      "Bash(git tag:*)",
+      "Bash(git stash:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose down:*)",
+      "Bash(docker compose stop:*)",
+      "Bash(docker compose restart:*)",
+      "Bash(docker compose rm:*)",
+      "Bash(docker compose build:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "oh-my-claudecode@omc": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/danger-guard.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

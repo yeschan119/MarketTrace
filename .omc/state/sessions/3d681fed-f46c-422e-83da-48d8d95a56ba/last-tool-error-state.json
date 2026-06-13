@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/data/MarketTrace/web && npx tsc --noEmit 2>&1\",\"timeout\":60000,\"description\":\"TypeScript type-check after tooltip fixes\"}",
+  "error": "Exit code 2\nsrc/components/AbnormalReturnChart.tsx(51,13): error TS2322: Type '(value: number | string | undefined, name: string | number) => [string, string]' is not assignable to type 'Formatter<ValueType, NameType> & ((value: ValueType, name: NameType, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => ReactNode | [...])'.\n  Type '(value: number | string | undefined, name: string | number) => [string, string]' is not assignable to type 'Formatter<ValueType, NameType>'.\n    ...",
+  "timestamp": "2026-06-12T13:13:20.453Z",
+  "retry_count": 4
+}

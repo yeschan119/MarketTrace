@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "entries": {
+    "466399dafa2d20f60587180bad0a07358eb7f2bce724df0ff682f038ad33f5ad": {
+      "last_emitted_at_ms": 1781271682958,
+      "message": "Read multiple files in parallel when possible for faster analysis."
+    },
+    "808cb04420bcb368ab4716038ddd950b51198d0402b6cf8e965d66ca42ebccbe": {
+      "last_emitted_at_ms": 1781271398923,
+      "message": "[SLOP WARNING] Detected fallback/workaround language in this tool input. Do not make potential slop: avoid ad-hoc fallback layers, workaround shims, or environment-specific patches unless explicitly justified. For architecture concerns, consult the architect for a concrete design first. If this seems environment-specific, ask the user to confirm constraints before proceeding.\n\nVerify changes work after editing. Test functionality before marking complete."
+    },
+    "445ed27a3872b681d98190bae61ccb84954e1bc4e140df5370be958dee776b3a": {
+      "last_emitted_at_ms": 1781271366449,
+      "message": "Verify changes work after editing. Test functionality before marking complete."
+    },
+    "79a93d4a2f8f50b95f852280616242fee1855dc99a3c75211917f55e72e95fae": {
+      "last_emitted_at_ms": 1781271306452,
+      "message": "Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests)."
+    },
+    "8aea2cd54dcea7b148296047482608f3bfc6bce4c20e186977805ed747e8cdf3": {
+      "last_emitted_at_ms": 1781270897192,
+      "message": "Spawning agent: oh-my-claudecode:executor (opus) | Task: Vertical slice pipeline integration"
+    },
+    "e05a2742af2a4fe5fd841893f08e39c6f9a9aa32be217a2d12dcb43d694a4c76": {
+      "last_emitted_at_ms": 1781270585804,
+      "message": "Spawning agent: oh-my-claudecode:executor (sonnet) | Task: FastAPI read endpoints"
+    },
+    "88b140a574a108307c95f9c8d07a6dfdea93951e1e3babddadd7a2a8c9646e4f": {
+      "last_emitted_at_ms": 1781270568615,
+      "message": "[SLOP WARNING] Detected fallback/workaround language in this tool input. Do not make potential slop: avoid ad-hoc fallback layers, workaround shims, or environment-specific patches unless explicitly justified. For architecture concerns, consult the architect for a concrete design first. If this seems environment-specific, ask the user to confirm constraints before proceeding.\n\nSpawning agent: oh-my-claudecode:executor (sonnet) | Task: Impact returns layer"
+    },
+    "ffbae3cba674746c1d26d31b9dd89965666b11a87d57c091a59f1cdf47a0f7b3": {
+      "last_emitted_at_ms": 1781270553904,
+      "message": "Spawning agent: oh-my-claudecode:executor (sonnet) | Task: NLP event extraction layer"
+    },
+    "60031e63d67d4ae424971be0e038c8594c0d942b51d7068d7abc1083cc6d6b8b": {
+      "last_emitted_at_ms": 1781270533391,
+      "message": "Spawning agent: oh-my-claudecode:executor (sonnet) | Task: Providers and ingest layer"
+    }
+  },
+  "updated_at": "2026-06-12T13:41:22.958Z"
+}

@@ -1,0 +1,232 @@
+"""Integration test for the vertical-slice pipeline.
+
+Runs entirely on in-memory SQLite with fakes — no network, no Anthropic API
+key. Synthetic price frames are constructed so the D+1/5/20 raw, market, and
+abnormal returns are known exact numbers (positional row offsets).
+
+Synthetic design
+----------------
+Both stock and market frames have 30 rows over consecutive calendar days.
+The event sits at row 5 (its date is the document's ``published_at.date()``).
+Positional offsets from row 5: +1 -> row 6, +5 -> row 10, +20 -> row 25.
+
+  Stock adj_close:  row5=100, row6=103, row10=115, row25=140
+    raw: 1d=0.03, 5d=0.15, 20d=0.40
+  Market adj_close: row5=200, row6=202, row10=210, row25=220
+    mkt: 1d=0.01, 5d=0.05, 20d=0.10
+  Abnormal: 1d=0.02, 5d=0.10, 20d=0.30
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime, timedelta
+
+import polars as pl
+import pytest
+
+from markettrace.db.models import Document, Event, Instrument, ModelRun, Outcome
+from markettrace.nlp.schemas import EventExtraction
+from markettrace.pipeline.vertical_slice import SliceResult, run_slice
+from markettrace.providers.base import DocumentRef, RawDocument
+
+_BASE_DATE = date(2024, 1, 2)  # one calendar day per row
+_EVENT_ROW = 5
+_EVENT_DATE = _BASE_DATE + timedelta(days=_EVENT_ROW)
+_PUBLISHED_AT = datetime(
+    _EVENT_DATE.year, _EVENT_DATE.month, _EVENT_DATE.day, tzinfo=UTC
+)
+
+_DISCLOSURE_TEXT = (
+    "Apple Inc. reported quarterly results that beat analyst expectations, "
+    "driven by strong iPhone demand. Management raised guidance for the year."
+)
+
+
+def _build_price_frame(overrides: dict[int, float]) -> pl.DataFrame:
+    """30-row OHLCV frame; ``overrides`` sets adj_close at given row indices."""
+    n = 30
+    closes = [50.0] * n
+    for idx, value in overrides.items():
+        closes[idx] = value
+    dates = [_BASE_DATE + timedelta(days=i) for i in range(n)]
+    return pl.DataFrame(
+        {
+            "date": dates,
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "adj_close": closes,
+            "volume": [1_000_000.0] * n,
+        }
+    )
+
+
+_STOCK_FRAME = _build_price_frame({5: 100.0, 6: 103.0, 10: 115.0, 25: 140.0})
+_MARKET_FRAME = _build_price_frame({5: 200.0, 6: 202.0, 10: 210.0, 25: 220.0})
+
+
+class _FakeDisclosureProvider:
+    market = "US"
+
+    def fetch_raw(self, ref: DocumentRef) -> RawDocument:
+        return RawDocument(
+            ref=ref,
+            content=_DISCLOSURE_TEXT,
+            fetched_at=datetime.now(UTC),
+        )
+
+
+class _FakePriceProvider:
+    market = "US"
+
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        if ticker.lower() == "spy":
+            return _MARKET_FRAME.clone()
+        return _STOCK_FRAME.clone()
+
+
+class _FakeExtractor:
+    model = "claude-sonnet-4-6"
+
+    def extract(self, text: str, *, source_reliability: float | None = None):
+        event = EventExtraction(
+            event_type="earnings_beat",
+            entities=["AAPL"],
+            industries=["Technology"],
+            channels=["earnings", "sentiment"],
+            direction="positive",
+            horizon_days=5,
+            surprise_score=0.8,
+            novelty_score=0.3,
+            source_reliability=source_reliability,
+            confidence=0.9,
+            evidence=[
+                "Apple Inc. reported quarterly results that beat analyst expectations.",
+                "Management raised guidance for the year.",
+            ],
+        )
+        return event, "claude-sonnet-4-6-20260101"
+
+
+def _make_ref() -> DocumentRef:
+    return DocumentRef(
+        source="sec_edgar",
+        external_id="0000320193-24-000001",
+        url="https://www.sec.gov/Archives/edgar/data/320193/aapl_10q.html",
+        market="US",
+        published_at=_PUBLISHED_AT,
+        title="10-Q",
+        primary_ticker="AAPL",
+    )
+
+
+def _seed_instrument(session) -> Instrument:
+    instrument = Instrument(market="US", ticker="AAPL", name="Apple Inc.")
+    session.add(instrument)
+    session.commit()
+    return instrument
+
+
+def test_run_slice_end_to_end(db_session, tmp_object_store) -> None:
+    instrument = _seed_instrument(db_session)
+
+    result = run_slice(
+        db_session,
+        tmp_object_store,
+        ref=_make_ref(),
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakePriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+        horizons=(1, 5, 20),
+    )
+
+    assert isinstance(result, SliceResult)
+    assert result.instrument_id == instrument.id
+
+    # --- exactly one Document ---
+    documents = db_session.query(Document).all()
+    assert len(documents) == 1
+    assert documents[0].id == result.document_id
+
+    # --- exactly one Event, fields round-tripped ---
+    events = db_session.query(Event).all()
+    assert len(events) == 1
+    event = events[0]
+    assert event.id == result.event_id
+    assert event.primary_instrument_id == instrument.id
+    assert event.event_type == "earnings_beat"
+    assert event.entities == ["AAPL"]
+    assert event.evidence == [
+        "Apple Inc. reported quarterly results that beat analyst expectations.",
+        "Management raised guidance for the year.",
+    ]
+    assert event.model == "claude-sonnet-4-6"
+    assert event.model_version == "claude-sonnet-4-6-20260101"
+
+    # --- three Outcomes with known abnormal returns ---
+    outcomes = (
+        db_session.query(Outcome).order_by(Outcome.horizon_days).all()
+    )
+    assert [o.horizon_days for o in outcomes] == [1, 5, 20]
+    for o in outcomes:
+        assert o.event_id == event.id
+        assert o.instrument_id == instrument.id
+
+    by_h = {o.horizon_days: o for o in outcomes}
+    assert by_h[1].raw_return == pytest.approx(0.03)
+    assert by_h[1].market_return == pytest.approx(0.01)
+    assert by_h[1].abnormal_return == pytest.approx(0.02)
+    assert by_h[5].raw_return == pytest.approx(0.15)
+    assert by_h[5].market_return == pytest.approx(0.05)
+    assert by_h[5].abnormal_return == pytest.approx(0.10)
+    assert by_h[20].raw_return == pytest.approx(0.40)
+    assert by_h[20].market_return == pytest.approx(0.10)
+    assert by_h[20].abnormal_return == pytest.approx(0.30)
+
+    # SliceResult carries the same outcomes.
+    assert {o.horizon_days for o in result.outcomes} == {1, 5, 20}
+
+    # --- exactly one ModelRun(kind="vertical_slice") ---
+    model_runs = db_session.query(ModelRun).all()
+    assert len(model_runs) == 1
+    assert model_runs[0].kind == "vertical_slice"
+    assert model_runs[0].params == {"ticker": "AAPL", "horizons": [1, 5, 20]}
+
+
+def test_run_slice_unresolvable_ticker_raises(db_session, tmp_object_store) -> None:
+    _seed_instrument(db_session)
+
+    with pytest.raises(ValueError):
+        run_slice(
+            db_session,
+            tmp_object_store,
+            ref=_make_ref(),
+            disclosure_provider=_FakeDisclosureProvider(),
+            price_provider=_FakePriceProvider(),
+            extractor=_FakeExtractor(),
+            ticker="ZZZZ",  # not seeded -> unresolvable
+        )
+
+
+def test_run_slice_dedups_document_on_rerun(db_session, tmp_object_store) -> None:
+    """Re-running fetch+ingest of identical content must not duplicate the Document."""
+    _seed_instrument(db_session)
+
+    ref = _make_ref()
+    kwargs = dict(
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakePriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+    )
+
+    first = run_slice(db_session, tmp_object_store, ref=ref, **kwargs)
+    second = run_slice(db_session, tmp_object_store, ref=ref, **kwargs)
+
+    # Same content -> deduped to a single Document row.
+    assert db_session.query(Document).count() == 1
+    assert second.document_id == first.document_id

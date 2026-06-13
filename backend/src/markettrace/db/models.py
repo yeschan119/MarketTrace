@@ -1,0 +1,154 @@
+"""SQLAlchemy 2.0 declarative models.
+
+These table and column names are the integration contract that the
+ingest / nlp / impact / api modules depend on. JSON columns use
+``sqlalchemy.JSON`` so they map to ``jsonb`` on PostgreSQL and ``JSON``
+on SQLite, keeping the models portable for tests. All timestamps are
+timezone-aware.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    JSON,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    """Declarative base for all MarketTrace ORM models."""
+
+
+class Instrument(Base):
+    __tablename__ = "instruments"
+    __table_args__ = (UniqueConstraint("market", "ticker", name="uq_instruments_market_ticker"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market: Mapped[str] = mapped_column(String, nullable=False)
+    ticker: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    industry: Mapped[str | None] = mapped_column(String, nullable=True)
+    listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    aliases: Mapped[list[EntityAlias]] = relationship(
+        back_populates="instrument", cascade="all, delete-orphan"
+    )
+    prices: Mapped[list[Price]] = relationship(
+        back_populates="instrument", cascade="all, delete-orphan"
+    )
+
+
+class EntityAlias(Base):
+    __tablename__ = "entity_aliases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(
+        ForeignKey("instruments.id"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(String, nullable=False)
+    alias_type: Mapped[str] = mapped_column(String, nullable=False)
+
+    instrument: Mapped[Instrument] = relationship(back_populates="aliases")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    external_id: Mapped[str] = mapped_column(String, nullable=False)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_object_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    market: Mapped[str] = mapped_column(String, nullable=False)
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DocumentEntity(Base):
+    __tablename__ = "document_entities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
+    primary_instrument_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instruments.id"), nullable=True
+    )
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    entities: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    industries: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    channels: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    direction: Mapped[str] = mapped_column(String, nullable=False)
+    horizon_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    surprise_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    novelty_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source_reliability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    evidence: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    model: Mapped[str] = mapped_column(String, nullable=False)
+    model_version: Mapped[str] = mapped_column(String, nullable=False)
+    analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    primary_instrument: Mapped[Instrument | None] = relationship()
+
+
+class Price(Base):
+    __tablename__ = "prices"
+    __table_args__ = (
+        UniqueConstraint("instrument_id", "date", name="uq_prices_instrument_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    open: Mapped[float] = mapped_column(Float, nullable=False)
+    high: Mapped[float] = mapped_column(Float, nullable=False)
+    low: Mapped[float] = mapped_column(Float, nullable=False)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    adj_close: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[float] = mapped_column(Float, nullable=False)
+
+    instrument: Mapped[Instrument] = relationship(back_populates="prices")
+
+
+class Outcome(Base):
+    __tablename__ = "outcomes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    horizon_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    market_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ModelRun(Base):
+    __tablename__ = "model_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    params: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    data_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "entries": {
+    "79a93d4a2f8f50b95f852280616242fee1855dc99a3c75211917f55e72e95fae": {
+      "last_emitted_at_ms": 1781271533757,
+      "message": "Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests)."
+    },
+    "445ed27a3872b681d98190bae61ccb84954e1bc4e140df5370be958dee776b3a": {
+      "last_emitted_at_ms": 1781270221905,
+      "message": "Verify changes work after editing. Test functionality before marking complete."
+    },
+    "3347dd20339f5605b0735513337e7c5dbeab469f875b5ecd9136238e08200817": {
+      "last_emitted_at_ms": 1781269561706,
+      "message": "Spawning agent: oh-my-claudecode:executor (sonnet) | Task: Next.js frontend scaffold"
+    },
+    "466399dafa2d20f60587180bad0a07358eb7f2bce724df0ff682f038ad33f5ad": {
+      "last_emitted_at_ms": 1781269546603,
+      "message": "Read multiple files in parallel when possible for faster analysis."
+    },
+    "4be082d2a3e18b77ac57b35aadee5c3a81ccc953c86e43120f4fc64433e848cf": {
+      "last_emitted_at_ms": 1781269542153,
+      "message": "[SLOP WARNING] Detected fallback/workaround language in this tool input. Do not make potential slop: avoid ad-hoc fallback layers, workaround shims, or environment-specific patches unless explicitly justified. For architecture concerns, consult the architect for a concrete design first. If this seems environment-specific, ask the user to confirm constraints before proceeding.\n\nSpawning agent: oh-my-claudecode:executor (opus) | Task: Backend foundation scaffold"
+    }
+  },
+  "updated_at": "2026-06-12T13:38:53.757Z"
+}
