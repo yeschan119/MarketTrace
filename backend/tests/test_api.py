@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from markettrace.api.deps import get_db
 from markettrace.api.main import create_app
-from markettrace.db.models import Base, Document, Event, Instrument, Outcome
+from markettrace.db.models import Base, Document, Event, EventImpact, Instrument, Outcome
 
 
 def _now() -> datetime:
@@ -191,3 +191,45 @@ def test_instrument_timeline(client: TestClient, seeded: dict) -> None:
 def test_instrument_timeline_404(client: TestClient) -> None:
     resp = client.get("/instruments/99999/timeline")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /stats/event-types
+# ---------------------------------------------------------------------------
+
+
+def test_event_type_stats_empty(client: TestClient) -> None:
+    resp = client.get("/stats/event-types")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_event_type_stats_aggregates(client: TestClient, seeded: dict, ts_session: Session) -> None:
+    instrument_id = seeded["instrument_id"]
+    # Two impacts in the same (event_type, horizon) bucket but distinct events
+    # (the table is unique on event_id + horizon_days).
+    for ev_id, ar in ((seeded["event_id"], 0.02), (seeded["event_id"] + 1000, 0.04)):
+        ts_session.add(
+            EventImpact(
+                event_id=ev_id,
+                instrument_id=instrument_id,
+                event_type="earnings",
+                industry="Technology",
+                direction="positive",
+                horizon_days=1,
+                abnormal_return=ar,
+                signed_abnormal_return=ar,
+                computed_at=_now(),
+            )
+        )
+    ts_session.flush()
+
+    resp = client.get("/stats/event-types")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    row = data[0]
+    assert row["event_type"] == "earnings"
+    assert row["horizon_days"] == 1
+    assert row["count"] == 2
+    assert row["mean_abnormal_return"] == pytest.approx(0.03)

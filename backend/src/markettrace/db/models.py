@@ -141,6 +141,37 @@ class Outcome(Base):
     raw_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     market_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sector_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sector_abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EventImpact(Base):
+    """Per-event, per-horizon impact score linking an event to its instrument.
+
+    Sits one layer above :class:`Outcome`: it folds the raw/abnormal returns
+    together with the event's stated ``direction`` into a *directional* impact
+    figure (``signed_abnormal_return``), so a positive-direction event followed
+    by outperformance reads as a *confirmed* positive impact and the opposite as
+    a *contradicted* one. ``industry`` snapshots the instrument's sector at
+    analysis time for sector-level aggregation.
+    """
+
+    __tablename__ = "event_impacts"
+    __table_args__ = (
+        UniqueConstraint("event_id", "horizon_days", name="uq_event_impacts_event_horizon"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    industry: Mapped[str | None] = mapped_column(String, nullable=True)
+    direction: Mapped[str] = mapped_column(String, nullable=False)
+    horizon_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sector_abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    signed_abnormal_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

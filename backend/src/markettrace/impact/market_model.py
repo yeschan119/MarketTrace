@@ -31,3 +31,32 @@ def abnormal_return(stock_return: float, market_return: float) -> float:
         outperformance relative to the market.
     """
     return stock_return - market_return
+
+
+def sector_adjusted_return(stock_return: float, sector_return: float) -> float:
+    """Return the industry/sector-adjusted abnormal return.
+
+    Same beta = 1 assumption as :func:`abnormal_return`, but benchmarked
+    against a sector index (e.g. a semiconductor ETF) instead of the broad
+    market::
+
+        AR_sector = R_stock - R_sector
+
+    Subtracting the sector return strips out moves common to the whole
+    industry, isolating the stock's idiosyncratic reaction to the event.
+    A two-factor (market + sector) decomposition reduces to this pure
+    sector-relative figure, so it is exposed as its own function.
+
+    Parameters
+    ----------
+    stock_return:
+        Cumulative simple return of the stock over the horizon.
+    sector_return:
+        Cumulative return of the sector benchmark over the same horizon.
+
+    Returns
+    -------
+    float
+        ``stock_return - sector_return``.
+    """
+    return stock_return - sector_return

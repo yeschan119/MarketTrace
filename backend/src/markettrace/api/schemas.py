@@ -23,6 +23,8 @@ class OutcomeOut(BaseModel):
     raw_return: float | None
     market_return: float | None
     abnormal_return: float | None
+    sector_return: float | None = None
+    sector_abnormal_return: float | None = None
 
 
 class EventSummary(BaseModel):
@@ -71,3 +73,13 @@ class InstrumentTimeline(BaseModel):
 
     instrument: InstrumentOut
     events: list[EventSummary]
+
+
+class EventTypeStatOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type: str
+    horizon_days: int
+    count: int
+    mean_abnormal_return: float | None
+    std_abnormal_return: float | None

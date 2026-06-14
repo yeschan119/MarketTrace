@@ -24,7 +24,7 @@ from datetime import UTC, date, datetime, timedelta
 import polars as pl
 import pytest
 
-from markettrace.db.models import Document, Event, Instrument, ModelRun, Outcome
+from markettrace.db.models import Document, Event, EventImpact, Instrument, ModelRun, Outcome
 from markettrace.nlp.schemas import EventExtraction
 from markettrace.pipeline.vertical_slice import SliceResult, run_slice
 from markettrace.providers.base import DocumentRef, RawDocument
@@ -189,11 +189,69 @@ def test_run_slice_end_to_end(db_session, tmp_object_store) -> None:
     # SliceResult carries the same outcomes.
     assert {o.horizon_days for o in result.outcomes} == {1, 5, 20}
 
+    # --- one EventImpact per horizon, directional sign applied ---
+    impacts = db_session.query(EventImpact).order_by(EventImpact.horizon_days).all()
+    assert [i.horizon_days for i in impacts] == [1, 5, 20]
+    assert all(i.event_id == event.id and i.event_type == "earnings_beat" for i in impacts)
+    # positive direction + positive abnormal return -> positive signed impact
+    by_h_imp = {i.horizon_days: i for i in impacts}
+    assert by_h_imp[1].signed_abnormal_return == pytest.approx(0.02)
+    assert by_h_imp[20].signed_abnormal_return == pytest.approx(0.30)
+
     # --- exactly one ModelRun(kind="vertical_slice") ---
     model_runs = db_session.query(ModelRun).all()
     assert len(model_runs) == 1
     assert model_runs[0].kind == "vertical_slice"
-    assert model_runs[0].params == {"ticker": "AAPL", "horizons": [1, 5, 20]}
+    assert model_runs[0].params == {
+        "ticker": "AAPL",
+        "horizons": [1, 5, 20],
+        "sector_index_ticker": None,
+    }
+
+
+class _FakeSectorPriceProvider:
+    """Returns a distinct sector frame for XLK, market frame for spy, else stock."""
+
+    market = "US"
+
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        t = ticker.lower()
+        if t == "spy":
+            return _MARKET_FRAME.clone()
+        if t == "xlk":
+            # sector index: row5=300, row6=306 -> 1d sector return = 0.02
+            return _build_price_frame({5: 300.0, 6: 306.0, 10: 330.0, 25: 360.0})
+        return _STOCK_FRAME.clone()
+
+
+def test_run_slice_auto_resolves_sector_from_industry(db_session, tmp_object_store) -> None:
+    """An instrument with a mapped industry gets sector-adjusted outcomes."""
+    instrument = Instrument(
+        market="US", ticker="AAPL", name="Apple Inc.", industry="Technology"
+    )
+    db_session.add(instrument)
+    db_session.commit()
+
+    run_slice(
+        db_session,
+        tmp_object_store,
+        ref=_make_ref(),
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakeSectorPriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+        horizons=(1,),
+    )
+
+    outcome = db_session.query(Outcome).filter(Outcome.horizon_days == 1).one()
+    # stock 1d raw = 0.03, sector (XLK) 1d = 0.02 -> sector abnormal = 0.01
+    assert outcome.sector_return == pytest.approx(0.02)
+    assert outcome.sector_abnormal_return == pytest.approx(0.01)
+
+    # provenance records the auto-resolved sector ticker
+    run = db_session.query(ModelRun).one()
+    assert run.params["sector_index_ticker"] == "XLK"
 
 
 def test_run_slice_unresolvable_ticker_raises(db_session, tmp_object_store) -> None:

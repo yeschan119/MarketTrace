@@ -11,11 +11,13 @@ from markettrace.api.schemas import (
     DocumentOut,
     EventDetail,
     EventSummary,
+    EventTypeStatOut,
     InstrumentOut,
     InstrumentTimeline,
     OutcomeOut,
 )
 from markettrace.db.models import Document, Event, Instrument, Outcome
+from markettrace.impact.statistics import compute_event_type_statistics
 
 router = APIRouter()
 
@@ -105,3 +107,10 @@ def get_instrument_timeline(
         instrument=InstrumentOut.model_validate(instrument),
         events=[_event_summary(event, doc) for event, doc in rows],
     )
+
+
+@router.get("/stats/event-types", response_model=list[EventTypeStatOut])
+def get_event_type_stats(db: Session = Depends(get_db)) -> list[EventTypeStatOut]:
+    """Mean and dispersion of abnormal returns per (event_type, horizon)."""
+    stats = compute_event_type_statistics(db)
+    return [EventTypeStatOut.model_validate(s) for s in stats]

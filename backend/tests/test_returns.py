@@ -256,6 +256,45 @@ def test_outcome_result_is_frozen() -> None:
 
 
 def test_compute_event_outcomes_default_horizons() -> None:
-    """Default horizons are (1, 5, 20)."""
+    """Default horizons are (1, 5, 20, 60)."""
     outcomes = compute_event_outcomes(_STOCK, _MARKET, _EVENT_DATE)
-    assert [o.horizon_days for o in outcomes] == [1, 5, 20]
+    assert [o.horizon_days for o in outcomes] == [1, 5, 20, 60]
+
+
+def test_compute_event_outcomes_60d_out_of_range_is_none() -> None:
+    """The 30-row synthetic frame cannot reach a 60-day horizon -> None fields."""
+    outcomes = compute_event_outcomes(_STOCK, _MARKET, _EVENT_DATE, horizons=(60,))
+    o = outcomes[0]
+    assert o.horizon_days == 60
+    assert o.raw_return is None
+    assert o.abnormal_return is None
+
+
+def test_compute_event_outcomes_sector_none_by_default() -> None:
+    """Without sector_prices, sector fields stay None."""
+    outcomes = compute_event_outcomes(_STOCK, _MARKET, _EVENT_DATE, horizons=(1,))
+    o = outcomes[0]
+    assert o.sector_return is None
+    assert o.sector_abnormal_return is None
+
+
+def test_compute_event_outcomes_sector_adjusted_values() -> None:
+    """With a sector frame, sector_abnormal_return = raw - sector."""
+    # Sector index: row 5 -> 300.0, row 6 -> 306.0  => 1d sector return = 0.02
+    n = 30
+    sector_closes = [250.0] * n
+    sector_closes[5] = 300.0
+    sector_closes[6] = 306.0
+    sector_df = pl.DataFrame(
+        {"date": [_make_date(i) for i in range(n)], "adj_close": sector_closes}
+    )
+    outcomes = compute_event_outcomes(
+        _STOCK, _MARKET, _EVENT_DATE, horizons=(1,), sector_prices=sector_df
+    )
+    o = outcomes[0]
+    # raw 1d = 0.03, sector 1d = 0.02  => sector abnormal = 0.01
+    assert o.raw_return == pytest.approx(0.03)
+    assert o.sector_return == pytest.approx(0.02)
+    assert o.sector_abnormal_return == pytest.approx(0.01)
+    # market-adjusted figure is unchanged by the sector input
+    assert o.abnormal_return == pytest.approx(0.02)

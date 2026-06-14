@@ -36,12 +36,21 @@ class OutcomeResult:
     abnormal_return:
         ``raw_return - market_return`` (market-adjusted model, beta = 1).
         ``None`` when either component is ``None``.
+    sector_return:
+        Cumulative simple return of the sector/industry benchmark over the
+        same window, or ``None`` when no sector benchmark was supplied or its
+        data is unavailable.
+    sector_abnormal_return:
+        ``raw_return - sector_return`` (industry-adjusted model, beta = 1).
+        ``None`` when either component is ``None``.
     """
 
     horizon_days: int
     raw_return: float | None
     market_return: float | None
     abnormal_return: float | None
+    sector_return: float | None = None
+    sector_abnormal_return: float | None = None
 
 
 def cumulative_return(
@@ -100,10 +109,11 @@ def compute_event_outcomes(
     stock_prices: pl.DataFrame,
     market_prices: pl.DataFrame,
     event_date: date,
-    horizons: tuple[int, ...] = (1, 5, 20),
+    horizons: tuple[int, ...] = (1, 5, 20, 60),
     price_col: str = "adj_close",
+    sector_prices: pl.DataFrame | None = None,
 ) -> list[OutcomeResult]:
-    """Compute market-adjusted abnormal returns for each horizon.
+    """Compute market- (and optionally sector-) adjusted returns per horizon.
 
     For each horizon ``h`` in *horizons*:
 
@@ -113,6 +123,10 @@ def compute_event_outcomes(
     3. ``abnormal_return`` = ``raw_return - market_return`` (market-adjusted
        model).  If either component is ``None``, ``abnormal_return`` is also
        ``None``.
+    4. When *sector_prices* is provided, ``sector_return`` is computed the same
+       way and ``sector_abnormal_return`` = ``raw_return - sector_return``.
+       Both stay ``None`` when *sector_prices* is ``None`` or its data is
+       unavailable for a horizon.
 
     Parameters
     ----------
@@ -123,9 +137,12 @@ def compute_event_outcomes(
     event_date:
         The event close date (baseline row ``t0``).
     horizons:
-        Tuple of trading-day horizons to evaluate (default ``(1, 5, 20)``).
+        Tuple of trading-day horizons to evaluate (default ``(1, 5, 20, 60)``).
     price_col:
-        Price column name used in both DataFrames (default ``"adj_close"``).
+        Price column name used in all DataFrames (default ``"adj_close"``).
+    sector_prices:
+        Optional price DataFrame for the sector/industry benchmark. When
+        ``None``, sector fields are left ``None``.
 
     Returns
     -------
@@ -143,12 +160,21 @@ def compute_event_outcomes(
         else:
             ar = market_model.abnormal_return(raw, mkt)
 
+        sec: float | None = None
+        sec_ar: float | None = None
+        if sector_prices is not None:
+            sec = cumulative_return(sector_prices, event_date, h, price_col)
+            if raw is not None and sec is not None:
+                sec_ar = market_model.sector_adjusted_return(raw, sec)
+
         results.append(
             OutcomeResult(
                 horizon_days=h,
                 raw_return=raw,
                 market_return=mkt,
                 abnormal_return=ar,
+                sector_return=sec,
+                sector_abnormal_return=sec_ar,
             )
         )
 

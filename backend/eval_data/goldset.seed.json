@@ -1,0 +1,38 @@
+[
+  {
+    "id": "us-aapl-earnings-beat",
+    "text": "Apple Inc. today announced financial results for its fiscal fourth quarter, posting record revenue of $94.9 billion, up 8 percent year over year and ahead of analyst expectations. Earnings per share of $1.46 beat the consensus estimate of $1.39.",
+    "gold_event_type": "earnings_beat",
+    "gold_entities": ["AAPL"]
+  },
+  {
+    "id": "us-aapl-product-launch",
+    "text": "Apple today unveiled iPhone 16, introducing a new camera system and the A18 chip. The new lineup goes on sale next week and represents the company's most significant hardware update in years.",
+    "gold_event_type": "product_launch",
+    "gold_entities": ["AAPL"]
+  },
+  {
+    "id": "us-buyback",
+    "text": "The Board of Directors of Microsoft Corporation has authorized a new share repurchase program of up to $60 billion of the company's common stock. The buyback has no expiration date and may be suspended at any time.",
+    "gold_event_type": "buyback",
+    "gold_entities": ["MSFT"]
+  },
+  {
+    "id": "us-dividend",
+    "text": "Johnson & Johnson announced that its Board of Directors declared a quarterly dividend of $1.24 per share on the company's common stock, an increase of 4.2 percent from the prior quarterly dividend.",
+    "gold_event_type": "dividend",
+    "gold_entities": ["JNJ"]
+  },
+  {
+    "id": "kr-samsung-guidance",
+    "text": "Samsung Electronics provided guidance that second-quarter operating profit is expected to decline sharply due to weak memory chip demand and falling DRAM prices, falling short of market consensus.",
+    "gold_event_type": "guidance_cut",
+    "gold_entities": ["005930"]
+  },
+  {
+    "id": "us-lawsuit",
+    "text": "A federal jury found that the company willfully infringed three patents and ordered it to pay $300 million in damages. The company said it strongly disagrees with the verdict and plans to appeal.",
+    "gold_event_type": "lawsuit",
+    "gold_entities": []
+  }
+]

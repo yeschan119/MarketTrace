@@ -12,18 +12,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+
 from markettrace.db.models import Event, ModelRun, Outcome
+from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult, compute_event_outcomes
+from markettrace.impact.sector_index import resolve_sector_index
 from markettrace.ingest.disclosures import ingest_document
 from markettrace.ingest.prices import ingest_prices
 from markettrace.nlp.entity_linker import link_entities, resolve_instrument
+from markettrace.nlp.novelty import novelty_score
 from markettrace.providers.base import DocumentRef
 
 __all__ = ["SliceResult", "run_slice", "main"]
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
 
@@ -48,7 +56,8 @@ def run_slice(
     extractor,
     ticker: str,
     market_index_ticker: str = "spy",
-    horizons: tuple[int, ...] = (1, 5, 20),
+    sector_index_ticker: str | None = None,
+    horizons: tuple[int, ...] = (1, 5, 20, 60),
 ) -> SliceResult:
     """Run the end-to-end vertical slice for a single disclosure ``ref``.
 
@@ -84,6 +93,13 @@ def run_slice(
     )
 
     # --- d. persist event (impact hypothesis) ---
+    # Fall back to a computed novelty score when the extractor leaves it null:
+    # compare this disclosure against prior events' evidence for the same
+    # instrument so a rehash of an already-recorded story scores low.
+    resolved_novelty = event_extraction.novelty_score
+    if resolved_novelty is None:
+        resolved_novelty = _compute_prior_novelty(session, instrument.id, raw.content)
+
     model_id = getattr(extractor, "model", None) or _DEFAULT_MODEL
     event = Event(
         document_id=document.id,
@@ -95,7 +111,7 @@ def run_slice(
         direction=event_extraction.direction,
         horizon_days=event_extraction.horizon_days,
         surprise_score=event_extraction.surprise_score,
-        novelty_score=event_extraction.novelty_score,
+        novelty_score=resolved_novelty,
         source_reliability=event_extraction.source_reliability,
         confidence=event_extraction.confidence,
         evidence=event_extraction.evidence,
@@ -106,18 +122,44 @@ def run_slice(
     session.add(event)
     session.flush()
 
-    # --- e. fetch price window for stock + market index ---
+    # --- e. fetch price window for stock + market (+ optional sector) index ---
     event_date = document.published_at.date()
     window_start = event_date - timedelta(days=5)
-    window_end = event_date + timedelta(days=40)
+    # Cover the longest horizon with slack for weekends/holidays: a 60 trading-day
+    # horizon spans ~84 calendar days, so reserve well beyond that.
+    max_horizon = max(horizons)
+    window_end = event_date + timedelta(days=max_horizon * 2 + 15)
 
     stock_df = price_provider.get_ohlcv(ticker, window_start, window_end)
     market_df = price_provider.get_ohlcv(market_index_ticker, window_start, window_end)
 
+    # Auto-resolve a sector benchmark from the instrument's industry unless the
+    # caller passed one explicitly. The sector-adjusted figure is supplementary,
+    # so a missing mapping or a failed fetch degrades to market-adjusted only and
+    # never aborts the slice.
+    if sector_index_ticker is None:
+        sector_index_ticker = resolve_sector_index(ref.market, instrument.industry)
+
+    sector_df = None
+    if sector_index_ticker is not None:
+        try:
+            sector_df = price_provider.get_ohlcv(
+                sector_index_ticker, window_start, window_end
+            )
+        except Exception:  # noqa: BLE001 - sector data is optional; keep the core result
+            logger.warning(
+                "sector benchmark %s fetch failed; falling back to market-adjusted only",
+                sector_index_ticker,
+                exc_info=True,
+            )
+            sector_df = None
+
     ingest_prices(session, instrument.id, stock_df)
 
     # --- f. compute + persist outcomes ---
-    outcomes = compute_event_outcomes(stock_df, market_df, event_date, horizons)
+    outcomes = compute_event_outcomes(
+        stock_df, market_df, event_date, horizons, sector_prices=sector_df
+    )
     for result in outcomes:
         session.add(
             Outcome(
@@ -127,15 +169,27 @@ def run_slice(
                 raw_return=result.raw_return,
                 market_return=result.market_return,
                 abnormal_return=result.abnormal_return,
+                sector_return=result.sector_return,
+                sector_abnormal_return=result.sector_abnormal_return,
                 computed_at=now,
             )
         )
+
+    # --- f2. persist per-event directional impact scores ---
+    for impact in build_event_impacts(
+        event, outcomes, industry=instrument.industry, computed_at=now
+    ):
+        session.add(impact)
 
     # --- g. record provenance ---
     session.add(
         ModelRun(
             kind="vertical_slice",
-            params={"ticker": ticker, "horizons": list(horizons)},
+            params={
+                "ticker": ticker,
+                "horizons": list(horizons),
+                "sector_index_ticker": sector_index_ticker,
+            },
             data_version=None,
             created_at=now,
         )
@@ -150,6 +204,25 @@ def run_slice(
         instrument_id=instrument.id,
         outcomes=outcomes,
     )
+
+
+def _compute_prior_novelty(session, instrument_id: int, candidate_text: str) -> float:
+    """Novelty of *candidate_text* vs. prior events' evidence for an instrument.
+
+    Returns ``1.0`` when there is no prior event on record for the instrument
+    (fully novel), otherwise ``1.0 - max Jaccard similarity`` against the
+    concatenated evidence sentences of each prior event.
+    """
+    rows = session.execute(
+        select(Event.evidence).where(Event.primary_instrument_id == instrument_id)
+    ).all()
+
+    prior_texts: list[str] = []
+    for (evidence,) in rows:
+        if evidence:
+            prior_texts.append(" ".join(str(s) for s in evidence))
+
+    return novelty_score(candidate_text, prior_texts)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -188,6 +261,11 @@ def main(argv: list[str] | None = None) -> int:
         "--market-index",
         default=None,
         help="Benchmark index ticker (default: US 'spy', KR settings.kr_market_index_ticker).",
+    )
+    parser.add_argument(
+        "--sector-index",
+        default=None,
+        help="Optional sector/industry benchmark ticker for sector-adjusted returns.",
     )
     args = parser.parse_args(argv)
 
@@ -270,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
             extractor=extractor,
             ticker=args.ticker,
             market_index_ticker=market_index_ticker,
+            sector_index_ticker=args.sector_index,
         )
     finally:
         session.close()
@@ -284,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
                 "raw_return": o.raw_return,
                 "market_return": o.market_return,
                 "abnormal_return": o.abnormal_return,
+                "sector_return": o.sector_return,
+                "sector_abnormal_return": o.sector_abnormal_return,
             }
             for o in result.outcomes
         ],
