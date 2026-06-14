@@ -28,6 +28,12 @@ export default function RootLayout({
               >
                 Events
               </a>
+              <a
+                href="/stats"
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
+                Stats
+              </a>
               <div className="ml-auto">
                 <AuthControls />
               </div>

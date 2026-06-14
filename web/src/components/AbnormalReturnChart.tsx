@@ -27,12 +27,22 @@ export function AbnormalReturnChart({ outcomes }: Props) {
 
   const sorted = [...outcomes].sort((a, b) => a.horizon_days - b.horizon_days);
 
+  // Returns can be null (e.g. a D+60 horizon before 60 trading days have
+  // elapsed); map those to null so the line skips the point instead of
+  // plotting a misleading 0%.
+  const toPct = (v: number | null | undefined): number | null =>
+    v == null ? null : parseFloat((v * 100).toFixed(3));
+
   const data = sorted.map((o) => ({
     day: `D+${o.horizon_days}`,
-    abnormal_return: parseFloat((o.abnormal_return * 100).toFixed(3)),
-    raw_return: parseFloat((o.raw_return * 100).toFixed(3)),
-    market_return: parseFloat((o.market_return * 100).toFixed(3)),
+    abnormal_return: toPct(o.abnormal_return),
+    raw_return: toPct(o.raw_return),
+    market_return: toPct(o.market_return),
+    sector_abnormal_return: toPct(o.sector_abnormal_return),
   }));
+
+  // Only show the sector line when at least one horizon has a sector figure.
+  const hasSector = data.some((d) => d.sector_abnormal_return != null);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -56,6 +66,8 @@ export function AbnormalReturnChart({ outcomes }: Props) {
                   ? "Abnormal Return"
                   : name === "raw_return"
                   ? "Raw Return"
+                  : name === "sector_abnormal_return"
+                  ? "Sector-Adjusted"
                   : "Market Return";
               return [pct, label];
             }}
@@ -87,12 +99,28 @@ export function AbnormalReturnChart({ outcomes }: Props) {
             dot={{ r: 3, fill: "#f59e0b" }}
             name="market_return"
           />
+          {hasSector && (
+            <Line
+              type="monotone"
+              dataKey="sector_abnormal_return"
+              stroke="#a855f7"
+              strokeWidth={2}
+              dot={{ r: 4, fill: "#a855f7" }}
+              name="sector_abnormal_return"
+              connectNulls
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-3 flex gap-4 text-xs text-gray-500">
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">
           <span className="inline-block h-0.5 w-4 bg-indigo-500" /> Abnormal
         </span>
+        {hasSector && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-4 bg-purple-500" /> Sector-Adjusted
+          </span>
+        )}
         <span className="flex items-center gap-1">
           <span className="inline-block h-0.5 w-4 bg-emerald-500" /> Raw
         </span>

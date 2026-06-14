@@ -16,6 +16,16 @@ export interface Outcome {
   raw_return: number;
   market_return: number;
   abnormal_return: number;
+  sector_return?: number | null;
+  sector_abnormal_return?: number | null;
+}
+
+export interface EventTypeStat {
+  event_type: string;
+  horizon_days: number;
+  count: number;
+  mean_abnormal_return: number | null;
+  std_abnormal_return: number | null;
 }
 
 export interface Document {

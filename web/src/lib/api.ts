@@ -1,6 +1,7 @@
 import type {
   EventSummary,
   EventDetail,
+  EventTypeStat,
   InstrumentTimeline,
   HealthResponse,
 } from "@/types/api";
@@ -53,6 +54,10 @@ export const api = {
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {
     return apiFetch<InstrumentTimeline>(`/instruments/${id}/timeline`);
+  },
+
+  getEventTypeStats(): Promise<EventTypeStat[]> {
+    return apiFetch<EventTypeStat[]>("/stats/event-types");
   },
 
   login(username: string, password: string): Promise<{ token: string }> {

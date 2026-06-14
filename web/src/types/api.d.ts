@@ -183,6 +183,10 @@ export interface components {
             market_return: number | null;
             /** Abnormal Return */
             abnormal_return: number | null;
+            /** Sector Return */
+            sector_return?: number | null;
+            /** Sector Abnormal Return */
+            sector_abnormal_return?: number | null;
         };
         /** ValidationError */
         ValidationError: {
