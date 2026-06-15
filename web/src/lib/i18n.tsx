@@ -15,7 +15,7 @@ const LANG_KEY = "markettrace_lang";
 type Dict = { [key: string]: string | Dict };
 
 const en: Dict = {
-  nav: { events: "Events", stats: "Stats" },
+  nav: { events: "Events", stats: "Stats", macro: "Macro" },
   common: { unknownError: "Unknown error" },
   auth: {
     login: "Login",
@@ -111,10 +111,28 @@ const en: Dict = {
     novelty: "Novelty",
     sourceReliability: "Source Reliability",
   },
+  macro: {
+    title: "Macro Surprises",
+    count: "{n} series",
+    loading: "Loading macro data...",
+    failTitle: "Failed to load macro data",
+    subtitle:
+      "Latest economic release per series with its standardized surprise vs the expected value (consensus when available, else a baseline forecast).",
+    empty: "No macro data yet — run the macro ingest first.",
+    th: {
+      series: "Series",
+      reference: "Reference",
+      released: "Released",
+      expected: "Expected",
+      surprise: "Surprise (σ)",
+    },
+    baseline: "baseline",
+    consensus: "consensus",
+  },
 };
 
 const ko: Dict = {
-  nav: { events: "이벤트", stats: "통계" },
+  nav: { events: "이벤트", stats: "통계", macro: "거시" },
   common: { unknownError: "알 수 없는 오류" },
   auth: {
     login: "로그인",
@@ -209,6 +227,24 @@ const ko: Dict = {
     surprise: "서프라이즈",
     novelty: "신규성",
     sourceReliability: "출처 신뢰도",
+  },
+  macro: {
+    title: "거시 서프라이즈",
+    count: "{n}개 시리즈",
+    loading: "거시 지표 불러오는 중...",
+    failTitle: "거시 지표를 불러오지 못했습니다",
+    subtitle:
+      "시리즈별 최신 경제지표 발표값과 예상 대비 표준화 서프라이즈(컨센서스가 있으면 컨센서스, 없으면 기준선 예측).",
+    empty: "아직 거시 데이터가 없습니다 — 먼저 거시 수집을 실행하세요.",
+    th: {
+      series: "시리즈",
+      reference: "기준일",
+      released: "발표값",
+      expected: "예상값",
+      surprise: "서프라이즈 (σ)",
+    },
+    baseline: "기준선",
+    consensus: "컨센서스",
   },
 };
 

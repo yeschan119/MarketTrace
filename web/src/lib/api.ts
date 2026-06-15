@@ -3,6 +3,7 @@ import type {
   EventDetail,
   EventTypeStat,
   InstrumentTimeline,
+  MacroObservation,
   HealthResponse,
 } from "@/types/api";
 
@@ -58,6 +59,10 @@ export const api = {
 
   getEventTypeStats(): Promise<EventTypeStat[]> {
     return apiFetch<EventTypeStat[]>("/stats/event-types");
+  },
+
+  getMacroObservations(): Promise<MacroObservation[]> {
+    return apiFetch<MacroObservation[]>("/macro/observations");
   },
 
   login(username: string, password: string): Promise<{ token: string }> {

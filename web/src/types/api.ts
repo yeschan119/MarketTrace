@@ -28,6 +28,17 @@ export interface EventTypeStat {
   std_abnormal_return: number | null;
 }
 
+export interface MacroObservation {
+  series_id: string;
+  reference_date: string;
+  released_value: number;
+  previous_value: number | null;
+  expected_value: number | null;
+  expected_source: string | null;
+  surprise_score: number | null;
+  published_at: string;
+}
+
 export interface Document {
   url: string;
   source: string;

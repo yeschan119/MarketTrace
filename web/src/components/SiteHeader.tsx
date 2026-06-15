@@ -24,6 +24,12 @@ export function SiteHeader() {
         >
           {t("nav.stats")}
         </a>
+        <a
+          href="/macro"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.macro")}
+        </a>
         {/* Language toggle sits immediately left of the auth / Ingest controls. */}
         <div className="ml-auto flex items-center gap-3">
           <LanguageToggle />
