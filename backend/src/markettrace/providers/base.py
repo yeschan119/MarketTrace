@@ -50,3 +50,26 @@ class PriceProvider(Protocol):
     market: str
 
     def get_ohlcv(self, ticker: str, start: date, end: date) -> "pl.DataFrame": ...  # noqa: UP037
+
+
+@dataclass(frozen=True)
+class MacroPoint:
+    """One vintage-preserving macroeconomic observation as first published.
+
+    ``released_value`` is the value as it appeared on ``released_at`` (the
+    initial release), not a later revision — this is what avoids look-ahead
+    bias. ``previous_value`` is the prior period's released value when known.
+    """
+
+    series_id: str
+    reference_date: date
+    released_value: float
+    released_at: datetime
+    previous_value: float | None = None
+
+
+@runtime_checkable
+class MacroProvider(Protocol):
+    source: str
+
+    def get_observations(self, series_id: str, since: date) -> list[MacroPoint]: ...

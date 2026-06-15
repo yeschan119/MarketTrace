@@ -183,3 +183,42 @@ class ModelRun(Base):
     params: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     data_version: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MacroObservation(Base):
+    """A single vintage-preserving macroeconomic release (blueprint §4).
+
+    Stores the value *as first published* (``released_value``) together with the
+    consensus or baseline ``expected_value`` and the prior reading, so a
+    standardized ``surprise_score`` can be computed without look-ahead bias
+    (§9). Each revision of a given ``(series_id, reference_date)`` is kept as a
+    separate row (``revision``) to preserve the revision history. The three
+    timestamps follow the §2 principle: ``occurred_at`` = end of the reference
+    period, ``published_at`` = the release/vintage date, ``first_seen_at`` =
+    when this system ingested it.
+    """
+
+    __tablename__ = "macro_observations"
+    __table_args__ = (
+        UniqueConstraint(
+            "series_id", "reference_date", "revision", name="uq_macro_obs_series_ref_rev"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    series_id: Mapped[str] = mapped_column(String, nullable=False)
+    reference_date: Mapped[date] = mapped_column(Date, nullable=False)
+    released_value: Mapped[float] = mapped_column(Float, nullable=False)
+    previous_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    expected_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # "consensus" when a real forecast was supplied, "baseline" when derived
+    # deterministically from history, NULL when no expectation is available.
+    expected_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    surprise_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    occurred_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source: Mapped[str] = mapped_column(String, nullable=False)

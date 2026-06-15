@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -83,3 +83,16 @@ class EventTypeStatOut(BaseModel):
     count: int
     mean_abnormal_return: float | None
     std_abnormal_return: float | None
+
+
+class MacroObservationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    series_id: str
+    reference_date: date
+    released_value: float
+    previous_value: float | None
+    expected_value: float | None
+    expected_source: str | None
+    surprise_score: float | None
+    published_at: datetime

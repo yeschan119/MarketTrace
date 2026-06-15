@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     tiingo_api_key: str | None = None
     # KR market-index proxy (KODEX 200 ETF) for abnormal-return computation.
     kr_market_index_ticker: str = "069500"
+    # FRED/ALFRED macroeconomic data (surprise feature). Key is optional; macro
+    # ingestion is skipped/raises clearly when unset.
+    fred_api_key: str | None = None
+    # Comma-separated FRED series ingested by default (markettrace-macro).
+    macro_series: str = "CPIAUCSL,UNRATE,FEDFUNDS,DGS10"
     # Explicit model override. When None, the provider's default (above) is used.
     extraction_model: str | None = None
     # Comma-separated list of origins allowed by CORS (the deployed web URL).
@@ -78,6 +83,11 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parsed CORS origins from the comma-separated ``cors_allow_origins``."""
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
+    @property
+    def macro_series_list(self) -> list[str]:
+        """Parsed FRED series ids from the comma-separated ``macro_series``."""
+        return [s.strip() for s in self.macro_series.split(",") if s.strip()]
 
     @property
     def resolved_extraction_model(self) -> str:

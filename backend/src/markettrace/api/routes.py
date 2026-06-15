@@ -14,9 +14,16 @@ from markettrace.api.schemas import (
     EventTypeStatOut,
     InstrumentOut,
     InstrumentTimeline,
+    MacroObservationOut,
     OutcomeOut,
 )
-from markettrace.db.models import Document, Event, Instrument, Outcome
+from markettrace.db.models import (
+    Document,
+    Event,
+    Instrument,
+    MacroObservation,
+    Outcome,
+)
 from markettrace.impact.statistics import compute_event_type_statistics
 
 router = APIRouter()
@@ -114,3 +121,33 @@ def get_event_type_stats(db: Session = Depends(get_db)) -> list[EventTypeStatOut
     """Mean and dispersion of abnormal returns per (event_type, horizon)."""
     stats = compute_event_type_statistics(db)
     return [EventTypeStatOut.model_validate(s) for s in stats]
+
+
+@router.get("/macro/observations", response_model=list[MacroObservationOut])
+def get_macro_observations(
+    series: str | None = None, db: Session = Depends(get_db)
+) -> list[MacroObservationOut]:
+    """Latest macro release (with surprise) per series, sorted by series id.
+
+    Optional ``?series=CPIAUCSL,UNRATE`` filters to the given comma-separated
+    series ids. Returns one row per series — the most recent reference period
+    (and revision) on record.
+    """
+    stmt = select(MacroObservation)
+    if series:
+        wanted = [s.strip() for s in series.split(",") if s.strip()]
+        stmt = stmt.where(MacroObservation.series_id.in_(wanted))
+    rows = db.scalars(stmt).all()
+
+    latest: dict[str, MacroObservation] = {}
+    for row in rows:
+        current = latest.get(row.series_id)
+        if current is None or (row.reference_date, row.revision) > (
+            current.reference_date,
+            current.revision,
+        ):
+            latest[row.series_id] = row
+
+    return [
+        MacroObservationOut.model_validate(latest[k]) for k in sorted(latest)
+    ]

@@ -45,6 +45,8 @@ services:
         sync: false                     # set in Render dashboard; never committed
       - key: OPENDART_API_KEY
         sync: false                     # KR disclosures; set in Render dashboard
+      - key: FRED_API_KEY
+        sync: false                     # macro surprise (FRED/ALFRED); set in dashboard
       - key: SEC_USER_AGENT
         value: "MarketTrace gimg10737@gmail.com"
       - key: OBJECT_STORE_DIR

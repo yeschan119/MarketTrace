@@ -5,9 +5,9 @@ Maps market strings to concrete provider implementations.
 
 from __future__ import annotations
 
-from markettrace.providers.base import DisclosureProvider, PriceProvider
+from markettrace.providers.base import DisclosureProvider, MacroProvider, PriceProvider
 
-__all__ = ["get_disclosure_provider", "get_price_provider"]
+__all__ = ["get_disclosure_provider", "get_price_provider", "get_macro_provider"]
 
 
 def get_disclosure_provider(market: str, **kw) -> DisclosureProvider:
@@ -84,3 +84,24 @@ def get_price_provider(market: str, *, provider: str | None = None, **kw) -> Pri
         return KrNaverPriceProvider(**kw)  # type: ignore[return-value]
 
     raise ValueError(f"Unknown price market: {market!r}")
+
+
+def get_macro_provider(source: str = "fred", **kw) -> MacroProvider:
+    """Return a ``MacroProvider`` for the given source (default ``"fred"``).
+
+    **kw is forwarded to the provider constructor; for ``"fred"`` the
+    ``fred_api_key`` from settings is supplied unless overridden.
+
+    Raises
+    ------
+    ValueError
+        When ``source`` is not supported.
+    """
+    if source == "fred":
+        from markettrace.config import get_settings
+        from markettrace.providers.fred import FredMacroProvider
+
+        kw.setdefault("api_key", get_settings().fred_api_key)
+        return FredMacroProvider(**kw)  # type: ignore[return-value]
+
+    raise ValueError(f"Unknown macro source: {source!r}")

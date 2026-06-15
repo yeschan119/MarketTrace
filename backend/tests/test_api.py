@@ -13,7 +13,15 @@ from sqlalchemy.pool import StaticPool
 
 from markettrace.api.deps import get_db
 from markettrace.api.main import create_app
-from markettrace.db.models import Base, Document, Event, EventImpact, Instrument, Outcome
+from markettrace.db.models import (
+    Base,
+    Document,
+    Event,
+    EventImpact,
+    Instrument,
+    MacroObservation,
+    Outcome,
+)
 
 
 def _now() -> datetime:
@@ -233,3 +241,50 @@ def test_event_type_stats_aggregates(client: TestClient, seeded: dict, ts_sessio
     assert row["horizon_days"] == 1
     assert row["count"] == 2
     assert row["mean_abnormal_return"] == pytest.approx(0.03)
+
+
+def _macro_row(series_id: str, ref: datetime, value: float, surprise: float | None):
+    return MacroObservation(
+        series_id=series_id,
+        reference_date=ref.date(),
+        released_value=value,
+        previous_value=None,
+        expected_value=value - 1.0,
+        expected_source="baseline",
+        surprise_score=surprise,
+        occurred_at=ref,
+        published_at=ref,
+        first_seen_at=_now(),
+        revision=0,
+        source="fred",
+    )
+
+
+def test_macro_observations_returns_latest_per_series(client, ts_session):
+    # Two CPI releases (latest = March) + one UNRATE release.
+    ts_session.add(_macro_row("CPIAUCSL", datetime(2024, 1, 1, tzinfo=UTC), 300.0, 1.5))
+    ts_session.add(_macro_row("CPIAUCSL", datetime(2024, 3, 1, tzinfo=UTC), 303.0, 2.0))
+    ts_session.add(_macro_row("UNRATE", datetime(2024, 3, 1, tzinfo=UTC), 3.9, -0.5))
+    ts_session.flush()
+
+    resp = client.get("/macro/observations")
+    assert resp.status_code == 200
+    data = resp.json()
+    # One row per series, sorted by series id.
+    assert [r["series_id"] for r in data] == ["CPIAUCSL", "UNRATE"]
+    cpi = data[0]
+    assert cpi["reference_date"] == "2024-03-01"  # latest reference period
+    assert cpi["released_value"] == pytest.approx(303.0)
+    assert cpi["surprise_score"] == pytest.approx(2.0)
+    assert cpi["expected_source"] == "baseline"
+
+
+def test_macro_observations_series_filter(client, ts_session):
+    ts_session.add(_macro_row("CPIAUCSL", datetime(2024, 3, 1, tzinfo=UTC), 303.0, 2.0))
+    ts_session.add(_macro_row("UNRATE", datetime(2024, 3, 1, tzinfo=UTC), 3.9, -0.5))
+    ts_session.flush()
+
+    resp = client.get("/macro/observations", params={"series": "UNRATE"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [r["series_id"] for r in data] == ["UNRATE"]
