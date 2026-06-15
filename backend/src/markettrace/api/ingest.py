@@ -24,7 +24,7 @@ from markettrace.pipeline.seed import (
     KR_WATCHLIST,
     seed_watchlist,
 )
-from markettrace.pipeline.vertical_slice import run_slice
+from markettrace.pipeline.vertical_slice import recompute_document_outcomes, run_slice
 from markettrace.providers.registry import (
     get_disclosure_provider,
     get_price_provider,
@@ -93,7 +93,31 @@ def _ingest_one(session, store, settings, filing: dict[str, str]) -> None:
         )
     ).first()
     if existing is not None:
-        logger.info("ingest: skipping existing document %s/%s", ref.source, ref.external_id)
+        # Already ingested: don't re-extract (no LLM cost, no duplicate events),
+        # but recompute outcomes + event_impacts when they were produced by an
+        # older engine (e.g. missing the 60-day horizon or the event_impacts the
+        # /stats endpoint reads). Idempotent: a fully up-to-date doc recomputes 0.
+        recomputed = recompute_document_outcomes(
+            session,
+            document=existing,
+            price_provider=price,
+            ticker=ticker,
+            market=market,
+            market_index_ticker=market_index_ticker,
+        )
+        if recomputed:
+            logger.info(
+                "ingest: recomputed outcomes for %d event(s) on existing %s/%s",
+                recomputed,
+                ref.source,
+                ref.external_id,
+            )
+        else:
+            logger.info(
+                "ingest: existing document %s/%s already up to date; skipping",
+                ref.source,
+                ref.external_id,
+            )
         return
 
     from markettrace.nlp.event_extractor import EventExtractor

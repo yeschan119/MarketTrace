@@ -17,9 +17,9 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 
-from markettrace.db.models import Event, ModelRun, Outcome
+from markettrace.db.models import Event, EventImpact, Instrument, ModelRun, Outcome
 from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult, compute_event_outcomes
 from markettrace.impact.sector_index import resolve_sector_index
@@ -29,7 +29,7 @@ from markettrace.nlp.entity_linker import link_entities, resolve_instrument
 from markettrace.nlp.novelty import novelty_score
 from markettrace.providers.base import DocumentRef
 
-__all__ = ["SliceResult", "run_slice", "main"]
+__all__ = ["SliceResult", "run_slice", "recompute_document_outcomes", "main"]
 
 logger = logging.getLogger(__name__)
 
@@ -122,64 +122,21 @@ def run_slice(
     session.add(event)
     session.flush()
 
-    # --- e. fetch price window for stock + market (+ optional sector) index ---
+    # --- e/f/f2. fetch prices, compute + persist outcomes and impacts ---
     event_date = document.published_at.date()
-    window_start = event_date - timedelta(days=5)
-    # Cover the longest horizon with slack for weekends/holidays: a 60 trading-day
-    # horizon spans ~84 calendar days, so reserve well beyond that.
-    max_horizon = max(horizons)
-    window_end = event_date + timedelta(days=max_horizon * 2 + 15)
-
-    stock_df = price_provider.get_ohlcv(ticker, window_start, window_end)
-    market_df = price_provider.get_ohlcv(market_index_ticker, window_start, window_end)
-
-    # Auto-resolve a sector benchmark from the instrument's industry unless the
-    # caller passed one explicitly. The sector-adjusted figure is supplementary,
-    # so a missing mapping or a failed fetch degrades to market-adjusted only and
-    # never aborts the slice.
-    if sector_index_ticker is None:
-        sector_index_ticker = resolve_sector_index(ref.market, instrument.industry)
-
-    sector_df = None
-    if sector_index_ticker is not None:
-        try:
-            sector_df = price_provider.get_ohlcv(
-                sector_index_ticker, window_start, window_end
-            )
-        except Exception:  # noqa: BLE001 - sector data is optional; keep the core result
-            logger.warning(
-                "sector benchmark %s fetch failed; falling back to market-adjusted only",
-                sector_index_ticker,
-                exc_info=True,
-            )
-            sector_df = None
-
-    ingest_prices(session, instrument.id, stock_df)
-
-    # --- f. compute + persist outcomes ---
-    outcomes = compute_event_outcomes(
-        stock_df, market_df, event_date, horizons, sector_prices=sector_df
+    outcomes, sector_index_ticker = _compute_and_persist_outcomes(
+        session,
+        event=event,
+        instrument=instrument,
+        ticker=ticker,
+        market=ref.market,
+        price_provider=price_provider,
+        event_date=event_date,
+        market_index_ticker=market_index_ticker,
+        sector_index_ticker=sector_index_ticker,
+        horizons=horizons,
+        now=now,
     )
-    for result in outcomes:
-        session.add(
-            Outcome(
-                event_id=event.id,
-                instrument_id=instrument.id,
-                horizon_days=result.horizon_days,
-                raw_return=result.raw_return,
-                market_return=result.market_return,
-                abnormal_return=result.abnormal_return,
-                sector_return=result.sector_return,
-                sector_abnormal_return=result.sector_abnormal_return,
-                computed_at=now,
-            )
-        )
-
-    # --- f2. persist per-event directional impact scores ---
-    for impact in build_event_impacts(
-        event, outcomes, industry=instrument.industry, computed_at=now
-    ):
-        session.add(impact)
 
     # --- g. record provenance ---
     session.add(
@@ -204,6 +161,190 @@ def run_slice(
         instrument_id=instrument.id,
         outcomes=outcomes,
     )
+
+
+def _compute_and_persist_outcomes(
+    session,
+    *,
+    event,
+    instrument,
+    ticker: str,
+    market: str,
+    price_provider,
+    event_date,
+    market_index_ticker: str,
+    sector_index_ticker: str | None,
+    horizons: tuple[int, ...],
+    now: datetime,
+) -> tuple[list[OutcomeResult], str | None]:
+    """Fetch prices and (re)persist outcomes + event_impacts for one event.
+
+    Shared by :func:`run_slice` and :func:`recompute_document_outcomes`. Returns
+    the computed outcomes and the sector index ticker actually used (resolved
+    from the instrument's industry when not supplied), so the caller can record
+    provenance. The sector-adjusted figure is supplementary: a missing mapping
+    or a failed fetch degrades to market-adjusted only and never aborts.
+    """
+    window_start = event_date - timedelta(days=5)
+    # Cover the longest horizon with slack for weekends/holidays: a 60 trading-day
+    # horizon spans ~84 calendar days, so reserve well beyond that.
+    max_horizon = max(horizons)
+    window_end = event_date + timedelta(days=max_horizon * 2 + 15)
+
+    stock_df = price_provider.get_ohlcv(ticker, window_start, window_end)
+    market_df = price_provider.get_ohlcv(market_index_ticker, window_start, window_end)
+
+    # Auto-resolve a sector benchmark from the instrument's industry unless the
+    # caller passed one explicitly.
+    if sector_index_ticker is None:
+        sector_index_ticker = resolve_sector_index(market, instrument.industry)
+
+    sector_df = None
+    if sector_index_ticker is not None:
+        try:
+            sector_df = price_provider.get_ohlcv(
+                sector_index_ticker, window_start, window_end
+            )
+        except Exception:  # noqa: BLE001 - sector data is optional; keep the core result
+            logger.warning(
+                "sector benchmark %s fetch failed; falling back to market-adjusted only",
+                sector_index_ticker,
+                exc_info=True,
+            )
+            sector_df = None
+
+    ingest_prices(session, instrument.id, stock_df)
+
+    outcomes = compute_event_outcomes(
+        stock_df, market_df, event_date, horizons, sector_prices=sector_df
+    )
+    for result in outcomes:
+        session.add(
+            Outcome(
+                event_id=event.id,
+                instrument_id=instrument.id,
+                horizon_days=result.horizon_days,
+                raw_return=result.raw_return,
+                market_return=result.market_return,
+                abnormal_return=result.abnormal_return,
+                sector_return=result.sector_return,
+                sector_abnormal_return=result.sector_abnormal_return,
+                computed_at=now,
+            )
+        )
+
+    for impact in build_event_impacts(
+        event, outcomes, industry=instrument.industry, computed_at=now
+    ):
+        session.add(impact)
+
+    return outcomes, sector_index_ticker
+
+
+def _needs_recompute(session, event, horizons: tuple[int, ...]) -> bool:
+    """True when *event* is missing outcomes for the longest horizon or any impact row.
+
+    Detects rows produced by an older engine (e.g. only the 1/5/20-day horizons,
+    or outcomes without the paired ``event_impacts`` that ``/stats`` reads).
+    """
+    existing_horizons = set(
+        session.scalars(
+            select(Outcome.horizon_days).where(Outcome.event_id == event.id)
+        ).all()
+    )
+    if not existing_horizons:
+        return True
+    if max(horizons) not in existing_horizons:
+        return True
+    impact_count = session.scalar(
+        select(func.count())
+        .select_from(EventImpact)
+        .where(EventImpact.event_id == event.id)
+    )
+    return not impact_count
+
+
+def recompute_document_outcomes(
+    session,
+    *,
+    document,
+    price_provider,
+    ticker: str,
+    market: str,
+    market_index_ticker: str = "spy",
+    sector_index_ticker: str | None = None,
+    horizons: tuple[int, ...] = (1, 5, 20, 60),
+    force: bool = False,
+) -> int:
+    """Recompute outcomes + event_impacts for events on an already-ingested document.
+
+    Reuses each existing :class:`Event` (no LLM re-extraction, so no extraction
+    cost and no duplicate events). For every event that ``_needs_recompute``
+    flags — or all of them when *force* is set — the stale ``outcomes`` and
+    ``event_impacts`` rows are deleted and recomputed with the current engine
+    (full *horizons* incl. 60-day, sector-adjusted returns). Commits once and
+    returns the number of events recomputed.
+
+    Note: ``novelty_score`` is left as-is; backfilling it would require the raw
+    disclosure text (re-extraction), which this fast path deliberately avoids.
+    """
+    now = datetime.now(UTC)
+    events = list(
+        session.scalars(select(Event).where(Event.document_id == document.id)).all()
+    )
+    event_date = document.published_at.date()
+    recomputed = 0
+
+    for event in events:
+        if not force and not _needs_recompute(session, event, horizons):
+            continue
+        if event.primary_instrument_id is None:
+            logger.warning(
+                "recompute: event %s has no primary instrument; skipping", event.id
+            )
+            continue
+        instrument = session.get(Instrument, event.primary_instrument_id)
+        if instrument is None:
+            logger.warning(
+                "recompute: instrument %s for event %s missing; skipping",
+                event.primary_instrument_id,
+                event.id,
+            )
+            continue
+
+        session.execute(delete(Outcome).where(Outcome.event_id == event.id))
+        session.execute(delete(EventImpact).where(EventImpact.event_id == event.id))
+
+        _compute_and_persist_outcomes(
+            session,
+            event=event,
+            instrument=instrument,
+            ticker=ticker,
+            market=market,
+            price_provider=price_provider,
+            event_date=event_date,
+            market_index_ticker=market_index_ticker,
+            sector_index_ticker=sector_index_ticker,
+            horizons=horizons,
+            now=now,
+        )
+        recomputed += 1
+
+    if recomputed:
+        session.add(
+            ModelRun(
+                kind="recompute_outcomes",
+                params={
+                    "document_id": document.id,
+                    "events": recomputed,
+                    "horizons": list(horizons),
+                },
+                data_version=None,
+                created_at=now,
+            )
+        )
+    session.commit()
+    return recomputed
 
 
 def _compute_prior_novelty(session, instrument_id: int, candidate_text: str) -> float:

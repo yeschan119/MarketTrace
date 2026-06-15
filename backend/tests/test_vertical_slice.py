@@ -26,7 +26,11 @@ import pytest
 
 from markettrace.db.models import Document, Event, EventImpact, Instrument, ModelRun, Outcome
 from markettrace.nlp.schemas import EventExtraction
-from markettrace.pipeline.vertical_slice import SliceResult, run_slice
+from markettrace.pipeline.vertical_slice import (
+    SliceResult,
+    recompute_document_outcomes,
+    run_slice,
+)
 from markettrace.providers.base import DocumentRef, RawDocument
 
 _BASE_DATE = date(2024, 1, 2)  # one calendar day per row
@@ -288,6 +292,90 @@ def test_run_slice_dedups_document_on_rerun(db_session, tmp_object_store) -> Non
     # Same content -> deduped to a single Document row.
     assert db_session.query(Document).count() == 1
     assert second.document_id == first.document_id
+
+
+def test_recompute_backfills_missing_horizon_and_impacts(db_session, tmp_object_store) -> None:
+    """Old-engine data (no 60-day horizon) is recomputed in place, no duplicate event."""
+    _seed_instrument(db_session)
+    ref = _make_ref()
+
+    # Simulate data produced by an older engine: only the 1/5/20-day horizons.
+    result = run_slice(
+        db_session,
+        tmp_object_store,
+        ref=ref,
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakePriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+        horizons=(1, 5, 20),
+    )
+    document = db_session.get(Document, result.document_id)
+    assert {o.horizon_days for o in db_session.query(Outcome).all()} == {1, 5, 20}
+
+    # Recompute with the current default horizons (adds the 60-day horizon).
+    recomputed = recompute_document_outcomes(
+        db_session,
+        document=document,
+        price_provider=_FakePriceProvider(),
+        ticker="AAPL",
+        market="US",
+        market_index_ticker="spy",
+    )
+    assert recomputed == 1
+
+    # Same single event reused — no duplicate, full horizon set + paired impacts.
+    assert db_session.query(Event).count() == 1
+    assert {o.horizon_days for o in db_session.query(Outcome).all()} == {1, 5, 20, 60}
+    assert {i.horizon_days for i in db_session.query(EventImpact).all()} == {1, 5, 20, 60}
+
+    # Now up to date -> a second recompute is a no-op.
+    assert (
+        recompute_document_outcomes(
+            db_session,
+            document=document,
+            price_provider=_FakePriceProvider(),
+            ticker="AAPL",
+            market="US",
+            market_index_ticker="spy",
+        )
+        == 0
+    )
+
+
+def test_recompute_backfills_when_impacts_missing(db_session, tmp_object_store) -> None:
+    """Outcomes present for every horizon but no event_impacts still triggers recompute."""
+    _seed_instrument(db_session)
+    ref = _make_ref()
+    result = run_slice(
+        db_session,
+        tmp_object_store,
+        ref=ref,
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakePriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+        horizons=(1, 5, 20, 60),
+    )
+    document = db_session.get(Document, result.document_id)
+
+    # Drop the event_impacts (as if an older engine never wrote them).
+    db_session.query(EventImpact).delete()
+    db_session.commit()
+    assert db_session.query(EventImpact).count() == 0
+
+    recomputed = recompute_document_outcomes(
+        db_session,
+        document=document,
+        price_provider=_FakePriceProvider(),
+        ticker="AAPL",
+        market="US",
+        market_index_ticker="spy",
+    )
+    assert recomputed == 1
+    assert {i.horizon_days for i in db_session.query(EventImpact).all()} == {1, 5, 20, 60}
 
 
 # ---------------------------------------------------------------------------
