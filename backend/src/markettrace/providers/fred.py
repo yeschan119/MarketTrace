@@ -22,6 +22,10 @@ _FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 # ALFRED output_type 4 = "Initial release only": one row per reference period,
 # carrying the value as first published and its release (realtime_start) date.
 _INITIAL_RELEASE = 4
+# output_type=4 requires an explicit real-time window covering every vintage;
+# the API's default (today..today) matches no vintages and returns HTTP 400.
+_REALTIME_START = "1900-01-01"
+_REALTIME_END = "9999-12-31"
 
 
 class FredMacroProvider:
@@ -53,6 +57,10 @@ class FredMacroProvider:
                 "file_type": "json",
                 "observation_start": since.strftime("%Y-%m-%d"),
                 "output_type": _INITIAL_RELEASE,
+                # output_type=4 needs an explicit real-time window spanning all
+                # vintages; the API default (today..today) finds none and 400s.
+                "realtime_start": _REALTIME_START,
+                "realtime_end": _REALTIME_END,
             },
         )
         resp.raise_for_status()

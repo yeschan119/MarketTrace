@@ -77,6 +77,9 @@ class TestRequestShape:
         assert "series_id=CPIAUCSL" in url
         assert "output_type=4" in url
         assert "observation_start=2020-01-01" in url
+        # output_type=4 needs an explicit real-time window or FRED returns 400.
+        assert "realtime_start=1900-01-01" in url
+        assert "realtime_end=9999-12-31" in url
 
     def test_raises_on_http_error(self):
         def handler(request: httpx.Request) -> httpx.Response:
