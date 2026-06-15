@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketTrace — 개발 로드맵</title>
+<style>
+  :root{
+    --indigo:#818cf8; --indigo-light:#1e1b4b; --ink:#e2e8f0; --muted:#94a3b8;
+    --green:#4ade80; --green-bg:#10301d; --amber:#fbbf24; --amber-bg:#3a2c0a;
+    --red:#f87171; --red-bg:#3a1414; --gray:#94a3b8; --gray-bg:#1e293b;
+    --line:#2a3344; --card:#161e2e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",Roboto,sans-serif;
+    background:#0b1120;color:var(--ink);line-height:1.55;padding:0 0 80px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  header{background:linear-gradient(135deg,#1e1b4b,#312e6b 55%,#3b0d5e);color:#fff;padding:44px 0 38px;margin-bottom:34px;border-bottom:1px solid #2a2550}
+  header .wrap{display:block}
+  .logo{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .logo span{opacity:.8;font-weight:500;font-size:16px;margin-left:10px}
+  .tagline{margin-top:10px;font-size:15px;opacity:.92;max-width:760px}
+  .pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);
+    padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+  h2{font-size:20px;margin:38px 0 14px;display:flex;align-items:center;gap:9px}
+  h2 .num{background:var(--indigo);color:#fff;width:26px;height:26px;border-radius:7px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .sub{color:var(--muted);font-size:13.5px;margin:-6px 0 16px}
+
+  /* phase strip */
+  .strip{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:8px}
+  .strip .st{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 12px;text-align:center}
+  .strip .st .ph{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.4px}
+  .strip .st .nm{font-size:13px;font-weight:700;margin:4px 0 8px}
+  .strip .st .pct{font-size:22px;font-weight:800}
+  .done .pct{color:var(--green)} .partial .pct{color:var(--amber)} .todo .pct{color:var(--red)}
+  .bar{height:6px;border-radius:99px;background:var(--gray-bg);overflow:hidden;margin-top:7px}
+  .bar > i{display:block;height:100%;border-radius:99px}
+  .done .bar>i{background:var(--green)} .partial .bar>i{background:var(--amber)} .todo .bar>i{background:var(--red)}
+
+  /* pipeline flow */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+  .flow .node{flex:1;min-width:96px;border-radius:10px;padding:11px 9px;text-align:center;font-size:12px;font-weight:600;
+    border:1px solid var(--line);position:relative}
+  .flow .node small{display:block;font-size:10px;font-weight:500;opacity:.7;margin-top:2px}
+  .n-done{background:var(--green-bg);border-color:#1f5135;color:#86efac}
+  .n-partial{background:var(--amber-bg);border-color:#5c4510;color:#fcd34d}
+  .n-todo{background:var(--gray-bg);color:#94a3b8}
+
+  /* phase cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .card .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .card .title{font-size:16.5px;font-weight:800;display:flex;align-items:center;gap:10px}
+  .badge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px}
+  .b-done{background:var(--green-bg);color:var(--green)}
+  .b-partial{background:var(--amber-bg);color:var(--amber)}
+  .b-todo{background:var(--red-bg);color:var(--red)}
+  .pbar{flex:1;min-width:160px;height:9px;background:var(--gray-bg);border-radius:99px;overflow:hidden}
+  .pbar>i{display:block;height:100%;border-radius:99px}
+  .pbar.g>i{background:var(--green)} .pbar.a>i{background:var(--amber)} .pbar.r>i{background:var(--red)}
+  .pct-lbl{font-size:13px;font-weight:800;width:42px;text-align:right}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:16px}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}.strip{grid-template-columns:repeat(3,1fr)}}
+  ul.items{list-style:none;font-size:13.5px}
+  ul.items li{padding:4px 0 4px 24px;position:relative;color:#cbd5e1}
+  ul.items li:before{position:absolute;left:0;top:3px;font-size:13px}
+  li.ok:before{content:"✅"} li.no:before{content:"⬜"}
+  .coltitle{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px}
+  .crit{margin-top:14px;font-size:12.5px;color:#c7d2fe;background:var(--indigo-light);border:1px solid #2e2a5e;border-radius:8px;padding:9px 12px}
+  .crit b{color:#a5b4fc}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{background:#1e293b;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .t-ok{background:var(--green-bg);color:var(--green)} .t-no{background:var(--gray-bg);color:#64748b}
+  .t-part{background:var(--amber-bg);color:var(--amber)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .mini{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .mini h3{font-size:14px;margin-bottom:10px}
+  .commit{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;background:#0b1120;color:#a5b4fc;
+    border:1px solid #2a3344;padding:1px 6px;border-radius:5px}
+  .next li{padding:6px 0 6px 26px}
+  .next li:before{content:"→";color:var(--indigo);font-weight:800;left:4px}
+  footer{margin-top:34px;text-align:center;color:var(--muted);font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 20px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="logo">MarketTrace <span>개발 로드맵</span></div>
+    <div class="tagline">공시(SEC EDGAR / OpenDART) → LLM 구조화 사건 추출 → 시장·산업조정 이상수익률 자동 계산.
+      LLM은 추출만, 수익률은 전용 수치 모듈. 설명가능성·재현성·시점보존이 핵심 가치.</div>
+    <div class="pills">
+      <span class="pill">🟢 배포: miffy178.com (TLS)</span>
+      <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
+      <span class="pill">✅ 235 tests · ruff clean</span>
+      <span class="pill">FastAPI + Next.js + PostgreSQL</span>
+      <span class="pill">기준일: 2026-06-14</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- OVERVIEW STRIP -->
+  <h2><span class="num">▣</span> 전체 진행 현황</h2>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--green)"></i> 완료</span>
+    <span><i class="dot" style="background:var(--amber)"></i> 진행 중 / 부분 완료</span>
+    <span><i class="dot" style="background:var(--red)"></i> 미착수</span>
+  </div>
+  <div class="strip">
+    <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
+    <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">65%</div><div class="bar"><i style="width:65%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">80%</div><div class="bar"><i style="width:80%"></i></div></div>
+    <div class="st todo"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">0%</div><div class="bar"><i style="width:3%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">45%</div><div class="bar"><i style="width:45%"></i></div></div>
+  </div>
+
+  <!-- PIPELINE FLOW -->
+  <h2><span class="num">⇄</span> 파이프라인 흐름 <span style="font-size:13px;font-weight:500;color:var(--muted)">(블루프린트 §3)</span></h2>
+  <p class="sub">초록 = 동작 중 · 노랑 = 부분 구현 · 회색 = 미구현</p>
+  <div class="flow">
+    <div class="node n-done">수집기<small>SEC·OpenDART·Tiingo·Naver</small></div>
+    <div class="node n-done">원문 저장소<small>ObjectStore + 해시</small></div>
+    <div class="node n-done">정규화·중복제거<small>content_hash·novelty</small></div>
+    <div class="node n-done">기업·산업 연결<small>entity_linker</small></div>
+    <div class="node n-done">사건 추출<small>LLM tool-use</small></div>
+    <div class="node n-todo">Feature Store<small>미구현</small></div>
+    <div class="node n-partial">영향 분석<small>이상수익률 1/5/20/60·섹터·통계</small></div>
+    <div class="node n-todo">신호·위험 엔진<small>미착수</small></div>
+    <div class="node n-done">API·대시보드<small>FastAPI + Next.js</small></div>
+    <div class="node n-todo">사후 성과 측정<small>미구현</small></div>
+  </div>
+
+  <!-- PHASE CARDS -->
+  <h2><span class="num">✦</span> 단계별 상세</h2>
+
+  <!-- PHASE 0 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 0 · 스캐폴딩 <span class="badge b-done">완료</span></div>
+      <div class="pbar g"><i style="width:100%"></i></div><div class="pct-lbl" style="color:var(--green)">100%</div>
+    </div>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items">
+          <li class="ok">모노레포: backend (FastAPI/Py3.12) + web (Next.js15)</li>
+          <li class="ok">DB 테이블 + Alembic 마이그레이션 (0001→0002)</li>
+          <li class="ok">Provider 추상화 Protocol + DTO</li>
+          <li class="ok">FastAPI 부트 + /health + OpenAPI</li>
+          <li class="ok">Next.js + Tailwind + TanStack Query</li>
+        </ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items"><li class="ok" style="color:var(--green);font-weight:600">없음 — 전부 완료</li></ul>
+      </div>
+    </div>
+    <div class="crit"><b>완료 기준 ✅</b> — alembic upgrade 성공, pytest 통과, web이 /health로 백엔드 연결 표시</div>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 1 · 버티컬 슬라이스 <span class="badge b-done">완료</span></div>
+      <div class="pbar g"><i style="width:100%"></i></div><div class="pct-lbl" style="color:var(--green)">100%</div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">블루프린트 §11 첫 목표: "공시 1건 → 기업·사건 식별 → 영향가설 저장 → 1/5/20일 시장조정 수익률 자동계산" — <b>US·KR 양쪽 라이브 검증 완료, 배포됨.</b></p>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items">
+          <li class="ok">SEC EDGAR / OpenDART 공시 수집 + 원문보존 + 중복제거</li>
+          <li class="ok">기업 연결 (CIK / corp_code → instrument)</li>
+          <li class="ok">LLM 강제 tool-use 사건 추출 (Anthropic/OpenAI 선택)</li>
+          <li class="ok">가격 + 시장조정 이상수익률 1/5/20일</li>
+          <li class="ok">시장 인식 CLI (markettrace-slice --market US|KR)</li>
+          <li class="ok">사건 타임라인 + 상세 UI (근거·차트)</li>
+        </ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items"><li class="ok" style="color:var(--green);font-weight:600">없음 — 전부 완료</li></ul>
+      </div>
+    </div>
+    <div class="crit"><b>완료 기준 ✅</b> — 실제 공시 1건 → events 1행 + outcomes 3행(근거·모델버전 포함), Next.js 화면 렌더. AAPL(US)·삼성(KR) 모두 실데이터 검증.</div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~65%</span></div>
+      <div class="pbar a"><i style="width:65%"></i></div><div class="pct-lbl" style="color:var(--amber)">65%</div>
+    </div>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items">
+          <li class="ok">공시 → 기업 연결 (entity_linker)</li>
+          <li class="ok">사건 유형·방향·영향경로(channels)·기간 추출</li>
+          <li class="ok"><b>시장 추상화 (AC1)</b> — OpenDART(KR)를 동일 Protocol로 추가, 계약 테스트로 실증</li>
+          <li class="ok"><b>동일 사건 다문서 묶기 (novelty/dedup)</b> — Jaccard 군집(cluster_documents) + 슬라이스가 과거 evidence와 비교해 novelty 자동계산</li>
+          <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 시드 골드셋, markettrace-eval CLI</li>
+        </ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items">
+          <li class="no">사람 검토·수정 화면 (entity/event correction)</li>
+          <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
+          <li class="no">골드셋 라벨 확대 → 라이브 F1 측정(현재는 측정 프레임워크만)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="crit"><b>완료 기준 🟡</b> — 기업연결 정확도·분류 F1 <b>측정 가능</b>(메트릭·하베스트 구현). 실수치는 골드셋 확장 후 라이브 실행 필요.</div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 3 · 영향 측정 <span class="badge b-partial">진행 중 ~80%</span></div>
+      <div class="pbar a"><i style="width:80%"></i></div><div class="pct-lbl" style="color:var(--amber)">80%</div>
+    </div>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items">
+          <li class="ok">시장수익률 제거 이상수익률 (raw − market)</li>
+          <li class="ok"><b>산업(섹터) 수익률 조정</b> — sector_adjusted_return + industry→ETF 자동매핑(US SPDR·KR 091160)</li>
+          <li class="ok"><b>사건 후 1/5/20/60일 반응 저장</b> (60일 horizon 추가)</li>
+          <li class="ok"><b>사건유형별 평균·분산 통계</b> — impact.statistics + GET /stats/event-types</li>
+          <li class="ok"><b>event_impacts 테이블</b> — 방향부호 영향점수(signed_abnormal_return)</li>
+          <li class="ok">근거·모델·분석시각 provenance 기록</li>
+        </ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items">
+          <li class="no">surprise feature (예상 대비 실제, FRED/ALFRED 빈티지)</li>
+          <li class="no">macro_observations 테이블 (거시 빈티지)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="crit"><b>완료 기준 🟡</b> — 사건별 예측·실제 결과 자동연결 + 사건유형 통계 동작. surprise(빈티지) feature만 남음.</div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-todo">미착수</span></div>
+      <div class="pbar r"><i style="width:3%"></i></div><div class="pct-lbl" style="color:var(--red)">0%</div>
+    </div>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items"><li class="no" style="color:var(--muted)">—</li></ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items">
+          <li class="no">펀더멘털·이벤트·거시·가격·수급 모델 분리</li>
+          <li class="no">워크포워드 백테스트</li>
+          <li class="no">거래비용·슬리피지·거래정지·상폐 반영</li>
+          <li class="no">MLflow 모델 관리 + 기여도·실패사례 기록</li>
+        </ul>
+      </div>
+    </div>
+    <div class="crit"><b>완료 기준 🔴</b> — 표본 외 구간에서 벤치마크 대비 개선 확인 (look-ahead/survivorship 차단)</div>
+  </div>
+
+  <!-- PHASE 5 -->
+  <div class="card">
+    <div class="top">
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~45%</span></div>
+      <div class="pbar a"><i style="width:45%"></i></div><div class="pct-lbl" style="color:var(--amber)">45%</div>
+    </div>
+    <div class="cols">
+      <div><div class="coltitle">완료</div>
+        <ul class="items">
+          <li class="ok">종목별 사건 타임라인 API + 사건 상세 화면</li>
+          <li class="ok">변동 원인 후보·근거 (evidence·channels·direction)</li>
+          <li class="ok">이상수익률 차트 (1/5/20/60일·<b>섹터조정 라인</b>) + 점수 구성요소</li>
+          <li class="ok"><b>로그인 게이트 수동 인제스트</b> (모달 + Ingest 버튼)</li>
+          <li class="ok"><b>데이터 상태 대시보드 (부분)</b> — /stats 사건유형 반응 통계 페이지</li>
+        </ul>
+      </div>
+      <div><div class="coltitle">남은 작업</div>
+        <ul class="items">
+          <li class="no">관심종목 알림</li>
+          <li class="no">시나리오별 상승·하락 요인</li>
+          <li class="no">event_impacts UI 노출 + 모델 상태 대시보드 확장</li>
+        </ul>
+      </div>
+    </div>
+    <div class="crit"><b>참고</b> — 타임라인·상세는 Phase 1에서 구축, 여기선 확장 단계. 섹터조정 라인·/stats 페이지·로그인 인제스트는 운영/Phase3 노출 과정에서 추가됨.</div>
+  </div>
+
+  <!-- DATA MODEL -->
+  <h2><span class="num">▤</span> 데이터 모델 <span style="font-size:13px;font-weight:500;color:var(--muted)">(블루프린트 §4 · 13개 중 9개 구현)</span></h2>
+  <div class="grid2">
+    <table>
+      <tr><th>테이블</th><th>상태</th></tr>
+      <tr><td>instruments</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>entity_aliases</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>prices</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>documents</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>document_entities</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>events</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>outcomes <small style="color:var(--muted)">(+섹터컬럼)</small></td><td><span class="tag t-ok">구현</span></td></tr>
+    </table>
+    <table>
+      <tr><th>테이블</th><th>상태</th></tr>
+      <tr><td>model_runs</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>event_impacts</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>fundamentals</td><td><span class="tag t-no">Phase 4</span></td></tr>
+      <tr><td>macro_observations</td><td><span class="tag t-no">Phase 3-4</span></td></tr>
+      <tr><td>features</td><td><span class="tag t-no">Phase 4</span></td></tr>
+      <tr><td>signals</td><td><span class="tag t-no">Phase 4</span></td></tr>
+    </table>
+  </div>
+
+  <!-- PRINCIPLES + ACCEPTANCE -->
+  <h2><span class="num">◆</span> 핵심 설계 원칙 준수</h2>
+  <div class="grid2">
+    <div class="mini">
+      <h3>블루프린트 §2 원칙</h3>
+      <ul class="items">
+        <li class="ok">LLM(추출) ↔ 수치모델(수익률) 역할 분리</li>
+        <li class="ok">3시각 보존 (occurred / published / first_seen)</li>
+        <li class="ok">근거 추적 (URL·근거문장·모델·버전·분석시각)</li>
+        <li class="ok">시장 추상화 (provider 1개로 시장 추가)</li>
+        <li class="ok">재현성 — novelty·통계·F1 전부 결정론적 순수함수</li>
+      </ul>
+    </div>
+    <div class="mini">
+      <h3>수용 기준 (로드맵 AC1–AC9)</h3>
+      <ul class="items">
+        <li class="ok">AC1 provider 추상화 (SEC+OpenDART 동일 계약)</li>
+        <li class="ok">AC2 documents 3시각 NOT NULL</li>
+        <li class="ok">AC3 LLM 호출은 event_extractor에만</li>
+        <li class="ok">AC4–AC7 스키마·이상수익률·슬라이스·provenance</li>
+        <li class="ok">AC8–AC9 타입 동기화(+섹터필드) + 사건상세 차트 렌더</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- THIS SESSION -->
+  <h2><span class="num">✓</span> 이번 세션 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-06-14 · Phase 2/3 + UI · 커밋 2개)</span></h2>
+  <div class="mini">
+    <ul class="items">
+      <li class="ok"><span class="commit">ede6142</span> &nbsp;Phase 2/3 엔진 — 60일 horizon · 섹터조정 수익률 · event_impacts · 사건유형 통계 · novelty · F1 eval (backend 25파일 + migration 0002)</li>
+      <li class="ok"><span class="commit">1bf4ea3</span> &nbsp;Web UI — 섹터조정(보라) 라인 · /stats 사건유형 통계 페이지 · 타입 동기화</li>
+    </ul>
+    <p style="font-size:13px;color:var(--muted);margin-top:10px">
+      테스트 182 → <b style="color:var(--ink)">235</b> · ruff 클린 · alembic upgrade head 검증 · 로컬 스택 UI 헤드리스 검증(D+60·섹터라인·/stats 렌더 확인).
+      Phase 3 40→80%, Phase 2 50→65%, 데이터모델 8→9/13.</p>
+  </div>
+
+  <!-- NEXT -->
+  <h2><span class="num">»</span> 다음 추천 단계</h2>
+  <div class="mini">
+    <ul class="items next">
+      <li><b>배포·운영</b> — 커밋 2개 push → Render 자동배포(startCommand가 alembic 자동적용) → 로그인 후 Ingest 클릭 → D+60·섹터·/stats 실데이터 확인</li>
+      <li><b>Phase 3 마무리</b> — surprise feature(FRED/ALFRED 빈티지) + macro_observations 테이블 + event_impacts UI 노출</li>
+      <li><b>Phase 2 마무리</b> — 다건 배치(Prefect) + 검토·수정 UI + 골드셋 라벨 확대 → 라이브 F1 측정</li>
+      <li><b>Phase 4 착수</b> — 신호 모델 분리 + 워크포워드 백테스트(비용·상폐 반영) + MLflow + signals/features 테이블</li>
+    </ul>
+  </div>
+
+  <footer>
+    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + market-trace-roadmap.md · 갱신 2026-06-14<br>
+    공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
+  </footer>
+
+</div>
+</body>
+</html>
