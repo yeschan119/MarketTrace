@@ -4,11 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { AbnormalReturnChart } from "@/components/AbnormalReturnChart";
 import { ScoreBars } from "@/components/ScoreBars";
 
 export default function EventDetailPage() {
+  const { t, locale } = useI18n();
   const params = useParams();
   const id = params.id as string;
 
@@ -21,7 +23,7 @@ export default function EventDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
-        Loading event...
+        {t("eventDetail.loading")}
       </div>
     );
   }
@@ -29,9 +31,9 @@ export default function EventDetailPage() {
   if (isError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
-        <p className="font-semibold">Failed to load event</p>
+        <p className="font-semibold">{t("eventDetail.failTitle")}</p>
         <p className="mt-1 text-sm">
-          {error instanceof Error ? error.message : "Unknown error"}
+          {error instanceof Error ? error.message : t("common.unknownError")}
         </p>
       </div>
     );
@@ -46,7 +48,7 @@ export default function EventDetailPage() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-500">
         <Link href="/events" className="hover:text-gray-700 hover:underline">
-          Events
+          {t("nav.events")}
         </Link>
         <span>/</span>
         <span className="text-gray-900">{event.id}</span>
@@ -58,13 +60,13 @@ export default function EventDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
-                {event.entities[0] ?? "Unknown Instrument"}
+                {event.entities[0] ?? t("eventDetail.unknownInstrument")}
               </h1>
               <DirectionBadge direction={event.direction} />
             </div>
             <p className="mt-1 text-sm text-gray-500">
               {event.event_type} &middot;{" "}
-              {new Date(event.document.published_at).toLocaleDateString("en-US", {
+              {new Date(event.document.published_at).toLocaleDateString(locale, {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
@@ -84,15 +86,15 @@ export default function EventDetailPage() {
             )}
           </div>
           <div className="text-right text-sm text-gray-500">
-            <p>Model: <span className="font-mono text-gray-700">{event.model}</span></p>
-            <p>Version: <span className="font-mono text-gray-700">{event.model_version}</span></p>
+            <p>{t("eventDetail.model")}: <span className="font-mono text-gray-700">{event.model}</span></p>
+            <p>{t("eventDetail.version")}: <span className="font-mono text-gray-700">{event.model_version}</span></p>
           </div>
         </div>
 
         {/* Source document */}
         <div className="mt-4 rounded-md bg-gray-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Source Document
+            {t("eventDetail.sourceDoc")}
           </p>
           <a
             href={event.document.url}
@@ -123,7 +125,7 @@ export default function EventDetailPage() {
       {event.evidence.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="mb-3 text-sm font-semibold text-gray-700">
-            Supporting Evidence
+            {t("eventDetail.evidence")}
           </h3>
           <ul className="space-y-3">
             {event.evidence.map((ev, idx) => (
@@ -141,7 +143,7 @@ export default function EventDetailPage() {
           {event.industries.length > 0 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Industries
+                {t("eventDetail.industries")}
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {event.industries.map((ind) => (
@@ -158,7 +160,7 @@ export default function EventDetailPage() {
           {event.channels.length > 0 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Channels
+                {t("eventDetail.channels")}
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {event.channels.map((ch) => (

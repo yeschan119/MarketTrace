@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { useI18n } from "@/lib/i18n";
 
 interface ScoreEntry {
   label: string;
@@ -30,14 +31,15 @@ export function ScoreBars({
   novelty_score,
   source_reliability,
 }: Props) {
+  const { t } = useI18n();
   // Optional scores (surprise/novelty/source_reliability) may be null when the
   // model omits them; drop those bars rather than rendering a misleading 0%.
   const scores: ScoreEntry[] = (
     [
-      { label: "Confidence", value: confidence, color: "#6366f1" },
-      { label: "Surprise", value: surprise_score, color: "#f59e0b" },
-      { label: "Novelty", value: novelty_score, color: "#10b981" },
-      { label: "Source Reliability", value: source_reliability, color: "#3b82f6" },
+      { label: t("scores.confidence"), value: confidence, color: "#6366f1" },
+      { label: t("scores.surprise"), value: surprise_score, color: "#f59e0b" },
+      { label: t("scores.novelty"), value: novelty_score, color: "#10b981" },
+      { label: t("scores.sourceReliability"), value: source_reliability, color: "#3b82f6" },
     ] as { label: string; value: number | null; color: string }[]
   ).filter((s): s is ScoreEntry => s.value != null);
 
@@ -48,7 +50,7 @@ export function ScoreBars({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">Score Components</h3>
+      <h3 className="mb-4 text-sm font-semibold text-gray-700">{t("scores.title")}</h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart
           data={data}

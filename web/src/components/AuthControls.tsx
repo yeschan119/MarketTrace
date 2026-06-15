@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import type { EventSummary } from "@/types/api";
 
 type IngestState = "idle" | "loading" | "polling" | "done";
@@ -13,6 +14,7 @@ const POLL_MAX_TICKS = 15; // 15 × 10s = 2.5 min
 
 export function AuthControls() {
   const { token, login, logout } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   // ── Login modal state ──────────────────────────────────────────────────────
@@ -57,10 +59,8 @@ export function AuthControls() {
       await login(username, password);
       closeModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      setLoginError(
-        msg.includes("401") ? "Invalid username or password." : msg
-      );
+      const msg = err instanceof Error ? err.message : t("auth.loginFailed");
+      setLoginError(msg.includes("401") ? t("auth.invalidCreds") : msg);
     } finally {
       setLoginLoading(false);
     }
@@ -76,12 +76,12 @@ export function AuthControls() {
     try {
       await api.ingest(token);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Ingest failed";
+      const msg = err instanceof Error ? err.message : t("ingest.failed");
       if (msg.includes("401")) {
         logout();
-        setIngestMessage("Session expired — please log in again.");
+        setIngestMessage(t("ingest.sessionExpired"));
       } else {
-        setIngestMessage(`Error: ${msg}`);
+        setIngestMessage(`${t("ingest.errorPrefix")}${msg}`);
       }
       setIngestState("idle");
       return;
@@ -93,7 +93,7 @@ export function AuthControls() {
     pollCountRef.current = 0;
 
     setIngestState("polling");
-    setIngestMessage("Ingestion started — data will appear shortly");
+    setIngestMessage(t("ingest.started"));
 
     pollIntervalRef.current = setInterval(() => {
       pollCountRef.current += 1;
@@ -110,8 +110,8 @@ export function AuthControls() {
         setIngestState("done");
         setIngestMessage(
           hasNewData
-            ? `✓ ${currentCount} events loaded`
-            : "Ingestion in progress — refresh to check for new data"
+            ? t("ingest.eventsLoaded", { n: currentCount })
+            : t("ingest.inProgress")
         );
       } else {
         // Trigger a background refetch of the events list
@@ -132,7 +132,7 @@ export function AuthControls() {
           onClick={openModal}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
-          Login
+          {t("auth.login")}
         </button>
 
         {showModal && (
@@ -155,7 +155,7 @@ export function AuthControls() {
                 id="login-title"
                 className="mb-6 text-xl font-bold text-gray-900"
               >
-                Sign in
+                {t("auth.signInTitle")}
               </h2>
 
               <form onSubmit={handleLogin} className="space-y-4">
@@ -164,7 +164,7 @@ export function AuthControls() {
                     htmlFor="mt-username"
                     className="mb-1 block text-sm font-medium text-gray-700"
                   >
-                    Username
+                    {t("auth.username")}
                   </label>
                   <input
                     id="mt-username"
@@ -183,7 +183,7 @@ export function AuthControls() {
                     htmlFor="mt-password"
                     className="mb-1 block text-sm font-medium text-gray-700"
                   >
-                    Password
+                    {t("auth.password")}
                   </label>
                   <input
                     id="mt-password"
@@ -211,14 +211,14 @@ export function AuthControls() {
                     disabled={loginLoading}
                     className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                   >
-                    {loginLoading ? "Signing in…" : "Sign in"}
+                    {loginLoading ? t("auth.signingIn") : t("auth.signIn")}
                   </button>
                   <button
                     type="button"
                     onClick={closeModal}
                     className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
                   >
-                    Cancel
+                    {t("auth.cancel")}
                   </button>
                 </div>
               </form>
@@ -243,7 +243,7 @@ export function AuthControls() {
           onClick={handleRefresh}
           className="text-xs text-indigo-500 underline hover:text-indigo-700"
         >
-          Refresh
+          {t("ingest.refresh")}
         </button>
       )}
 
@@ -253,17 +253,17 @@ export function AuthControls() {
         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
       >
         {ingestState === "loading"
-          ? "Starting…"
+          ? t("ingest.starting")
           : ingestState === "polling"
-            ? "Ingesting… (~1–2 min)"
-            : "Ingest data"}
+            ? t("ingest.ingesting")
+            : t("ingest.button")}
       </button>
 
       <button
         onClick={logout}
         className="rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
       >
-        Logout
+        {t("auth.logout")}
       </button>
     </div>
   );

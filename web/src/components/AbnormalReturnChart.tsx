@@ -11,16 +11,19 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { Outcome } from "@/types/api";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   outcomes: Outcome[];
 }
 
 export function AbnormalReturnChart({ outcomes }: Props) {
+  const { t } = useI18n();
+
   if (!outcomes || outcomes.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
-        No outcome data available
+        {t("chart.noData")}
       </div>
     );
   }
@@ -47,7 +50,7 @@ export function AbnormalReturnChart({ outcomes }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="mb-4 text-sm font-semibold text-gray-700">
-        Abnormal Returns (%)
+        {t("chart.title")}
       </h3>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
@@ -63,12 +66,12 @@ export function AbnormalReturnChart({ outcomes }: Props) {
               const pct = isNaN(num) ? "-" : `${num.toFixed(3)}%`;
               const label =
                 name === "abnormal_return"
-                  ? "Abnormal Return"
+                  ? t("chart.abnormalReturn")
                   : name === "raw_return"
-                  ? "Raw Return"
+                  ? t("chart.rawReturn")
                   : name === "sector_abnormal_return"
-                  ? "Sector-Adjusted"
-                  : "Market Return";
+                  ? t("chart.sectorAdjusted")
+                  : t("chart.marketReturn");
               return [pct, label];
             }}
           />
@@ -114,18 +117,18 @@ export function AbnormalReturnChart({ outcomes }: Props) {
       </ResponsiveContainer>
       <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-4 bg-indigo-500" /> Abnormal
+          <span className="inline-block h-0.5 w-4 bg-indigo-500" /> {t("chart.abnormal")}
         </span>
         {hasSector && (
           <span className="flex items-center gap-1">
-            <span className="inline-block h-0.5 w-4 bg-purple-500" /> Sector-Adjusted
+            <span className="inline-block h-0.5 w-4 bg-purple-500" /> {t("chart.sectorAdjusted")}
           </span>
         )}
         <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-4 bg-emerald-500" /> Raw
+          <span className="inline-block h-0.5 w-4 bg-emerald-500" /> {t("chart.raw")}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-4 bg-amber-500" /> Market
+          <span className="inline-block h-0.5 w-4 bg-amber-500" /> {t("chart.market")}
         </span>
       </div>
     </div>

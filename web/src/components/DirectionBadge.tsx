@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "@/lib/i18n";
+
 interface Props {
   direction: string;
 }
@@ -12,15 +16,19 @@ const directionStyles: Record<string, string> = {
 };
 
 export function DirectionBadge({ direction }: Props) {
+  const { t } = useI18n();
+  const key = direction.toLowerCase();
   const style =
-    directionStyles[direction.toLowerCase()] ??
-    "bg-gray-100 text-gray-700 border border-gray-200";
+    directionStyles[key] ?? "bg-gray-100 text-gray-700 border border-gray-200";
+  const label = ["positive", "negative", "neutral"].includes(key)
+    ? t(`direction.${key}`)
+    : direction;
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${style}`}
     >
-      {direction}
+      {label}
     </span>
   );
 }

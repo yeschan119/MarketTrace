@@ -4,9 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { DirectionBadge } from "@/components/DirectionBadge";
 
 export default function InstrumentTimelinePage() {
+  const { t, locale } = useI18n();
   const params = useParams();
   const id = params.id as string;
 
@@ -19,7 +21,7 @@ export default function InstrumentTimelinePage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
-        Loading instrument timeline...
+        {t("instrument.loading")}
       </div>
     );
   }
@@ -27,9 +29,9 @@ export default function InstrumentTimelinePage() {
   if (isError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
-        <p className="font-semibold">Failed to load instrument</p>
+        <p className="font-semibold">{t("instrument.failTitle")}</p>
         <p className="mt-1 text-sm">
-          {error instanceof Error ? error.message : "Unknown error"}
+          {error instanceof Error ? error.message : t("common.unknownError")}
         </p>
       </div>
     );
@@ -46,7 +48,7 @@ export default function InstrumentTimelinePage() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-500">
         <Link href="/events" className="hover:text-gray-700 hover:underline">
-          Events
+          {t("nav.events")}
         </Link>
         <span>/</span>
         <span className="text-gray-900">
@@ -70,15 +72,15 @@ export default function InstrumentTimelinePage() {
       {/* Timeline */}
       <div>
         <h2 className="mb-4 text-lg font-semibold text-gray-800">
-          Event Timeline
+          {t("instrument.timeline")}
           <span className="ml-2 text-sm font-normal text-gray-500">
-            ({events.length} events)
+            {t("instrument.eventsCount", { n: events.length })}
           </span>
         </h2>
 
         {events.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
-            No events recorded for this instrument.
+            {t("instrument.empty")}
           </div>
         ) : (
           <div className="relative space-y-4 pl-6">
@@ -108,7 +110,7 @@ export default function InstrumentTimelinePage() {
                         {event.event_type}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500">
-                        {new Date(event.published_at).toLocaleDateString("en-US", {
+                        {new Date(event.published_at).toLocaleDateString(locale, {
                           year: "numeric",
                           month: "short",
                           day: "numeric",
@@ -118,7 +120,7 @@ export default function InstrumentTimelinePage() {
                     <div className="flex items-center gap-2">
                       <DirectionBadge direction={event.direction} />
                       <span className="text-xs text-gray-500">
-                        {(event.confidence * 100).toFixed(0)}% conf
+                        {(event.confidence * 100).toFixed(0)}% {t("instrument.conf")}
                       </span>
                     </div>
                   </div>
