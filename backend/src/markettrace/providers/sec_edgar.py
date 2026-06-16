@@ -7,6 +7,7 @@ an ``httpx.Client`` so tests can supply a mock transport.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -59,6 +60,7 @@ class SecEdgarProvider:
         since: datetime,
         *,
         primary_ticker: str | None = None,
+        forms: Collection[str] | None = None,
     ) -> list[DocumentRef]:
         """Return ``DocumentRef`` objects for all filings since ``since``.
 
@@ -70,7 +72,13 @@ class SecEdgarProvider:
             Only filings with ``filingDate >= since.date()`` are returned.
         primary_ticker:
             If provided, attached to every ``DocumentRef`` as ``primary_ticker``.
+        forms:
+            If provided, only filings whose ``form`` is in this set are kept
+            (e.g. ``{"8-K"}`` to restrict to material-event reports). Matching is
+            exact on the EDGAR form code.
         """
+        form_filter = set(forms) if forms else None
+
         url = _SUBMISSIONS_URL.format(cik=cik)
         resp = self._client.get(url)
         resp.raise_for_status()
@@ -92,6 +100,8 @@ class SecEdgarProvider:
         ):
             filing_date = datetime.fromisoformat(filing_date_str).date()
             if filing_date < since_date:
+                continue
+            if form_filter is not None and form not in form_filter:
                 continue
 
             accession_no_dashes = accession.replace("-", "")
@@ -129,12 +139,15 @@ class SecEdgarProvider:
         since: datetime,
         *,
         primary_ticker: str | None = None,
+        forms: Collection[str] | None = None,
     ) -> list[DocumentRef]:
         """Market-agnostic alias for :meth:`list_for_cik`.
 
         ``issuer_id`` is the issuer's CIK for the US market.
         """
-        return self.list_for_cik(issuer_id, since, primary_ticker=primary_ticker)
+        return self.list_for_cik(
+            issuer_id, since, primary_ticker=primary_ticker, forms=forms
+        )
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all CIKs in the configured watchlist since ``since``.

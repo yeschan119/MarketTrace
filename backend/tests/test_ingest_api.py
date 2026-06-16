@@ -11,10 +11,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import markettrace.api.ingest as ingest_mod
 from markettrace.api.auth import create_token
-from markettrace.api.ingest import _DEMO_FILINGS, _ingest_macro, _ingest_one
+from markettrace.api.ingest import _DEMO_FILINGS, _ingest_corpus, _ingest_macro, _ingest_one
 from markettrace.api.main import create_app
-from markettrace.db.models import Base, Document
+from markettrace.db.models import Base, Document, Instrument
 
 
 class _Settings:
@@ -192,3 +193,108 @@ def test_ingest_macro_runs_with_key(monkeypatch) -> None:
     assert captured["session"] is sentinel_session
     assert captured["provider"] is sentinel_provider
     assert captured["series_ids"] == ["CPIAUCSL", "UNRATE"]
+
+
+# ---------------------------------------------------------------------------
+# _ingest_corpus — caps, 8-K filter, idempotency, isolation (unit test, no network)
+# ---------------------------------------------------------------------------
+
+
+def _corpus_refs(n: int) -> list[SimpleNamespace]:
+    return [
+        SimpleNamespace(source="sec_edgar", external_id=f"acc-{i}", market="US")
+        for i in range(n)
+    ]
+
+
+@pytest.fixture
+def corpus_env(monkeypatch):
+    """Shrink the corpus to one issuer and stub out the network + extractor."""
+    monkeypatch.setattr(
+        ingest_mod,
+        "_CORPUS_ISSUERS",
+        [{"ticker": "AAPL", "cik": "320193", "name": "Apple Inc.", "industry": "Technology"}],
+    )
+    monkeypatch.setattr(ingest_mod, "_CORPUS_PER_ISSUER", 2)
+    monkeypatch.setattr(
+        "markettrace.nlp.event_extractor.EventExtractor", lambda *a, **kw: object()
+    )
+    monkeypatch.setattr(ingest_mod, "get_price_provider", lambda *a, **kw: object())
+
+    captured: dict = {}
+
+    class _Disclosure:
+        def list_for_issuer(self, issuer_id, since, *, primary_ticker=None, forms=None):
+            captured["forms"] = forms
+            captured["primary_ticker"] = primary_ticker
+            return _corpus_refs(3)  # more than the per-issuer cap
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+    return captured
+
+
+def test_corpus_seeds_caps_and_filters_to_8k(
+    monkeypatch, mem_session, corpus_env, fake_settings
+) -> None:
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        ingest_mod,
+        "run_slice",
+        lambda *a, **kw: calls.append((kw["ticker"], kw["ref"].external_id)),
+    )
+
+    _ingest_corpus(mem_session, None, fake_settings)
+
+    # Only the first _CORPUS_PER_ISSUER (2) of the 3 listed refs are ingested.
+    assert calls == [("AAPL", "acc-0"), ("AAPL", "acc-1")]
+    # The 8-K form filter and ticker were forwarded to the provider.
+    assert corpus_env["forms"] == ingest_mod._CORPUS_FORMS
+    assert corpus_env["primary_ticker"] == "AAPL"
+    # The issuer's Instrument was seeded so run_slice can resolve it.
+    assert mem_session.query(Instrument).filter_by(ticker="AAPL").count() == 1
+
+
+def test_corpus_skips_already_ingested_documents(
+    monkeypatch, mem_session, corpus_env, fake_settings
+) -> None:
+    mem_session.add(
+        Document(
+            source="sec_edgar",
+            external_id="acc-0",
+            url="https://example.com",
+            title="seed",
+            content_hash="seedhash",
+            market="US",
+            published_at=datetime(2026, 1, 1, tzinfo=UTC),
+            first_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+    )
+    mem_session.commit()
+
+    sliced: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod, "run_slice", lambda *a, **kw: sliced.append(kw["ref"].external_id)
+    )
+
+    _ingest_corpus(mem_session, None, fake_settings)
+
+    # acc-0 already exists -> no re-extraction; only acc-1 (still within the cap) runs.
+    assert sliced == ["acc-1"]
+
+
+def test_corpus_one_filing_failure_does_not_abort_issuer(
+    monkeypatch, mem_session, corpus_env, fake_settings
+) -> None:
+    sliced: list[str] = []
+
+    def _slice(*a, **kw):
+        if kw["ref"].external_id == "acc-0":
+            raise RuntimeError("boom: simulated slice failure")
+        sliced.append(kw["ref"].external_id)
+
+    monkeypatch.setattr(ingest_mod, "run_slice", _slice)
+
+    _ingest_corpus(mem_session, None, fake_settings)
+
+    # acc-0 failed but acc-1 was still ingested.
+    assert sliced == ["acc-1"]

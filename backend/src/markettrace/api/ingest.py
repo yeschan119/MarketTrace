@@ -1,10 +1,13 @@
 """Login-gated manual ingest endpoint.
 
-``POST /ingest`` (auth required) kicks off the demo ingestion set in a FastAPI
-background task and returns ``202 {"status": "started"}`` immediately. The
-background work uses its OWN DB session (the request session is closed once the
-response is sent) and is idempotent: filings already present (matched on
-``(source, external_id)``) are skipped.
+``POST /ingest`` (auth required) kicks off ingestion in a FastAPI background
+task and returns ``202 {"status": "started"}`` immediately. The work uses its
+OWN DB session (the request session is closed once the response is sent) and is
+idempotent: filings already present (matched on ``(source, external_id)``) are
+skipped. It covers the two demo filings, a small validation corpus of recent
+US 8-Ks (``_CORPUS_ISSUERS``), and the macro series (FRED). Each part is
+isolated and persists incrementally, so a run cut short by the platform timeout
+resumes on the next trigger.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from markettrace.db.session import make_engine, make_session_factory
 from markettrace.pipeline.seed import (
     DEFAULT_WATCHLIST,
     KR_WATCHLIST,
+    seed_instrument,
     seed_watchlist,
 )
 from markettrace.pipeline.vertical_slice import recompute_document_outcomes, run_slice
@@ -53,6 +57,25 @@ _DEMO_FILINGS: list[dict[str, str]] = [
         "accession": "20260430800083",
         "market_index": None,  # resolved from settings below
     },
+]
+
+# Small validation corpus (blueprint phase 4): the most recent 8-Ks for a handful
+# of US large caps, ingested by POST /ingest alongside the demo filings so the
+# backtest/eval has more than two events to work with. 8-K = material-event
+# report — short, event-dense, and cheap to extract (one gpt-4o-mini call each).
+# CIKs verified against EDGAR. Idempotent: already-ingested filings are skipped
+# (no LLM cost) and run_slice commits per filing, so a run cut short by the
+# free-tier timeout resumes where it stopped on the next /ingest.
+_CORPUS_FORMS = ("8-K",)
+_CORPUS_PER_ISSUER = 10
+_CORPUS_SINCE = datetime(2024, 1, 1, tzinfo=UTC)
+_CORPUS_MARKET_INDEX = "spy"
+_CORPUS_ISSUERS: list[dict[str, str]] = [
+    {"ticker": "AAPL", "cik": "320193", "name": "Apple Inc.", "industry": "Technology"},
+    {"ticker": "MSFT", "cik": "789019", "name": "Microsoft Corporation", "industry": "Technology"},
+    {"ticker": "NVDA", "cik": "1045810", "name": "NVIDIA Corporation", "industry": "Technology"},
+    {"ticker": "JPM", "cik": "19617", "name": "JPMorgan Chase & Co.", "industry": "Financials"},
+    {"ticker": "XOM", "cik": "34088", "name": "Exxon Mobil Corporation", "industry": "Energy"},
 ]
 
 
@@ -135,6 +158,73 @@ def _ingest_one(session, store, settings, filing: dict[str, str]) -> None:
     logger.info("ingest: completed %s/%s", ref.source, ref.external_id)
 
 
+def _ingest_corpus(session, store, settings) -> None:
+    """Ingest the most recent 8-Ks for each validation-corpus issuer (US).
+
+    Seeds each issuer's Instrument, lists its recent 8-K filings, and runs the
+    vertical slice on any not already ingested. Each filing is isolated in
+    try/except and run_slice commits per filing, so one failure (or a timeout)
+    leaves the successfully ingested filings persisted and the run resumable.
+    """
+    from markettrace.nlp.event_extractor import EventExtractor
+
+    disclosure = get_disclosure_provider("US", user_agent=settings.sec_user_agent)
+    price = get_price_provider("US")
+    extractor = EventExtractor()
+
+    for issuer in _CORPUS_ISSUERS:
+        ticker = issuer["ticker"]
+        seed_instrument(
+            session,
+            market="US",
+            ticker=ticker,
+            name=issuer["name"],
+            industry=issuer.get("industry"),
+        )
+        session.commit()
+
+        try:
+            refs = disclosure.list_for_issuer(
+                issuer["cik"],
+                _CORPUS_SINCE,
+                primary_ticker=ticker,
+                forms=_CORPUS_FORMS,
+            )
+        except Exception:  # noqa: BLE001 - one issuer must not abort the rest
+            session.rollback()
+            logger.exception("corpus: listing failed for %s", ticker)
+            continue
+
+        ingested = 0
+        for ref in refs[:_CORPUS_PER_ISSUER]:
+            existing = session.scalars(
+                select(Document).where(
+                    Document.source == ref.source,
+                    Document.external_id == ref.external_id,
+                )
+            ).first()
+            if existing is not None:
+                continue  # already ingested (idempotent) — cheap skip, no LLM call
+            try:
+                run_slice(
+                    session,
+                    store,
+                    ref=ref,
+                    disclosure_provider=disclosure,
+                    price_provider=price,
+                    extractor=extractor,
+                    ticker=ticker,
+                    market_index_ticker=_CORPUS_MARKET_INDEX,
+                )
+                ingested += 1
+            except Exception:  # noqa: BLE001 - one filing must not abort the rest
+                session.rollback()
+                logger.exception(
+                    "corpus: ingest failed for %s/%s", ref.source, ref.external_id
+                )
+        logger.info("corpus: %s ingested %d new 8-K(s)", ticker, ingested)
+
+
 def _ingest_macro(session, settings) -> None:
     """Populate ``macro_observations`` from FRED (idempotent; needs FRED_API_KEY).
 
@@ -180,6 +270,12 @@ def run_demo_ingest() -> None:
             except Exception:  # noqa: BLE001 - one filing must not abort the rest
                 session.rollback()
                 logger.exception("ingest: failed for %s/%s", filing["market"], filing["ticker"])
+
+        try:
+            _ingest_corpus(session, store, settings)
+        except Exception:  # noqa: BLE001 - corpus failure must not abort the ingest
+            session.rollback()
+            logger.exception("ingest: corpus ingest failed")
 
         try:
             _ingest_macro(session, settings)

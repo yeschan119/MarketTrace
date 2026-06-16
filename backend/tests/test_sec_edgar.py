@@ -101,6 +101,33 @@ class TestListForCik:
 
 
 # ---------------------------------------------------------------------------
+# list_for_cik — forms filter (fixture holds 10-Q, 10-Q, 10-K)
+# ---------------------------------------------------------------------------
+
+class TestFormsFilter:
+    _OLD = datetime(2020, 1, 1, tzinfo=UTC)
+
+    def test_keeps_only_requested_form(self, provider: SecEdgarProvider):
+        refs = provider.list_for_cik(CIK, self._OLD, forms={"10-K"})
+        assert len(refs) == 1
+
+    def test_keeps_multiple_of_a_form(self, provider: SecEdgarProvider):
+        refs = provider.list_for_cik(CIK, self._OLD, forms={"10-Q"})
+        assert len(refs) == 2
+
+    def test_absent_form_returns_empty(self, provider: SecEdgarProvider):
+        # No 8-K in the fixture -> nothing matches.
+        assert provider.list_for_cik(CIK, self._OLD, forms={"8-K"}) == []
+
+    def test_none_filter_keeps_all(self, provider: SecEdgarProvider):
+        assert len(provider.list_for_cik(CIK, self._OLD, forms=None)) == 3
+
+    def test_issuer_alias_forwards_forms(self, provider: SecEdgarProvider):
+        refs = provider.list_for_issuer(CIK, self._OLD, forms={"10-K"})
+        assert len(refs) == 1
+
+
+# ---------------------------------------------------------------------------
 # list_recent
 # ---------------------------------------------------------------------------
 
