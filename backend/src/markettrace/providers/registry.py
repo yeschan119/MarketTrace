@@ -29,6 +29,9 @@ def get_disclosure_provider(market: str, **kw) -> DisclosureProvider:
     if market == "US":
         from markettrace.providers.sec_edgar import SecEdgarProvider
 
+        # Space EDGAR requests (~5 req/s, well under SEC's 10 req/s cap) so bulk
+        # corpus ingestion is not throttled with 429s; retry/backoff is built in.
+        kw.setdefault("min_request_interval", 0.2)
         return SecEdgarProvider(**kw)  # type: ignore[return-value]
 
     if market == "KR":

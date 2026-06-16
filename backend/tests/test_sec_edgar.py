@@ -192,3 +192,115 @@ class TestListForIssuer:
         via_issuer = provider.list_for_issuer(CIK, since, primary_ticker="AAPL")
         via_cik = provider.list_for_cik(CIK, since, primary_ticker="AAPL")
         assert via_issuer == via_cik
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting + retry on SEC throttling (429/503)
+# ---------------------------------------------------------------------------
+
+_OLD = datetime(2020, 1, 1, tzinfo=UTC)
+
+
+def _provider_with(handler, **kw) -> SecEdgarProvider:
+    client = httpx.Client(
+        transport=httpx.MockTransport(handler), headers={"User-Agent": "t t@e.com"}
+    )
+    kw.setdefault("sleep", lambda _d: None)  # never sleep for real in tests
+    return SecEdgarProvider(user_agent="t t@e.com", client=client, **kw)
+
+
+def _doc_handler(doc_statuses):
+    """Submissions always 200; the doc URL returns *doc_statuses* in order."""
+    seq = iter(doc_statuses)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "submissions" in str(request.url):
+            return httpx.Response(
+                200, text=SUBMISSIONS_JSON, headers={"Content-Type": "application/json"}
+            )
+        code = next(seq)
+        if code == 200:
+            return httpx.Response(
+                200, text=PRIMARY_DOC_HTML, headers={"Content-Type": "text/html"}
+            )
+        return httpx.Response(code, text="slow down")
+
+    return handler
+
+
+class TestRetryAndThrottle:
+    def test_retries_then_succeeds_on_429(self):
+        delays: list[float] = []
+        prov = _provider_with(
+            _doc_handler([429, 429, 200]), sleep=lambda d: delays.append(d)
+        )
+        ref = prov.list_for_cik(CIK, _OLD)[0]
+        raw = prov.fetch_raw(ref)
+        assert raw.content == PRIMARY_DOC_HTML
+        # Two 429s -> two backoff sleeps of base*2**attempt = 1.0, 2.0.
+        assert delays == [1.0, 2.0]
+
+    def test_raises_after_exhausting_retries(self):
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "submissions" in str(request.url):
+                return httpx.Response(
+                    200, text=SUBMISSIONS_JSON, headers={"Content-Type": "application/json"}
+                )
+            attempts["n"] += 1
+            return httpx.Response(429, text="nope")
+
+        prov = _provider_with(handler, max_retries=2)
+        ref = prov.list_for_cik(CIK, _OLD)[0]
+        with pytest.raises(httpx.HTTPStatusError):
+            prov.fetch_raw(ref)
+        assert attempts["n"] == 3  # initial attempt + 2 retries
+
+    def test_honors_retry_after_header(self):
+        delays: list[float] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "submissions" in str(request.url):
+                return httpx.Response(
+                    200, text=SUBMISSIONS_JSON, headers={"Content-Type": "application/json"}
+                )
+            if not delays:  # first doc request -> throttle with explicit Retry-After
+                return httpx.Response(429, text="wait", headers={"Retry-After": "7"})
+            return httpx.Response(
+                200, text=PRIMARY_DOC_HTML, headers={"Content-Type": "text/html"}
+            )
+
+        prov = _provider_with(handler, sleep=lambda d: delays.append(d))
+        ref = prov.list_for_cik(CIK, _OLD)[0]
+        prov.fetch_raw(ref)
+        assert delays == [7.0]
+
+    def test_non_throttle_error_is_not_retried(self):
+        attempts = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "submissions" in str(request.url):
+                return httpx.Response(
+                    200, text=SUBMISSIONS_JSON, headers={"Content-Type": "application/json"}
+                )
+            attempts["n"] += 1
+            return httpx.Response(404, text="missing")
+
+        prov = _provider_with(handler)
+        ref = prov.list_for_cik(CIK, _OLD)[0]
+        with pytest.raises(httpx.HTTPStatusError):
+            prov.fetch_raw(ref)
+        assert attempts["n"] == 1  # 404 raises immediately, no retry
+
+    def test_throttle_spaces_consecutive_requests(self):
+        delays: list[float] = []
+        prov = _provider_with(
+            _doc_handler([200]),
+            min_request_interval=0.2,
+            sleep=lambda d: delays.append(d),
+            monotonic=lambda: 0.0,  # frozen clock -> the 2nd request waits the full interval
+        )
+        ref = prov.list_for_cik(CIK, _OLD)[0]  # request 1 (submissions)
+        prov.fetch_raw(ref)  # request 2 (doc) -> spaced by 0.2s
+        assert any(abs(d - 0.2) < 1e-9 for d in delays)
