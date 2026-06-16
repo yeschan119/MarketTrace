@@ -135,6 +135,30 @@ def _ingest_one(session, store, settings, filing: dict[str, str]) -> None:
     logger.info("ingest: completed %s/%s", ref.source, ref.external_id)
 
 
+def _ingest_macro(session, settings) -> None:
+    """Populate ``macro_observations`` from FRED (idempotent; needs FRED_API_KEY).
+
+    Skipped with a log line when no key is configured so the rest of the demo
+    ingest still succeeds. Wired here because production has no scheduled macro
+    job — the admin's ``POST /ingest`` is the only trigger that runs in Render.
+    """
+    if settings.fred_api_key is None:
+        logger.info("ingest: FRED_API_KEY not set; skipping macro ingest")
+        return
+
+    from markettrace.pipeline.macro_ingest import ingest_macro_series
+    from markettrace.providers.registry import get_macro_provider
+
+    provider = get_macro_provider("fred")
+    inserted = ingest_macro_series(
+        session,
+        provider,
+        settings.macro_series_list,
+        now=datetime.now(UTC),
+    )
+    logger.info("ingest: macro inserted %s", inserted)
+
+
 def run_demo_ingest() -> None:
     """Background worker: seed watchlists then ingest the demo filing set.
 
@@ -156,6 +180,12 @@ def run_demo_ingest() -> None:
             except Exception:  # noqa: BLE001 - one filing must not abort the rest
                 session.rollback()
                 logger.exception("ingest: failed for %s/%s", filing["market"], filing["ticker"])
+
+        try:
+            _ingest_macro(session, settings)
+        except Exception:  # noqa: BLE001 - macro failure must not abort the ingest
+            session.rollback()
+            logger.exception("ingest: macro ingest failed")
     finally:
         session.close()
 

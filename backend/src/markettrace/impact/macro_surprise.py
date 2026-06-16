@@ -88,6 +88,7 @@ def build_macro_observations(
     *,
     now: datetime,
     expected_lookup: dict | None = None,
+    prior_history: Sequence[float] | None = None,
 ) -> list[MacroObservation]:
     """Create one :class:`MacroObservation` per point with surprise filled in.
 
@@ -98,10 +99,18 @@ def build_macro_observations(
     prior releases (``"baseline"``). The scale uses only prior releases, so no
     observation depends on a value released after it. Rows are returned (not
     added to a session) so the caller controls persistence.
+
+    *prior_history* seeds the baseline/scale history with released values from
+    periods *before* the first point — released ascending. An incremental fetch
+    (only the newest releases) passes the earlier values stored in the DB here so
+    each new observation's expectation and scale match a full-history compute,
+    without re-downloading decades of data.
     """
     expected_lookup = expected_lookup or {}
     rows: list[MacroObservation] = []
-    history: list[float] = []  # released values strictly before the current point
+    # Released values strictly before the current point, seeded with any history
+    # the caller already holds (e.g. prior DB rows for an incremental fetch).
+    history: list[float] = list(prior_history or [])
 
     for point in points:
         consensus = expected_lookup.get(point.reference_date)

@@ -40,20 +40,46 @@ def ingest_macro_series(
     identical ``(series_id, reference_date, revision)`` row already exists. A
     single ``ModelRun`` records provenance when anything was inserted; the
     session is committed once at the end.
+
+    Fetches are *incremental*: a series already present in the DB is re-fetched
+    only from its latest stored ``reference_date`` (the overlap row is deduped),
+    not from *since*, so repeat runs avoid re-downloading decades of data. The
+    surprise of each new release still needs the full prior history for its
+    baseline/scale, so the released values stored before the fetch window seed
+    that history — reproducing a full-history compute. *since* is the fetch floor
+    only for series with no rows yet.
     """
     inserted: dict[str, int] = {}
 
     for series_id in series_ids:
-        points = provider.get_observations(series_id, since)
-        rows = build_macro_observations(points, now=now)
+        # Existing rows: dedup keys + the released-value history (initial release
+        # per period) used to seed surprise for incrementally fetched points.
+        existing_rows = session.execute(
+            select(
+                MacroObservation.reference_date,
+                MacroObservation.revision,
+                MacroObservation.released_value,
+            )
+            .where(MacroObservation.series_id == series_id)
+            .order_by(MacroObservation.reference_date)
+        ).all()
+        existing = {(r.reference_date, r.revision) for r in existing_rows}
 
-        existing = set(
-            session.execute(
-                select(MacroObservation.reference_date, MacroObservation.revision).where(
-                    MacroObservation.series_id == series_id
-                )
-            ).all()
-        )
+        # Re-fetch from the latest stored reference_date so only new releases come
+        # back (the boundary row is deduped, and re-including it lets the provider
+        # chain previous_value into the first new point). Seed history with the
+        # released values from strictly-earlier periods so baseline/scale match a
+        # full-history compute. New series fall back to the *since* floor.
+        last_ref = existing_rows[-1].reference_date if existing_rows else None
+        fetch_since = last_ref if last_ref is not None else since
+        prior_history = [
+            r.released_value
+            for r in existing_rows
+            if r.revision == 0 and r.reference_date < fetch_since
+        ]
+
+        points = provider.get_observations(series_id, fetch_since)
+        rows = build_macro_observations(points, now=now, prior_history=prior_history)
 
         count = 0
         for row in rows:

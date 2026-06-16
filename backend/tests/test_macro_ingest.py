@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 from markettrace.db.models import MacroObservation, ModelRun
+from markettrace.impact.macro_surprise import build_macro_observations
 from markettrace.pipeline.macro_ingest import ingest_macro_series
 from markettrace.providers.base import MacroPoint
 
@@ -73,3 +74,70 @@ def test_ingest_is_idempotent(db_session):
     assert db_session.query(MacroObservation).count() == 5
     # Only the first run (which inserted rows) records a ModelRun.
     assert db_session.query(ModelRun).filter(ModelRun.kind == "macro_ingest").count() == 1
+
+
+class _RecordingProvider:
+    """Records the *since* it was asked for and only returns points on/after it."""
+
+    source = "fred"
+
+    def __init__(self, points_by_series: dict[str, list[MacroPoint]]):
+        self._points = points_by_series
+        self.calls: list[tuple[str, date]] = []
+
+    def get_observations(self, series_id: str, since: date) -> list[MacroPoint]:
+        self.calls.append((series_id, since))
+        return [p for p in self._points.get(series_id, []) if p.reference_date >= since]
+
+
+def test_repeat_fetch_is_incremental_from_last_reference_date(db_session):
+    """A series already in the DB is re-fetched from its latest stored date, not *since*."""
+    points = _series_points("CPIAUCSL")
+    provider = _RecordingProvider({"CPIAUCSL": points})
+
+    ingest_macro_series(
+        db_session, provider, ["CPIAUCSL"], now=_NOW, since=date(2020, 1, 1)
+    )
+    ingest_macro_series(
+        db_session, provider, ["CPIAUCSL"], now=_NOW, since=date(2020, 1, 1)
+    )
+
+    first_since = provider.calls[0][1]
+    second_since = provider.calls[1][1]
+    assert first_since == date(2020, 1, 1)  # empty series -> the floor
+    assert second_since == date(2024, 5, 1)  # latest stored reference_date
+
+
+def test_incremental_new_release_surprise_matches_full_history(db_session):
+    """A point appended on a later run gets the SAME surprise a full rebuild would give."""
+    base = _series_points("CPIAUCSL")
+    provider = _RecordingProvider({"CPIAUCSL": base})
+
+    ingest_macro_series(db_session, provider, ["CPIAUCSL"], since=date(2020, 1, 1), now=_NOW)
+
+    # A new release lands; only the newest point is fetched on the second run.
+    new_point = MacroPoint(
+        series_id="CPIAUCSL",
+        reference_date=date(2024, 6, 1),
+        released_value=99.0,  # a sharp move so the surprise is clearly non-zero
+        released_at=datetime(2024, 6, 1, tzinfo=UTC),
+        previous_value=108.0,
+    )
+    provider._points["CPIAUCSL"] = base + [new_point]
+
+    inserted = ingest_macro_series(
+        db_session, provider, ["CPIAUCSL"], since=date(2020, 1, 1), now=_NOW
+    )
+    assert inserted == {"CPIAUCSL": 1}  # only the new release
+
+    row = (
+        db_session.query(MacroObservation)
+        .filter(MacroObservation.reference_date == date(2024, 6, 1))
+        .one()
+    )
+    # The surprise computed incrementally (history seeded from the DB) equals the
+    # surprise from rebuilding the whole series in one shot — no history lost.
+    full = build_macro_observations(base + [new_point], now=_NOW)
+    expected_surprise = full[-1].surprise_score
+    assert expected_surprise is not None
+    assert row.surprise_score == expected_surprise

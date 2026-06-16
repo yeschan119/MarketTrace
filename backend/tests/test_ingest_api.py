@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from markettrace.api.auth import create_token
-from markettrace.api.ingest import _DEMO_FILINGS, _ingest_one
+from markettrace.api.ingest import _DEMO_FILINGS, _ingest_macro, _ingest_one
 from markettrace.api.main import create_app
 from markettrace.db.models import Base, Document
 
@@ -142,3 +142,53 @@ def test_ingest_one_skips_existing(monkeypatch, mem_session, fake_settings: _Set
     _ingest_one(mem_session, None, fake_settings, filing)
 
     assert not run_slice_calls, "run_slice must not be called for an already-ingested document"
+
+
+# ---------------------------------------------------------------------------
+# _ingest_macro — gated on FRED_API_KEY (unit test — no network)
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_macro_skips_without_key(monkeypatch) -> None:
+    """No FRED_API_KEY -> macro ingest is a no-op (never builds a provider)."""
+    settings = SimpleNamespace(fred_api_key=None, macro_series_list=["CPIAUCSL"])
+
+    provider_calls: list[bool] = []
+    monkeypatch.setattr(
+        "markettrace.providers.registry.get_macro_provider",
+        lambda *a, **kw: provider_calls.append(True),
+    )
+
+    _ingest_macro(object(), settings)
+
+    assert not provider_calls, "macro provider must not be built when FRED_API_KEY is unset"
+
+
+def test_ingest_macro_runs_with_key(monkeypatch) -> None:
+    """With a key set, _ingest_macro feeds the configured series to ingest_macro_series."""
+    settings = SimpleNamespace(fred_api_key="abc", macro_series_list=["CPIAUCSL", "UNRATE"])
+    sentinel_provider = object()
+    sentinel_session = object()
+
+    monkeypatch.setattr(
+        "markettrace.providers.registry.get_macro_provider",
+        lambda source="fred": sentinel_provider,
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_ingest(session, provider, series_ids, *, now):
+        captured["session"] = session
+        captured["provider"] = provider
+        captured["series_ids"] = series_ids
+        return {s: 1 for s in series_ids}
+
+    monkeypatch.setattr(
+        "markettrace.pipeline.macro_ingest.ingest_macro_series", _fake_ingest
+    )
+
+    _ingest_macro(sentinel_session, settings)
+
+    assert captured["session"] is sentinel_session
+    assert captured["provider"] is sentinel_provider
+    assert captured["series_ids"] == ["CPIAUCSL", "UNRATE"]
