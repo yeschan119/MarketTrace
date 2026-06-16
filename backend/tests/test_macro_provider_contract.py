@@ -89,3 +89,77 @@ class TestRequestShape:
         provider = FredMacroProvider(api_key="k", client=client)
         with pytest.raises(httpx.HTTPStatusError):
             provider.get_observations("CPIAUCSL", date(2020, 1, 1))
+
+
+# FRED's standard (output_type=1) shape: current values, one vintage (today).
+FRED_CURRENT_OBS = {
+    "observations": [
+        {"realtime_start": "2026-06-16", "realtime_end": "2026-06-16", "date": "2024-01-02", "value": "4.10"},
+        {"realtime_start": "2026-06-16", "realtime_end": "2026-06-16", "date": "2024-01-03", "value": "4.20"},
+    ]
+}
+# The 400 FRED returns for a daily series with too many vintages for output_type=4.
+_VINTAGE_OVERFLOW = json.dumps(
+    {
+        "error_code": 400,
+        "error_message": (
+            "Bad Request.  There are 5045 vintage dates in the specified "
+            "real-time period: 1900-01-01 to 9999-12-31.  This exceeds the "
+            "maximum number of vintage dates allowed for output_type=4."
+        ),
+    }
+)
+
+
+class TestVintageOverflowFallback:
+    """Daily series exceeding the output_type=4 vintage cap fall back to current values."""
+
+    def _make_provider(self, *, requests: list[str] | None = None) -> FredMacroProvider:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if requests is not None:
+                requests.append(str(request.url))
+            if "output_type=4" in str(request.url):
+                return httpx.Response(
+                    400, text=_VINTAGE_OVERFLOW, headers={"Content-Type": "application/json"}
+                )
+            return httpx.Response(
+                200,
+                text=json.dumps(FRED_CURRENT_OBS),
+                headers={"Content-Type": "application/json"},
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        return FredMacroProvider(api_key="k", client=client)
+
+    def test_falls_back_to_current_observations(self):
+        points = self._make_provider().get_observations("DGS10", date(2024, 1, 1))
+        assert [p.reference_date for p in points] == [date(2024, 1, 2), date(2024, 1, 3)]
+        assert points[1].released_value == pytest.approx(4.20)
+        assert points[1].previous_value == pytest.approx(4.10)
+
+    def test_released_at_dated_to_reference_date(self):
+        # The fallback has no vintage date, so each value is dated to its period.
+        points = self._make_provider().get_observations("DGS10", date(2024, 1, 1))
+        assert points[0].released_at == datetime(2024, 1, 2, tzinfo=UTC)
+
+    def test_fallback_request_drops_output_type_and_realtime_window(self):
+        requests: list[str] = []
+        self._make_provider(requests=requests).get_observations("DGS10", date(2024, 1, 1))
+        assert len(requests) == 2  # the failed type=4 attempt, then the fallback
+        fallback = requests[1]
+        assert "output_type=4" not in fallback
+        assert "realtime_start" not in fallback
+
+    def test_non_overflow_400_still_raises(self):
+        # A 400 that is not a vintage overflow must not be silently swallowed.
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                400,
+                text=json.dumps({"error_code": 400, "error_message": "Bad series id."}),
+                headers={"Content-Type": "application/json"},
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        provider = FredMacroProvider(api_key="k", client=client)
+        with pytest.raises(httpx.HTTPStatusError):
+            provider.get_observations("NOPE", date(2024, 1, 1))

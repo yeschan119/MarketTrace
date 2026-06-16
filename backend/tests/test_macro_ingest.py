@@ -141,3 +141,36 @@ def test_incremental_new_release_surprise_matches_full_history(db_session):
     expected_surprise = full[-1].surprise_score
     assert expected_surprise is not None
     assert row.surprise_score == expected_surprise
+
+
+class _PartlyFailingProvider:
+    """Returns points for healthy series; raises for a named bad series."""
+
+    source = "fred"
+
+    def __init__(self, points_by_series: dict[str, list[MacroPoint]], bad: str):
+        self._points = points_by_series
+        self._bad = bad
+
+    def get_observations(self, series_id: str, since: date) -> list[MacroPoint]:
+        if series_id == self._bad:
+            raise RuntimeError("boom: simulated FRED failure")
+        return list(self._points.get(series_id, []))
+
+
+def test_one_failing_series_does_not_abort_the_rest(db_session):
+    """A series that errors is logged + skipped; healthy series still persist."""
+    provider = _PartlyFailingProvider(
+        {"CPIAUCSL": _series_points("CPIAUCSL")}, bad="DGS10"
+    )
+
+    inserted = ingest_macro_series(
+        db_session, provider, ["CPIAUCSL", "DGS10"], now=_NOW, since=date(2020, 1, 1)
+    )
+
+    assert inserted == {"CPIAUCSL": 5, "DGS10": 0}
+    rows = db_session.query(MacroObservation).all()
+    assert len(rows) == 5
+    assert {r.series_id for r in rows} == {"CPIAUCSL"}
+    # The healthy series' rows were committed despite the other series failing.
+    assert db_session.query(ModelRun).filter(ModelRun.kind == "macro_ingest").count() == 1

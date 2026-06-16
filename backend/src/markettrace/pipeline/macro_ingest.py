@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from datetime import UTC, date, datetime
 
@@ -21,6 +22,8 @@ from markettrace.db.models import MacroObservation, ModelRun
 from markettrace.impact.macro_surprise import build_macro_observations
 
 __all__ = ["ingest_macro_series", "main"]
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_SINCE = date(1990, 1, 1)
 
@@ -48,47 +51,56 @@ def ingest_macro_series(
     baseline/scale, so the released values stored before the fetch window seed
     that history — reproducing a full-history compute. *since* is the fetch floor
     only for series with no rows yet.
+
+    Each series is isolated: a fetch that fails (e.g. a bad series id or an API
+    error) is logged and skipped so the remaining series still persist, rather
+    than aborting the whole run.
     """
     inserted: dict[str, int] = {}
 
     for series_id in series_ids:
-        # Existing rows: dedup keys + the released-value history (initial release
-        # per period) used to seed surprise for incrementally fetched points.
-        existing_rows = session.execute(
-            select(
-                MacroObservation.reference_date,
-                MacroObservation.revision,
-                MacroObservation.released_value,
-            )
-            .where(MacroObservation.series_id == series_id)
-            .order_by(MacroObservation.reference_date)
-        ).all()
-        existing = {(r.reference_date, r.revision) for r in existing_rows}
+        try:
+            # Existing rows: dedup keys + the released-value history (initial
+            # release per period) used to seed surprise for incremental fetches.
+            existing_rows = session.execute(
+                select(
+                    MacroObservation.reference_date,
+                    MacroObservation.revision,
+                    MacroObservation.released_value,
+                )
+                .where(MacroObservation.series_id == series_id)
+                .order_by(MacroObservation.reference_date)
+            ).all()
+            existing = {(r.reference_date, r.revision) for r in existing_rows}
 
-        # Re-fetch from the latest stored reference_date so only new releases come
-        # back (the boundary row is deduped, and re-including it lets the provider
-        # chain previous_value into the first new point). Seed history with the
-        # released values from strictly-earlier periods so baseline/scale match a
-        # full-history compute. New series fall back to the *since* floor.
-        last_ref = existing_rows[-1].reference_date if existing_rows else None
-        fetch_since = last_ref if last_ref is not None else since
-        prior_history = [
-            r.released_value
-            for r in existing_rows
-            if r.revision == 0 and r.reference_date < fetch_since
-        ]
+            # Re-fetch from the latest stored reference_date so only new releases
+            # come back (the boundary row is deduped, and re-including it lets the
+            # provider chain previous_value into the first new point). Seed history
+            # with the released values from strictly-earlier periods so
+            # baseline/scale match a full-history compute. New series fall back to
+            # the *since* floor.
+            last_ref = existing_rows[-1].reference_date if existing_rows else None
+            fetch_since = last_ref if last_ref is not None else since
+            prior_history = [
+                r.released_value
+                for r in existing_rows
+                if r.revision == 0 and r.reference_date < fetch_since
+            ]
 
-        points = provider.get_observations(series_id, fetch_since)
-        rows = build_macro_observations(points, now=now, prior_history=prior_history)
+            points = provider.get_observations(series_id, fetch_since)
+            rows = build_macro_observations(points, now=now, prior_history=prior_history)
 
-        count = 0
-        for row in rows:
-            if (row.reference_date, row.revision) in existing:
-                continue
-            session.add(row)
-            existing.add((row.reference_date, row.revision))
-            count += 1
-        inserted[series_id] = count
+            count = 0
+            for row in rows:
+                if (row.reference_date, row.revision) in existing:
+                    continue
+                session.add(row)
+                existing.add((row.reference_date, row.revision))
+                count += 1
+            inserted[series_id] = count
+        except Exception:  # noqa: BLE001 - one series must not abort the rest
+            logger.exception("macro ingest: series %s failed; skipping", series_id)
+            inserted[series_id] = 0
 
     total = sum(inserted.values())
     if total:
