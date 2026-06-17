@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 __all__ = ["SecEdgarProvider"]
 
 _SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:0>10}.json"
+# Authoritative ticker -> CIK map (one JSON file, refreshed by SEC nightly).
+_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 _ARCHIVE_URL = (
     "https://www.sec.gov/Archives/edgar/data/{cik_int}/{accession}/{doc}"
 )
@@ -223,6 +225,23 @@ class SecEdgarProvider:
         return self.list_for_cik(
             issuer_id, since, primary_ticker=primary_ticker, forms=forms
         )
+
+    def resolve_ciks(self, tickers: Collection[str]) -> dict[str, str]:
+        """Map each ticker to its zero-padded 10-digit CIK via SEC's official file.
+
+        Looks up ``company_tickers.json`` (the authoritative ticker->CIK map) so
+        callers can drive ingestion by ticker without hand-curating CIKs. Matching
+        is case-insensitive; tickers SEC does not list are omitted from the result.
+        """
+        wanted = {t.upper() for t in tickers}
+        resp = self._get(_COMPANY_TICKERS_URL)
+        resp.raise_for_status()
+        out: dict[str, str] = {}
+        for row in resp.json().values():
+            ticker = str(row.get("ticker", "")).upper()
+            if ticker in wanted and "cik_str" in row:
+                out[ticker] = f"{int(row['cik_str']):010d}"
+        return out
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all CIKs in the configured watchlist since ``since``.

@@ -15,7 +15,8 @@ import markettrace.api.ingest as ingest_mod
 from markettrace.api.auth import create_token
 from markettrace.api.ingest import (
     _DEMO_FILINGS,
-    _ingest_corpus,
+    _ingest_corpus_kr,
+    _ingest_corpus_us,
     _ingest_macro,
     _ingest_one,
     _ingest_summary,
@@ -32,6 +33,7 @@ class _Settings:
     cors_allow_origins = "http://localhost:3000"
     kr_market_index_ticker = "069500"
     sec_user_agent = "test agent@example.com"
+    opendart_api_key = "testkey"
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -219,8 +221,8 @@ def corpus_env(monkeypatch):
     """Shrink the corpus to one issuer and stub out the network + extractor."""
     monkeypatch.setattr(
         ingest_mod,
-        "_CORPUS_ISSUERS",
-        [{"ticker": "AAPL", "cik": "320193", "name": "Apple Inc.", "industry": "Technology"}],
+        "_CORPUS_US_ISSUERS",
+        [{"ticker": "AAPL", "name": "Apple Inc.", "industry": "Technology"}],
     )
     monkeypatch.setattr(ingest_mod, "_CORPUS_PER_ISSUER", 2)
     monkeypatch.setattr(
@@ -231,9 +233,14 @@ def corpus_env(monkeypatch):
     captured: dict = {}
 
     class _Disclosure:
+        def resolve_ciks(self, tickers):
+            captured["resolved_tickers"] = list(tickers)
+            return {"AAPL": "0000320193"}
+
         def list_for_issuer(self, issuer_id, since, *, primary_ticker=None, forms=None):
             captured["forms"] = forms
             captured["primary_ticker"] = primary_ticker
+            captured["issuer_id"] = issuer_id
             return _corpus_refs(3)  # more than the per-issuer cap
 
     monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
@@ -250,7 +257,7 @@ def test_corpus_seeds_caps_and_filters_to_8k(
         lambda *a, **kw: calls.append((kw["ticker"], kw["ref"].external_id)),
     )
 
-    _ingest_corpus(mem_session, None, fake_settings)
+    _ingest_corpus_us(mem_session, None, fake_settings)
 
     # Only the first _CORPUS_PER_ISSUER (2) of the 3 listed refs are ingested.
     assert calls == [("AAPL", "acc-0"), ("AAPL", "acc-1")]
@@ -283,7 +290,7 @@ def test_corpus_skips_already_ingested_documents(
         ingest_mod, "run_slice", lambda *a, **kw: sliced.append(kw["ref"].external_id)
     )
 
-    _ingest_corpus(mem_session, None, fake_settings)
+    _ingest_corpus_us(mem_session, None, fake_settings)
 
     # acc-0 already exists -> no re-extraction; only acc-1 (still within the cap) runs.
     assert sliced == ["acc-1"]
@@ -301,10 +308,69 @@ def test_corpus_one_filing_failure_does_not_abort_issuer(
 
     monkeypatch.setattr(ingest_mod, "run_slice", _slice)
 
-    _ingest_corpus(mem_session, None, fake_settings)
+    _ingest_corpus_us(mem_session, None, fake_settings)
 
     # acc-0 failed but acc-1 was still ingested.
     assert sliced == ["acc-1"]
+
+
+# ---------------------------------------------------------------------------
+# _ingest_corpus_kr — corp_code resolution + forms-less provider fallback
+# ---------------------------------------------------------------------------
+
+
+def test_corpus_kr_resolves_corp_codes_and_handles_no_forms_kwarg(
+    monkeypatch, mem_session, fake_settings
+) -> None:
+    monkeypatch.setattr(
+        ingest_mod,
+        "_CORPUS_KR_ISSUERS",
+        [{"ticker": "005930", "name": "Samsung Electronics", "industry": "Technology"}],
+    )
+    monkeypatch.setattr(ingest_mod, "_CORPUS_PER_ISSUER", 2)
+    monkeypatch.setattr("markettrace.nlp.event_extractor.EventExtractor", lambda *a, **kw: object())
+    monkeypatch.setattr(ingest_mod, "get_price_provider", lambda *a, **kw: object())
+
+    captured: dict = {}
+
+    class _KrDisclosure:
+        def resolve_corp_codes(self, tickers):
+            captured["tickers"] = list(tickers)
+            return {"005930": "00126380"}
+
+        # No ``forms`` kwarg — _ingest_issuer_filings must fall back gracefully.
+        def list_for_issuer(self, issuer_id, since, *, primary_ticker=None):
+            captured["issuer_id"] = issuer_id
+            captured["primary_ticker"] = primary_ticker
+            return [
+                SimpleNamespace(source="opendart", external_id=f"rcept-{i}", market="KR")
+                for i in range(3)
+            ]
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _KrDisclosure())
+
+    sliced: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod, "run_slice", lambda *a, **kw: sliced.append(kw["ref"].external_id)
+    )
+
+    _ingest_corpus_kr(mem_session, None, fake_settings)
+
+    # corp_code resolved from the 6-digit ticker; capped at _CORPUS_PER_ISSUER (2).
+    assert captured["issuer_id"] == "00126380"
+    assert captured["primary_ticker"] == "005930"
+    assert sliced == ["rcept-0", "rcept-1"]
+    assert mem_session.query(Instrument).filter_by(ticker="005930").count() == 1
+
+
+def test_corpus_kr_skipped_without_opendart_key(monkeypatch, mem_session) -> None:
+    settings = SimpleNamespace(opendart_api_key=None)
+    built: list[bool] = []
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: built.append(True))
+
+    _ingest_corpus_kr(mem_session, None, settings)
+
+    assert not built, "KR corpus must not build a provider when OPENDART_API_KEY is unset"
 
 
 # ---------------------------------------------------------------------------

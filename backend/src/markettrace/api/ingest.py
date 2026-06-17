@@ -70,12 +70,59 @@ _CORPUS_FORMS = ("8-K",)
 _CORPUS_PER_ISSUER = 10
 _CORPUS_SINCE = datetime(2024, 1, 1, tzinfo=UTC)
 _CORPUS_MARKET_INDEX = "spy"
-_CORPUS_ISSUERS: list[dict[str, str]] = [
-    {"ticker": "AAPL", "cik": "320193", "name": "Apple Inc.", "industry": "Technology"},
-    {"ticker": "MSFT", "cik": "789019", "name": "Microsoft Corporation", "industry": "Technology"},
-    {"ticker": "NVDA", "cik": "1045810", "name": "NVIDIA Corporation", "industry": "Technology"},
-    {"ticker": "JPM", "cik": "19617", "name": "JPMorgan Chase & Co.", "industry": "Financials"},
-    {"ticker": "XOM", "cik": "34088", "name": "Exxon Mobil Corporation", "industry": "Energy"},
+
+# US validation corpus: liquid large caps across sectors, driven by TICKER. CIKs
+# are resolved from SEC's company_tickers.json at run time (no hand-curated CIKs
+# to drift), so growing this list to the blueprint's 50-100 names is just adding
+# tickers.
+_CORPUS_US_ISSUERS: list[dict[str, str]] = [
+    {"ticker": "AAPL", "name": "Apple Inc.", "industry": "Technology"},
+    {"ticker": "MSFT", "name": "Microsoft Corporation", "industry": "Technology"},
+    {"ticker": "NVDA", "name": "NVIDIA Corporation", "industry": "Technology"},
+    {"ticker": "AMZN", "name": "Amazon.com, Inc.", "industry": "Consumer Discretionary"},
+    {"ticker": "GOOGL", "name": "Alphabet Inc.", "industry": "Communication Services"},
+    {"ticker": "META", "name": "Meta Platforms, Inc.", "industry": "Communication Services"},
+    {"ticker": "TSLA", "name": "Tesla, Inc.", "industry": "Consumer Discretionary"},
+    {"ticker": "JPM", "name": "JPMorgan Chase & Co.", "industry": "Financials"},
+    {"ticker": "XOM", "name": "Exxon Mobil Corporation", "industry": "Energy"},
+    {"ticker": "JNJ", "name": "Johnson & Johnson", "industry": "Health Care"},
+    {"ticker": "V", "name": "Visa Inc.", "industry": "Financials"},
+    {"ticker": "WMT", "name": "Walmart Inc.", "industry": "Consumer Staples"},
+    {"ticker": "UNH", "name": "UnitedHealth Group Incorporated", "industry": "Health Care"},
+    {"ticker": "PG", "name": "The Procter & Gamble Company", "industry": "Consumer Staples"},
+    {"ticker": "HD", "name": "The Home Depot, Inc.", "industry": "Consumer Discretionary"},
+    {"ticker": "BAC", "name": "Bank of America Corporation", "industry": "Financials"},
+    {"ticker": "KO", "name": "The Coca-Cola Company", "industry": "Consumer Staples"},
+    {"ticker": "PFE", "name": "Pfizer Inc.", "industry": "Health Care"},
+    {"ticker": "CVX", "name": "Chevron Corporation", "industry": "Energy"},
+    {"ticker": "DIS", "name": "The Walt Disney Company", "industry": "Communication Services"},
+]
+
+# KR validation corpus: liquid KOSPI large caps, driven by 6-digit KRX TICKER.
+# corp_codes are resolved from OpenDART corpCode.xml at run time. OpenDART has no
+# form filter, so all recent filing types are listed and the extractor classifies
+# them.
+_CORPUS_KR_ISSUERS: list[dict[str, str]] = [
+    {"ticker": "005930", "name": "Samsung Electronics Co., Ltd.", "industry": "Technology"},
+    {"ticker": "000660", "name": "SK hynix Inc.", "industry": "Technology"},
+    {"ticker": "373220", "name": "LG Energy Solution, Ltd.", "industry": "Industrials"},
+    {"ticker": "207940", "name": "Samsung Biologics Co., Ltd.", "industry": "Health Care"},
+    {"ticker": "005380", "name": "Hyundai Motor Company", "industry": "Consumer Discretionary"},
+    {"ticker": "000270", "name": "Kia Corporation", "industry": "Consumer Discretionary"},
+    {"ticker": "005490", "name": "POSCO Holdings Inc.", "industry": "Materials"},
+    {"ticker": "035420", "name": "NAVER Corporation", "industry": "Communication Services"},
+    {"ticker": "035720", "name": "Kakao Corp.", "industry": "Communication Services"},
+    {"ticker": "051910", "name": "LG Chem, Ltd.", "industry": "Materials"},
+    {"ticker": "006400", "name": "Samsung SDI Co., Ltd.", "industry": "Technology"},
+    {"ticker": "028260", "name": "Samsung C&T Corporation", "industry": "Industrials"},
+    {"ticker": "105560", "name": "KB Financial Group Inc.", "industry": "Financials"},
+    {"ticker": "055550", "name": "Shinhan Financial Group Co., Ltd.", "industry": "Financials"},
+    {"ticker": "012330", "name": "Hyundai Mobis Co., Ltd.", "industry": "Consumer Discretionary"},
+    {"ticker": "068270", "name": "Celltrion, Inc.", "industry": "Health Care"},
+    {"ticker": "015760", "name": "Korea Electric Power Corporation", "industry": "Utilities"},
+    {"ticker": "032830", "name": "Samsung Life Insurance Co., Ltd.", "industry": "Financials"},
+    {"ticker": "003670", "name": "POSCO Future M Co., Ltd.", "industry": "Materials"},
+    {"ticker": "017670", "name": "SK Telecom Co., Ltd.", "industry": "Communication Services"},
 ]
 
 
@@ -158,71 +205,157 @@ def _ingest_one(session, store, settings, filing: dict[str, str]) -> None:
     logger.info("ingest: completed %s/%s", ref.source, ref.external_id)
 
 
-def _ingest_corpus(session, store, settings) -> None:
-    """Ingest the most recent 8-Ks for each validation-corpus issuer (US).
+def _ingest_issuer_filings(
+    session,
+    store,
+    *,
+    disclosure,
+    price,
+    extractor,
+    market: str,
+    issuer_id: str,
+    ticker: str,
+    name: str,
+    industry: str | None,
+    market_index_ticker: str,
+    forms,
+) -> int:
+    """Seed one corpus issuer and ingest its recent filings (idempotent).
 
-    Seeds each issuer's Instrument, lists its recent 8-K filings, and runs the
-    vertical slice on any not already ingested. Each filing is isolated in
-    try/except and run_slice commits per filing, so one failure (or a timeout)
-    leaves the successfully ingested filings persisted and the run resumable.
+    Lists the issuer's filings, caps at ``_CORPUS_PER_ISSUER``, skips any already
+    in the DB (cheap, no LLM), and runs the vertical slice on the rest. Each
+    filing is isolated in try/except and ``run_slice`` commits per filing, so one
+    failure (or a platform timeout) leaves successful filings persisted and the
+    run resumable. Returns the number of newly ingested filings.
     """
+    seed_instrument(session, market=market, ticker=ticker, name=name, industry=industry)
+    session.commit()
+
+    try:
+        refs = disclosure.list_for_issuer(
+            issuer_id, _CORPUS_SINCE, primary_ticker=ticker, forms=forms
+        )
+    except TypeError:
+        # Providers without a ``forms`` filter (OpenDART) take no such kwarg.
+        refs = disclosure.list_for_issuer(issuer_id, _CORPUS_SINCE, primary_ticker=ticker)
+    except Exception:  # noqa: BLE001 - one issuer must not abort the rest
+        session.rollback()
+        logger.exception("corpus: listing failed for %s", ticker)
+        return 0
+
+    ingested = 0
+    for ref in refs[:_CORPUS_PER_ISSUER]:
+        existing = session.scalars(
+            select(Document).where(
+                Document.source == ref.source,
+                Document.external_id == ref.external_id,
+            )
+        ).first()
+        if existing is not None:
+            continue  # already ingested (idempotent) — cheap skip, no LLM call
+        try:
+            run_slice(
+                session,
+                store,
+                ref=ref,
+                disclosure_provider=disclosure,
+                price_provider=price,
+                extractor=extractor,
+                ticker=ticker,
+                market_index_ticker=market_index_ticker,
+            )
+            ingested += 1
+        except Exception:  # noqa: BLE001 - one filing must not abort the rest
+            session.rollback()
+            logger.exception("corpus: ingest failed for %s/%s", ref.source, ref.external_id)
+    logger.info("corpus: %s ingested %d new filing(s)", ticker, ingested)
+    return ingested
+
+
+def _ingest_corpus_us(session, store, settings) -> None:
+    """Ingest recent 8-Ks for the US validation corpus (CIKs resolved by ticker)."""
     from markettrace.nlp.event_extractor import EventExtractor
 
     disclosure = get_disclosure_provider("US", user_agent=settings.sec_user_agent)
     price = get_price_provider("US")
     extractor = EventExtractor()
 
-    for issuer in _CORPUS_ISSUERS:
+    tickers = [i["ticker"] for i in _CORPUS_US_ISSUERS]
+    try:
+        ciks = disclosure.resolve_ciks(tickers)
+    except Exception:  # noqa: BLE001 - resolution failure must not abort the ingest
+        session.rollback()
+        logger.exception("corpus: US CIK resolution failed")
+        return
+
+    for issuer in _CORPUS_US_ISSUERS:
         ticker = issuer["ticker"]
-        seed_instrument(
+        cik = ciks.get(ticker.upper())
+        if cik is None:
+            logger.warning("corpus: no CIK for %s; skipping", ticker)
+            continue
+        _ingest_issuer_filings(
             session,
+            store,
+            disclosure=disclosure,
+            price=price,
+            extractor=extractor,
             market="US",
+            issuer_id=cik,
             ticker=ticker,
             name=issuer["name"],
             industry=issuer.get("industry"),
+            market_index_ticker=_CORPUS_MARKET_INDEX,
+            forms=_CORPUS_FORMS,
         )
-        session.commit()
 
-        try:
-            refs = disclosure.list_for_issuer(
-                issuer["cik"],
-                _CORPUS_SINCE,
-                primary_ticker=ticker,
-                forms=_CORPUS_FORMS,
-            )
-        except Exception:  # noqa: BLE001 - one issuer must not abort the rest
-            session.rollback()
-            logger.exception("corpus: listing failed for %s", ticker)
+
+def _ingest_corpus_kr(session, store, settings) -> None:
+    """Ingest recent filings for the KR validation corpus (corp_codes by ticker).
+
+    Skipped when no OpenDART key is configured. corp_codes are resolved from
+    OpenDART's corpCode.xml; OpenDART has no form filter so all recent filing
+    types are listed and the extractor classifies them.
+    """
+    if settings.opendart_api_key is None:
+        logger.info("ingest: OPENDART_API_KEY not set; skipping KR corpus")
+        return
+
+    from markettrace.nlp.event_extractor import EventExtractor
+
+    disclosure = get_disclosure_provider("KR")
+    price = get_price_provider("KR")
+    extractor = EventExtractor()
+    market_index_ticker = settings.kr_market_index_ticker
+
+    tickers = [i["ticker"] for i in _CORPUS_KR_ISSUERS]
+    try:
+        corp_codes = disclosure.resolve_corp_codes(tickers)
+    except Exception:  # noqa: BLE001 - resolution failure must not abort the ingest
+        session.rollback()
+        logger.exception("corpus: KR corp_code resolution failed")
+        return
+
+    for issuer in _CORPUS_KR_ISSUERS:
+        ticker = issuer["ticker"]
+        corp_code = corp_codes.get(ticker)
+        if corp_code is None:
+            logger.warning("corpus: no corp_code for %s; skipping", ticker)
             continue
-
-        ingested = 0
-        for ref in refs[:_CORPUS_PER_ISSUER]:
-            existing = session.scalars(
-                select(Document).where(
-                    Document.source == ref.source,
-                    Document.external_id == ref.external_id,
-                )
-            ).first()
-            if existing is not None:
-                continue  # already ingested (idempotent) — cheap skip, no LLM call
-            try:
-                run_slice(
-                    session,
-                    store,
-                    ref=ref,
-                    disclosure_provider=disclosure,
-                    price_provider=price,
-                    extractor=extractor,
-                    ticker=ticker,
-                    market_index_ticker=_CORPUS_MARKET_INDEX,
-                )
-                ingested += 1
-            except Exception:  # noqa: BLE001 - one filing must not abort the rest
-                session.rollback()
-                logger.exception(
-                    "corpus: ingest failed for %s/%s", ref.source, ref.external_id
-                )
-        logger.info("corpus: %s ingested %d new 8-K(s)", ticker, ingested)
+        _ingest_issuer_filings(
+            session,
+            store,
+            disclosure=disclosure,
+            price=price,
+            extractor=extractor,
+            market="KR",
+            issuer_id=corp_code,
+            ticker=ticker,
+            name=issuer["name"],
+            industry=issuer.get("industry"),
+            market_index_ticker=market_index_ticker,
+            forms=None,
+        )
 
 
 def _ingest_macro(session, settings) -> None:
@@ -271,11 +404,12 @@ def run_demo_ingest() -> None:
                 session.rollback()
                 logger.exception("ingest: failed for %s/%s", filing["market"], filing["ticker"])
 
-        try:
-            _ingest_corpus(session, store, settings)
-        except Exception:  # noqa: BLE001 - corpus failure must not abort the ingest
-            session.rollback()
-            logger.exception("ingest: corpus ingest failed")
+        for corpus_ingest in (_ingest_corpus_us, _ingest_corpus_kr):
+            try:
+                corpus_ingest(session, store, settings)
+            except Exception:  # noqa: BLE001 - corpus failure must not abort the ingest
+                session.rollback()
+                logger.exception("ingest: %s failed", corpus_ingest.__name__)
 
         try:
             _ingest_macro(session, settings)

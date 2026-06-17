@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import io
 import zipfile
+from collections.abc import Collection
 from datetime import UTC, datetime, timedelta, timezone
+from xml.etree import ElementTree as ET
 
 import httpx
 
@@ -20,6 +22,7 @@ __all__ = ["OpenDartProvider"]
 
 _LIST_URL = "https://opendart.fss.or.kr/api/list.json"
 _DOCUMENT_URL = "https://opendart.fss.or.kr/api/document.xml"
+_CORPCODE_URL = "https://opendart.fss.or.kr/api/corpCode.xml"
 _VIEWER_URL = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
 
 # DART timestamps are Korea Standard Time (UTC+9).
@@ -142,6 +145,30 @@ class OpenDartProvider:
         ``issuer_id`` is the issuer's 8-digit DART ``corp_code`` for the KR market.
         """
         return self.list_for_corp(issuer_id, since, primary_ticker=primary_ticker)
+
+    def resolve_corp_codes(self, stock_codes: Collection[str]) -> dict[str, str]:
+        """Map each 6-digit KRX stock code to its 8-digit DART ``corp_code``.
+
+        OpenDART offers no ticker->corp_code lookup, so this downloads the
+        ``corpCode.xml`` archive (a ZIP wrapping ``CORPCODE.xml``) and indexes the
+        listed companies by ``stock_code``. Lets callers drive KR ingestion by
+        ticker instead of hand-curating corp_codes. Codes not present (e.g. a
+        delisted or non-listed entity) are omitted from the result.
+        """
+        wanted = {s.strip() for s in stock_codes}
+        resp = self._client.get(_CORPCODE_URL, params={"crtfc_key": self._api_key})
+        resp.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
+            xml_bytes = archive.read(archive.namelist()[0])
+        root = ET.fromstring(xml_bytes)
+
+        out: dict[str, str] = {}
+        for item in root.iter("list"):
+            stock_code = (item.findtext("stock_code") or "").strip()
+            corp_code = (item.findtext("corp_code") or "").strip()
+            if stock_code and stock_code in wanted and corp_code:
+                out[stock_code] = corp_code
+        return out
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all corps in the configured watchlist since ``since``.
