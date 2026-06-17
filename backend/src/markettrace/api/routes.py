@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from markettrace.api.deps import get_db
 from markettrace.api.schemas import (
+    BacktestResultOut,
     DocumentOut,
     EventDetail,
     EventSummary,
@@ -25,8 +26,12 @@ from markettrace.db.models import (
     MacroObservation,
     Outcome,
 )
+from markettrace.impact.backtest import run_walk_forward_backtest
 from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import compute_event_type_statistics
+
+# Standard event-study horizons (trading days) reported by the backtest.
+_BACKTEST_HORIZONS = (1, 5, 20, 60)
 
 router = APIRouter()
 
@@ -133,6 +138,14 @@ def get_event_type_significance(
     distinguishable from zero, and is the sample even large enough to say?"""
     results = compute_event_type_significance(db)
     return [EventTypeSignificanceOut.model_validate(r) for r in results]
+
+
+@router.get("/stats/backtest", response_model=list[BacktestResultOut])
+def get_backtest(db: Session = Depends(get_db)) -> list[BacktestResultOut]:
+    """Walk-forward, look-ahead-blocked out-of-sample backtest per horizon:
+    hit rate, mean strategy return, and information coefficient."""
+    results = [run_walk_forward_backtest(db, horizon_days=h) for h in _BACKTEST_HORIZONS]
+    return [BacktestResultOut.model_validate(r) for r in results]
 
 
 @router.get("/macro/observations", response_model=list[MacroObservationOut])
