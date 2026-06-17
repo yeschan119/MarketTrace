@@ -13,9 +13,16 @@ from sqlalchemy.pool import StaticPool
 
 import markettrace.api.ingest as ingest_mod
 from markettrace.api.auth import create_token
-from markettrace.api.ingest import _DEMO_FILINGS, _ingest_corpus, _ingest_macro, _ingest_one
+from markettrace.api.ingest import (
+    _DEMO_FILINGS,
+    _ingest_corpus,
+    _ingest_macro,
+    _ingest_one,
+    _ingest_summary,
+    main,
+)
 from markettrace.api.main import create_app
-from markettrace.db.models import Base, Document, Instrument
+from markettrace.db.models import Base, Document, Event, Instrument
 
 
 class _Settings:
@@ -298,3 +305,71 @@ def test_corpus_one_filing_failure_does_not_abort_issuer(
 
     # acc-0 failed but acc-1 was still ingested.
     assert sliced == ["acc-1"]
+
+
+# ---------------------------------------------------------------------------
+# _ingest_summary + CLI main (--summary-only) — corpus counts, no network
+# ---------------------------------------------------------------------------
+
+
+def _seed_event(session, *, ticker: str, n: int) -> None:
+    inst = Instrument(market="US", ticker=ticker, name=ticker)
+    session.add(inst)
+    session.flush()
+    for i in range(n):
+        doc = Document(
+            source="sec_edgar",
+            external_id=f"{ticker}-{i}",
+            url="https://example.com",
+            title="seed",
+            content_hash=f"{ticker}hash{i}",
+            market="US",
+            published_at=datetime(2026, 1, 1, tzinfo=UTC),
+            first_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        session.add(doc)
+        session.flush()
+        session.add(
+            Event(
+                document_id=doc.id,
+                primary_instrument_id=inst.id,
+                event_type="earnings",
+                direction="positive",
+                horizon_days=20,
+                confidence=0.7,
+                model="test",
+                model_version="v1",
+                analyzed_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )
+    session.commit()
+
+
+def test_ingest_summary_counts_events_by_ticker(mem_session) -> None:
+    _seed_event(mem_session, ticker="AAPL", n=3)
+    _seed_event(mem_session, ticker="MSFT", n=1)
+
+    summary = _ingest_summary(mem_session)
+
+    assert summary["documents"] == 4
+    assert summary["events"] == 4
+    # Ordered by descending event count.
+    assert list(summary["events_by_ticker"].items()) == [("AAPL", 3), ("MSFT", 1)]
+
+
+def test_main_summary_only_skips_ingest(monkeypatch, mem_session, fake_settings) -> None:
+    """main(--summary-only) prints counts without running the ingest worker."""
+    _seed_event(mem_session, ticker="AAPL", n=2)
+
+    ran: list[bool] = []
+    monkeypatch.setattr(ingest_mod, "run_demo_ingest", lambda: ran.append(True))
+    monkeypatch.setattr(
+        ingest_mod, "get_settings", lambda: SimpleNamespace(database_url="sqlite://")
+    )
+    monkeypatch.setattr(ingest_mod, "make_engine", lambda url: object())
+    monkeypatch.setattr(ingest_mod, "make_session_factory", lambda engine: lambda: mem_session)
+
+    rc = main(["--summary-only"])
+
+    assert rc == 0
+    assert not ran, "--summary-only must not invoke run_demo_ingest"

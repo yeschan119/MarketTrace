@@ -16,7 +16,7 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from markettrace.api.auth import require_auth
 from markettrace.config import get_settings
@@ -294,3 +294,72 @@ def ingest(
     """Start the demo ingestion in the background; return immediately."""
     background_tasks.add_task(run_demo_ingest)
     return {"status": "started"}
+
+
+def _ingest_summary(session) -> dict[str, object]:
+    """Return current corpus counts: documents, events, and events per ticker."""
+    from markettrace.db.models import Event, Instrument
+
+    documents = session.scalar(select(func.count()).select_from(Document)) or 0
+    events = session.scalar(select(func.count()).select_from(Event)) or 0
+    rows = session.execute(
+        select(Instrument.ticker, func.count(Event.id))
+        .join(Event, Event.primary_instrument_id == Instrument.id)
+        .group_by(Instrument.ticker)
+        .order_by(func.count(Event.id).desc())
+    ).all()
+    return {
+        "documents": documents,
+        "events": events,
+        "events_by_ticker": {ticker: count for ticker, count in rows},
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI: run the full ingest (demo + corpus + macro) synchronously to completion.
+
+    Unlike ``POST /ingest`` — which schedules a FastAPI ``BackgroundTask`` that a
+    free-tier host may kill on idle spin-down before the corpus finishes — this
+    runs the whole job in one foreground process, so it completes the corpus in a
+    single invocation (e.g. a Render one-off job or shell). Idempotent: re-runs
+    skip already-ingested filings cheaply. Honours ``DATABASE_URL`` from the
+    environment, so point it at production by exporting that URL before running.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="markettrace-ingest", description=main.__doc__)
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Skip ingest; just print current DB corpus counts.",
+    )
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    if not args.summary_only:
+        run_demo_ingest()
+
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    session = make_session_factory(engine)()
+    try:
+        summary = _ingest_summary(session)
+    finally:
+        session.close()
+
+    logger.info(
+        "ingest summary: %d document(s), %d event(s)",
+        summary["documents"],
+        summary["events"],
+    )
+    for ticker, count in summary["events_by_ticker"].items():  # type: ignore[union-attr]
+        logger.info("  %-8s %d event(s)", ticker, count)
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
