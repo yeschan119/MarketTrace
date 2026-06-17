@@ -85,6 +85,20 @@ class EventTypeStatOut(BaseModel):
     std_abnormal_return: float | None
 
 
+class EventTypeSignificanceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type: str
+    horizon_days: int
+    count: int
+    mean_abnormal_return: float | None
+    std_abnormal_return: float | None
+    t_stat: float | None
+    p_value: float | None
+    significant_5pct: bool
+    sufficient_sample: bool
+
+
 class MacroObservationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

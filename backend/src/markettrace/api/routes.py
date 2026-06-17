@@ -11,6 +11,7 @@ from markettrace.api.schemas import (
     DocumentOut,
     EventDetail,
     EventSummary,
+    EventTypeSignificanceOut,
     EventTypeStatOut,
     InstrumentOut,
     InstrumentTimeline,
@@ -24,6 +25,7 @@ from markettrace.db.models import (
     MacroObservation,
     Outcome,
 )
+from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import compute_event_type_statistics
 
 router = APIRouter()
@@ -121,6 +123,16 @@ def get_event_type_stats(db: Session = Depends(get_db)) -> list[EventTypeStatOut
     """Mean and dispersion of abnormal returns per (event_type, horizon)."""
     stats = compute_event_type_statistics(db)
     return [EventTypeStatOut.model_validate(s) for s in stats]
+
+
+@router.get("/stats/significance", response_model=list[EventTypeSignificanceOut])
+def get_event_type_significance(
+    db: Session = Depends(get_db),
+) -> list[EventTypeSignificanceOut]:
+    """Per (event_type, horizon) one-sample t-test: is the mean abnormal return
+    distinguishable from zero, and is the sample even large enough to say?"""
+    results = compute_event_type_significance(db)
+    return [EventTypeSignificanceOut.model_validate(r) for r in results]
 
 
 @router.get("/macro/observations", response_model=list[MacroObservationOut])
