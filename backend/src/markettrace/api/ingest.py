@@ -29,6 +29,7 @@ from markettrace.pipeline.seed import (
     seed_watchlist,
 )
 from markettrace.pipeline.vertical_slice import recompute_document_outcomes, run_slice
+from markettrace.providers.caching import CachingPriceProvider
 from markettrace.providers.registry import (
     get_disclosure_provider,
     get_price_provider,
@@ -277,7 +278,10 @@ def _ingest_corpus_us(session, store, settings) -> None:
     from markettrace.nlp.event_extractor import EventExtractor
 
     disclosure = get_disclosure_provider("US", user_agent=settings.sec_user_agent)
-    price = get_price_provider("US")
+    # Cache price fetches: the corpus re-requests each stock (overlapping windows)
+    # and the market index (every filing) — without coalescing, the volume trips
+    # Tiingo's free-tier 429 quota. Caching cuts ~1000 calls to ~one per ticker.
+    price = CachingPriceProvider(get_price_provider("US"))
     extractor = EventExtractor()
 
     tickers = [i["ticker"] for i in _CORPUS_US_ISSUERS]
@@ -324,7 +328,7 @@ def _ingest_corpus_kr(session, store, settings) -> None:
     from markettrace.nlp.event_extractor import EventExtractor
 
     disclosure = get_disclosure_provider("KR")
-    price = get_price_provider("KR")
+    price = CachingPriceProvider(get_price_provider("KR"))
     extractor = EventExtractor()
     market_index_ticker = settings.kr_market_index_ticker
 
