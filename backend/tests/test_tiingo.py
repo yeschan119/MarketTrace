@@ -131,3 +131,63 @@ class TestRequestShape:
         provider = TiingoPriceProvider(api_key="k", client=client)
         with pytest.raises(httpx.HTTPStatusError):
             provider.get_ohlcv("AAPL", date(2024, 5, 15), date(2024, 5, 16))
+
+
+class TestThrottleRetry:
+    """Tiingo 429/503 resilience (mirrors the SEC provider)."""
+
+    def _provider(self, handler, *, sleeps: list[float], **kw) -> TiingoPriceProvider:
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        return TiingoPriceProvider(
+            api_key="k", client=client, sleep=sleeps.append, **kw
+        )
+
+    def test_retries_on_429_then_succeeds(self):
+        body = json.dumps(TIINGO_ROWS)
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(429, text="Too Many Requests")
+            return httpx.Response(200, text=body, headers={"Content-Type": "application/json"})
+
+        sleeps: list[float] = []
+        provider = self._provider(handler, sleeps=sleeps)
+        df = provider.get_ohlcv("GOOGL", date(2024, 5, 15), date(2024, 5, 16))
+
+        assert calls["n"] == 2  # one retry
+        assert len(df) == 2
+        assert sleeps  # backed off once before retrying
+
+    def test_persistent_429_raises_after_max_retries(self):
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(429, text="Too Many Requests")
+
+        sleeps: list[float] = []
+        provider = self._provider(handler, sleeps=sleeps, max_retries=3)
+        with pytest.raises(httpx.HTTPStatusError):
+            provider.get_ohlcv("GOOGL", date(2024, 5, 15), date(2024, 5, 16))
+
+        assert calls["n"] == 4  # initial + 3 retries
+        assert len(sleeps) == 3
+
+    def test_retry_after_is_capped(self):
+        calls = {"n": 0}
+        body = json.dumps(TIINGO_ROWS)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # An hourly-quota Retry-After must not become an hour-long sleep.
+                return httpx.Response(429, headers={"Retry-After": "3600"})
+            return httpx.Response(200, text=body, headers={"Content-Type": "application/json"})
+
+        sleeps: list[float] = []
+        provider = self._provider(handler, sleeps=sleeps, max_retry_delay=20.0)
+        provider.get_ohlcv("GOOGL", date(2024, 5, 15), date(2024, 5, 16))
+
+        assert sleeps == [20.0]  # capped, not 3600

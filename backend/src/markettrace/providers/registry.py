@@ -72,6 +72,7 @@ def get_price_provider(market: str, *, provider: str | None = None, **kw) -> Pri
             from markettrace.providers.tiingo import TiingoPriceProvider
 
             kw.setdefault("api_key", settings.tiingo_api_key)
+            kw.setdefault("min_request_interval", 0.5)  # space requests; Tiingo 429s bursts
             return TiingoPriceProvider(**kw)  # type: ignore[return-value]
 
         if name == "stooq":
