@@ -79,3 +79,34 @@ export interface InstrumentTimeline {
 export interface HealthResponse {
   status: string;
 }
+
+export interface LedgerEntry {
+  date: string;
+  card_tail: string | null;
+  description: string;
+  amount: number;
+  category: string;
+}
+
+export interface LedgerCategory {
+  category: string;
+  amount: number;
+  count: number;
+}
+
+export interface LedgerStatement {
+  file_name: string;
+  file_modified_at: string;
+  encrypted: boolean;
+  payment_due_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  billed_total: number | null;
+  domestic_total: number | null;
+  foreign_total: number | null;
+  parsed_total: number;
+  entry_count: number;
+  entries: LedgerEntry[];
+  categories: LedgerCategory[];
+  warnings: string[];
+}

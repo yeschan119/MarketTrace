@@ -8,7 +8,7 @@ export function SiteHeader() {
 
   return (
     <header className="border-b border-gray-200 bg-white px-6 py-4">
-      <nav className="mx-auto flex max-w-6xl items-center gap-6">
+      <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 sm:gap-6">
         <a href="/" className="text-xl font-bold tracking-tight text-indigo-600">
           MarketTrace
         </a>
@@ -29,6 +29,12 @@ export function SiteHeader() {
           className="text-sm font-medium text-gray-600 hover:text-gray-900"
         >
           {t("nav.macro")}
+        </a>
+        <a
+          href="/ledger"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.ledger")}
         </a>
         {/* Language toggle sits immediately left of the auth / Ingest controls. */}
         <div className="ml-auto flex items-center gap-3">

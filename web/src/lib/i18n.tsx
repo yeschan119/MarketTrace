@@ -15,7 +15,7 @@ const LANG_KEY = "markettrace_lang";
 type Dict = { [key: string]: string | Dict };
 
 const en: Dict = {
-  nav: { events: "Events", stats: "Stats", macro: "Macro" },
+  nav: { events: "Events", stats: "Stats", macro: "Macro", ledger: "Ledger" },
   common: { unknownError: "Unknown error" },
   auth: {
     login: "Login",
@@ -129,10 +129,40 @@ const en: Dict = {
     baseline: "baseline",
     consensus: "consensus",
   },
+  ledger: {
+    title: "Card Ledger",
+    subtitle: "Upload a password-protected card statement PDF to organize spend entries.",
+    loginRequired: "Sign in to view the ledger.",
+    fileLabel: "Statement PDF",
+    fileHelp: "Select a PDF statement",
+    missingFile: "Select a statement PDF first.",
+    passwordLabel: "Statement password",
+    passwordPlaceholder: "Enter PDF password",
+    load: "Upload and parse",
+    loading: "Loading ledger...",
+    failTitle: "Failed to load ledger",
+    file: "File",
+    period: "Period",
+    paymentDue: "Payment due",
+    billedTotal: "Billed total",
+    foreignTotal: "Foreign total",
+    parsedTotal: "Parsed total",
+    entries: "{n} entries",
+    warnings: "Warnings",
+    categories: "Category totals",
+    th: {
+      date: "Date",
+      category: "Category",
+      description: "Merchant",
+      card: "Card",
+      amount: "Amount",
+    },
+    empty: "No parsed ledger entries.",
+  },
 };
 
 const ko: Dict = {
-  nav: { events: "이벤트", stats: "통계", macro: "거시" },
+  nav: { events: "이벤트", stats: "통계", macro: "거시", ledger: "가계부" },
   common: { unknownError: "알 수 없는 오류" },
   auth: {
     login: "로그인",
@@ -245,6 +275,36 @@ const ko: Dict = {
     },
     baseline: "기준선",
     consensus: "컨센서스",
+  },
+  ledger: {
+    title: "가계부",
+    subtitle: "카드 명세서 PDF를 업로드해 지출 내역으로 정리합니다.",
+    loginRequired: "가계부를 보려면 로그인하세요.",
+    fileLabel: "명세서 PDF",
+    fileHelp: "PDF 명세서를 선택하세요",
+    missingFile: "먼저 명세서 PDF를 선택하세요.",
+    passwordLabel: "명세서 비밀번호",
+    passwordPlaceholder: "PDF 비밀번호 입력",
+    load: "업로드 후 파싱",
+    loading: "가계부 불러오는 중...",
+    failTitle: "가계부를 불러오지 못했습니다",
+    file: "파일",
+    period: "이용기간",
+    paymentDue: "결제일",
+    billedTotal: "청구금액",
+    foreignTotal: "해외 청구",
+    parsedTotal: "파싱 거래합계",
+    entries: "거래 {n}건",
+    warnings: "확인 필요",
+    categories: "카테고리 합계",
+    th: {
+      date: "일자",
+      category: "분류",
+      description: "가맹점",
+      card: "카드",
+      amount: "금액",
+    },
+    empty: "파싱된 거래 내역이 없습니다.",
   },
 };
 

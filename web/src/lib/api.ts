@@ -3,6 +3,7 @@ import type {
   EventDetail,
   EventTypeStat,
   InstrumentTimeline,
+  LedgerStatement,
   MacroObservation,
   HealthResponse,
 } from "@/types/api";
@@ -33,6 +34,25 @@ async function apiPost<T>(
     method: "POST",
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function apiPostForm<T>(
+  path: string,
+  body: FormData,
+  token?: string
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body,
   });
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
@@ -71,5 +91,27 @@ export const api = {
 
   ingest(token: string): Promise<{ status: string }> {
     return apiPost<{ status: string }>("/ingest", undefined, token);
+  },
+
+  getLedgerStatement(
+    token: string,
+    password?: string
+  ): Promise<LedgerStatement> {
+    return apiPost<LedgerStatement>(
+      "/ledger/statement",
+      { password: password || undefined },
+      token
+    );
+  },
+
+  uploadLedgerStatement(
+    token: string,
+    file: File,
+    password?: string
+  ): Promise<LedgerStatement> {
+    const form = new FormData();
+    form.append("file", file);
+    if (password) form.append("password", password);
+    return apiPostForm<LedgerStatement>("/ledger/statement/upload", form, token);
   },
 };

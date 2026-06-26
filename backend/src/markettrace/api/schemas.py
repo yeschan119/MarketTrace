@@ -122,3 +122,44 @@ class MacroObservationOut(BaseModel):
     expected_source: str | None
     surprise_score: float | None
     published_at: datetime
+
+
+class LedgerRequest(BaseModel):
+    password: str | None = None
+
+
+class LedgerEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date
+    card_tail: str | None
+    description: str
+    amount: int
+    category: str
+
+
+class LedgerCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    category: str
+    amount: int
+    count: int
+
+
+class LedgerStatementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_name: str
+    file_modified_at: datetime
+    encrypted: bool
+    payment_due_date: date | None
+    period_start: date | None
+    period_end: date | None
+    billed_total: int | None
+    domestic_total: int | None
+    foreign_total: int | None
+    parsed_total: int
+    entry_count: int
+    entries: list[LedgerEntryOut]
+    categories: list[LedgerCategoryOut]
+    warnings: list[str]

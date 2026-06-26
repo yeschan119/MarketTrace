@@ -67,12 +67,15 @@ class Settings(BaseSettings):
     # Explicit model override. When None, the provider's default (above) is used.
     extraction_model: str | None = None
     # Comma-separated list of origins allowed by CORS (the deployed web URL).
-    cors_allow_origins: str = "http://localhost:3000"
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     # Admin credentials + token-signing secret for the login-gated manual ingest.
     # All env-driven (sync:false on Render); login is disabled (503) when unset.
     admin_username: str | None = None
     admin_password: str | None = None
     auth_secret: str | None = None
+    # Local card-statement PDFs used by the login-gated ledger view.
+    card_statement_dir: str = "card_statement"
+    card_statement_password: str | None = None
 
     @field_validator("database_url")
     @classmethod

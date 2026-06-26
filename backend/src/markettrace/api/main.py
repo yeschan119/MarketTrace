@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from markettrace.api.auth import router as auth_router
 from markettrace.api.ingest import router as ingest_router
+from markettrace.api.ledger import router as ledger_router
 from markettrace.api.routes import router
 from markettrace.config import get_settings
 
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     application.include_router(router)
     application.include_router(auth_router)
     application.include_router(ingest_router)
+    application.include_router(ledger_router)
 
     return application
 
