@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from markettrace.api.auth import require_auth
 from markettrace.api.schemas import LedgerRequest, LedgerStatementOut
@@ -60,7 +61,8 @@ async def upload_ledger_statement(
     statement_password = password or settings.card_statement_password
 
     try:
-        statement = parse_statement_bytes(
+        statement = await run_in_threadpool(
+            parse_statement_bytes,
             data=data,
             file_name=file_name,
             password=statement_password,

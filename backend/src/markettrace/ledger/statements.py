@@ -22,8 +22,8 @@ _PERIOD_RE = re.compile(
     r"(20\d{2})\.\s*(\d{2})\.\s*(\d{2})"
 )
 _OCR_DATE_RE = re.compile(r"^26[. ]*\d{2}[.: ]*\d{2}")
-_OPENAI_OCR_MAX_PAGES = 6
-_OPENAI_OCR_RENDER_ZOOM = 2.0
+_OPENAI_OCR_RENDER_ZOOM = 1.5
+_OPENAI_OCR_TIMEOUT_SECONDS = 45
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -473,6 +473,7 @@ def _call_openai_merchant_ocr(
     prompt = _openai_merchant_ocr_prompt(transaction_lines)
     response = client.responses.create(
         model=model,
+        max_output_tokens=2000,
         input=[
             {
                 "role": "user",
@@ -486,6 +487,7 @@ def _call_openai_merchant_ocr(
             }
         ],
         temperature=0,
+        timeout=_OPENAI_OCR_TIMEOUT_SECONDS,
     )
     return str(getattr(response, "output_text", "") or "")
 
@@ -498,9 +500,8 @@ def _render_pdf_page_images(data: bytes) -> list[str]:
 
     images: list[str] = []
     with fitz.open(stream=data, filetype="pdf") as document:
-        page_count = min(document.page_count, _OPENAI_OCR_MAX_PAGES)
         matrix = fitz.Matrix(_OPENAI_OCR_RENDER_ZOOM, _OPENAI_OCR_RENDER_ZOOM)
-        for page_index in range(page_count):
+        for page_index in _openai_ocr_page_indexes(document.page_count):
             page = document.load_page(page_index)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
             encoded = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
@@ -509,6 +510,14 @@ def _render_pdf_page_images(data: bytes) -> list[str]:
     if not images:
         raise StatementError("statement PDF did not contain renderable pages")
     return images
+
+
+def _openai_ocr_page_indexes(page_count: int) -> list[int]:
+    if page_count <= 0:
+        return []
+    if page_count >= 3:
+        return [1, 2]
+    return list(range(page_count))
 
 
 def _openai_merchant_ocr_prompt(transaction_lines: list[str]) -> str:

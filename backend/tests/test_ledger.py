@@ -122,6 +122,8 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
     assert merchants == ["지에스더프레시", "케이에프씨"]
     assert seen["api_key"] == "test-key"
     assert seen["model"] == "gpt-4o-mini"
+    assert seen["max_output_tokens"] == 2000
+    assert seen["timeout"] == statement_mod._OPENAI_OCR_TIMEOUT_SECONDS
     request = seen["input"][0]["content"]
     assert request[0]["type"] == "input_text"
     assert request[1] == {
@@ -206,6 +208,22 @@ def test_render_pdf_page_images_returns_png_data_urls() -> None:
 
     assert len(images) == 1
     assert images[0].startswith("data:image/png;base64,")
+
+
+def test_render_pdf_page_images_limits_to_statement_detail_pages() -> None:
+    import fitz
+
+    document = fitz.open()
+    for page_number in range(4):
+        page = document.new_page()
+        page.insert_text((72, 72), f"statement page {page_number + 1}")
+    data = document.tobytes()
+    document.close()
+
+    images = statement_mod._render_pdf_page_images(data)
+
+    assert len(images) == 2
+    assert all(image.startswith("data:image/png;base64,") for image in images)
 
 
 class _Settings:
@@ -321,7 +339,12 @@ def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
         seen["password"] = password
         return _fake_statement()
 
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        seen["threaded"] = True
+        return func(*args, **kwargs)
+
     monkeypatch.setattr(ledger_api, "parse_statement_bytes", fake_parse_statement_bytes)
+    monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
 
     token = create_token()
     app = create_app()
@@ -342,4 +365,5 @@ def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
         "data": b"%PDF-1.7",
         "file_name": "uploaded.pdf",
         "password": "pw",
+        "threaded": True,
     }
