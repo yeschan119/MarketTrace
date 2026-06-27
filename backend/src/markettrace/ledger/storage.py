@@ -8,7 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from markettrace.db.models import LedgerStatementRecord
-from markettrace.ledger.statements import LedgerCategory, LedgerEntry, LedgerStatement
+from markettrace.ledger.statements import (
+    LedgerCategory,
+    LedgerEntry,
+    LedgerStatement,
+    categorize_description,
+    category_totals,
+)
 
 
 def resolve_statement_month(statement: LedgerStatement) -> date:
@@ -78,6 +84,29 @@ def get_ledger_statement(
     )
 
 
+def build_ledger_statement_from_record(row: LedgerStatementRecord) -> LedgerStatement:
+    """Return a display statement from a saved row using current category rules."""
+    entries = [_entry_from_payload(entry) for entry in row.entries]
+    return LedgerStatement(
+        statement_month=row.statement_month,
+        uploaded_at=row.uploaded_at,
+        file_name=row.file_name,
+        file_modified_at=row.file_modified_at,
+        encrypted=row.encrypted,
+        payment_due_date=row.payment_due_date,
+        period_start=row.period_start,
+        period_end=row.period_end,
+        billed_total=row.billed_total,
+        domestic_total=row.domestic_total,
+        foreign_total=row.foreign_total,
+        parsed_total=row.parsed_total,
+        entry_count=row.entry_count,
+        entries=entries,
+        categories=category_totals(entries),
+        warnings=list(row.warnings),
+    )
+
+
 def _entry_payload(entry: LedgerEntry) -> dict:
     return {
         "date": entry.date.isoformat(),
@@ -94,3 +123,14 @@ def _category_payload(category: LedgerCategory) -> dict:
         "amount": category.amount,
         "count": category.count,
     }
+
+
+def _entry_from_payload(value: dict) -> LedgerEntry:
+    description = str(value.get("description") or "")
+    return LedgerEntry(
+        date=date.fromisoformat(str(value["date"])),
+        card_tail=value.get("card_tail"),
+        description=description,
+        amount=int(value.get("amount") or 0),
+        category=categorize_description(description),
+    )

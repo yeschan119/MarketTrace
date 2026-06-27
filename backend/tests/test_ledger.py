@@ -67,7 +67,8 @@ def test_parse_statement_text_extracts_summary_entries_and_categories() -> None:
         "KFC",
     ]
     assert {category.category for category in statement.categories} >= {
-        "식비/마트",
+        "마트/식료품",
+        "외식",
         "구독/디지털",
     }
 
@@ -85,8 +86,62 @@ def test_parse_statement_text_applies_merchant_overrides() -> None:
         "케이에프씨",
         "오픈AI 구독",
     ]
+    assert [entry.category for entry in statement.entries] == [
+        "마트/식료품",
+        "외식",
+        "구독/디지털",
+    ]
     assert statement.warnings == [
         "청구금액과 파싱 거래 합계가 다릅니다. 할부, 수수료, 할인, 중복 상세 내역을 확인하세요."
+    ]
+
+
+def test_parse_statement_text_uses_granular_korean_categories() -> None:
+    statement = parse_statement_text(
+        text="""
+        2026.07.01 account
+        100,000
+        100,000
+        0
+        text period 2026. 05. 01 - 2026. 05. 31
+        26.05.01 »Î001 unreadable one 1,000
+        26.05.02 »Î001 unreadable two 2,000
+        26.05.03 »Î001 unreadable three 3,000
+        26.05.04 »Î001 unreadable four 4,000
+        26.05.05 »Î001 unreadable five 5,000
+        26.05.06 »Î001 unreadable six 6,000
+        26.05.07 »Î001 unreadable seven 7,000
+        26.05.08 »Î001 unreadable eight 8,000
+        26.05.09 »Î001 unreadable nine 9,000
+        26.05.10 »Î001 unreadable ten 10,000
+        """,
+        file_name="statement.pdf",
+        file_modified_at=datetime(2026, 6, 26, tzinfo=UTC),
+        merchant_overrides=[
+            "스타벅스",
+            "쿠팡",
+            "올리브영",
+            "서울치과",
+            "한국전력",
+            "GS칼텍스",
+            "CGV",
+            "교보문고",
+            "아고다",
+            statement_mod._UNREADABLE_MERCHANT,
+        ],
+    )
+
+    assert [entry.category for entry in statement.entries] == [
+        "카페/간식",
+        "온라인쇼핑",
+        "생활/쇼핑",
+        "의료/약국",
+        "주거/공과금",
+        "주유/차량",
+        "문화/여가",
+        "교육/도서",
+        "여행/숙박",
+        "인식불가",
     ]
 
 
@@ -654,6 +709,72 @@ def test_ledger_statements_list_and_month_lookup(monkeypatch) -> None:
     ]
     assert detail.status_code == 200
     assert detail.json()["entries"][0]["description"] == "TEST MERCHANT"
+
+
+def test_saved_statement_detail_recategorizes_existing_entries(monkeypatch) -> None:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        session.add(
+            LedgerStatementRecord(
+                statement_month=date(2026, 6, 1),
+                file_name="saved.pdf",
+                file_modified_at=datetime(2026, 6, 26, tzinfo=UTC),
+                uploaded_at=datetime(2026, 6, 27, tzinfo=UTC),
+                encrypted=True,
+                payment_due_date=None,
+                period_start=None,
+                period_end=None,
+                billed_total=None,
+                domestic_total=None,
+                foreign_total=None,
+                parsed_total=10_500,
+                entry_count=3,
+                entries=[
+                    {
+                        "date": "2026-06-01",
+                        "card_tail": "881",
+                        "description": "스타벅스",
+                        "amount": 3000,
+                        "category": "기타",
+                    },
+                    {
+                        "date": "2026-06-02",
+                        "card_tail": "881",
+                        "description": "쿠팡",
+                        "amount": 7000,
+                        "category": "기타",
+                    },
+                    {
+                        "date": "2026-06-03",
+                        "card_tail": "881",
+                        "description": statement_mod._UNREADABLE_MERCHANT,
+                        "amount": 500,
+                        "category": "기타",
+                    },
+                ],
+                categories=[{"category": "기타", "amount": 10_500, "count": 3}],
+                warnings=[],
+            )
+        )
+        session.commit()
+        token = create_token()
+
+        resp = client.get(
+            "/ledger/statements/2026-06",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [entry["category"] for entry in data["entries"]] == [
+        "카페/간식",
+        "온라인쇼핑",
+        "인식불가",
+    ]
+    assert {category["category"] for category in data["categories"]} == {
+        "카페/간식",
+        "온라인쇼핑",
+        "인식불가",
+    }
 
 
 def test_ledger_statement_upload_replaces_same_month(monkeypatch) -> None:

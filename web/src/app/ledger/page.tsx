@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import type { LedgerStatement, LedgerStatementSummary } from "@/types/api";
+import type {
+  LedgerEntry,
+  LedgerStatement,
+  LedgerStatementSummary,
+} from "@/types/api";
 
 function formatWon(value: number | null, locale: string): string {
   if (value == null) return "-";
@@ -48,6 +52,48 @@ function SummaryItem({
   );
 }
 
+type LedgerCategorySection = {
+  category: string;
+  amount: number;
+  count: number;
+  entries: LedgerEntry[];
+};
+
+function buildCategorySections(
+  statement: LedgerStatement | undefined
+): LedgerCategorySection[] {
+  if (!statement) return [];
+
+  const entriesByCategory = new Map<string, LedgerEntry[]>();
+  for (const entry of statement.entries) {
+    const entries = entriesByCategory.get(entry.category) ?? [];
+    entries.push(entry);
+    entriesByCategory.set(entry.category, entries);
+  }
+
+  const knownCategories = new Set(
+    statement.categories.map((category) => category.category)
+  );
+  const sections = statement.categories.map((category) => ({
+    category: category.category,
+    amount: category.amount,
+    count: category.count,
+    entries: entriesByCategory.get(category.category) ?? [],
+  }));
+
+  for (const [category, entries] of entriesByCategory) {
+    if (knownCategories.has(category)) continue;
+    sections.push({
+      category,
+      amount: entries.reduce((sum, entry) => sum + entry.amount, 0),
+      count: entries.length,
+      entries,
+    });
+  }
+
+  return sections;
+}
+
 export default function LedgerPage() {
   const { token, logout } = useAuth();
   const { t, locale } = useI18n();
@@ -57,6 +103,9 @@ export default function LedgerPage() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    () => new Set()
+  );
 
   function toLedgerErrorMessage(err: unknown): string {
     if (isApiError(err) && err.status === 401) {
@@ -152,14 +201,6 @@ export default function LedgerPage() {
     uploadStatement.mutate({ nextFile: file, nextPassword });
   }
 
-  if (!token) {
-    return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-600 shadow-sm">
-        {authNotice || t("ledger.loginRequired")}
-      </div>
-    );
-  }
-
   const summaries: LedgerStatementSummary[] = statementSummaries.data ?? [];
   const selectedMonthUpload =
     uploadStatement.data?.statement_month &&
@@ -168,6 +209,12 @@ export default function LedgerPage() {
       : undefined;
   const statement: LedgerStatement | undefined =
     selectedStatement.data ?? selectedMonthUpload;
+  const statementIdentity =
+    statement?.uploaded_at ?? statement?.statement_month ?? "";
+  const categorySections = useMemo(
+    () => buildCategorySections(statement),
+    [statement]
+  );
   const isFetching = selectedStatement.isFetching || statementSummaries.isFetching;
   const isParsing = uploadStatement.isPending;
   const errorMessage = validationError
@@ -179,6 +226,30 @@ export default function LedgerPage() {
         : statementSummaries.isError && statementSummaries.error instanceof Error
           ? statementSummaries.error.message
           : "";
+
+  useEffect(() => {
+    setExpandedCategories(new Set());
+  }, [statementIdentity]);
+
+  function toggleCategory(category: string) {
+    setExpandedCategories((current) => {
+      const next = new Set(current);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  }
+
+  if (!token) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-600 shadow-sm">
+        {authNotice || t("ledger.loginRequired")}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -334,108 +405,126 @@ export default function LedgerPage() {
             />
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SummaryItem
-                  label={t("ledger.parsedTotal")}
-                  value={formatWon(statement.parsed_total, locale)}
-                />
-                <SummaryItem
-                  label={t("ledger.foreignTotal")}
-                  value={formatWon(statement.foreign_total, locale)}
-                />
-              </div>
-
-              {statement.entries.length === 0 ? (
-                <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
-                  {t("ledger.empty")}
-                </div>
-              ) : (
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        <th className="px-4 py-3">{t("ledger.th.date")}</th>
-                        <th className="px-4 py-3">{t("ledger.th.category")}</th>
-                        <th className="px-4 py-3">{t("ledger.th.description")}</th>
-                        <th className="px-4 py-3">{t("ledger.th.card")}</th>
-                        <th className="px-4 py-3 text-right">
-                          {t("ledger.th.amount")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statement.entries.map((entry, idx) => (
-                        <tr
-                          key={`${entry.date}-${entry.description}-${entry.amount}-${idx}`}
-                          className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
-                        >
-                          <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                            {formatDate(entry.date, locale)}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
-                              {entry.category}
-                            </span>
-                          </td>
-                          <td className="max-w-md px-4 py-3 text-gray-900">
-                            <span className="block truncate">
-                              {entry.description}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-gray-500">
-                            {entry.card_tail ? `***${entry.card_tail}` : "-"}
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">
-                            {formatWon(entry.amount, locale)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SummaryItem
+                label={t("ledger.parsedTotal")}
+                value={formatWon(statement.parsed_total, locale)}
+              />
+              <SummaryItem
+                label={t("ledger.foreignTotal")}
+                value={formatWon(statement.foreign_total, locale)}
+              />
             </div>
 
-            <aside className="space-y-4">
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  {t("ledger.categories")}
-                </h2>
-                <div className="mt-3 space-y-3">
-                  {statement.categories.map((category) => (
-                    <div
-                      key={category.category}
-                      className="flex items-center justify-between gap-4 text-sm"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-800">
-                          {category.category}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {t("ledger.entries", { n: category.count })}
-                        </div>
-                      </div>
-                      <div className="font-mono font-semibold text-gray-900">
-                        {formatWon(category.amount, locale)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {statement.entries.length === 0 ? (
+              <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+                {t("ledger.empty")}
               </div>
+            ) : (
+              <div className="space-y-3">
+                {categorySections.map((section, sectionIndex) => {
+                  const isExpanded = expandedCategories.has(section.category);
+                  const sectionId = `ledger-category-${sectionIndex}`;
+                  return (
+                    <section
+                      key={section.category}
+                      className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        aria-controls={sectionId}
+                        onClick={() => toggleCategory(section.category)}
+                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gray-300 font-mono text-sm font-semibold text-gray-600"
+                          >
+                            {isExpanded ? "-" : "+"}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-gray-900">
+                              {section.category}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {t("ledger.entries", { n: section.count })}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right font-mono text-sm font-semibold text-gray-900">
+                          {formatWon(section.amount, locale)}
+                        </span>
+                      </button>
 
-              {statement.warnings.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  <h2 className="font-semibold">{t("ledger.warnings")}</h2>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {statement.warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </aside>
+                      {isExpanded && (
+                        <div
+                          id={sectionId}
+                          className="overflow-x-auto border-t border-gray-200"
+                        >
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                <th className="px-4 py-3">
+                                  {t("ledger.th.date")}
+                                </th>
+                                <th className="px-4 py-3">
+                                  {t("ledger.th.description")}
+                                </th>
+                                <th className="px-4 py-3">
+                                  {t("ledger.th.card")}
+                                </th>
+                                <th className="px-4 py-3 text-right">
+                                  {t("ledger.th.amount")}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {section.entries.map((entry, idx) => (
+                                <tr
+                                  key={`${entry.date}-${entry.description}-${entry.amount}-${idx}`}
+                                  className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                                >
+                                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                    {formatDate(entry.date, locale)}
+                                  </td>
+                                  <td className="max-w-md px-4 py-3 text-gray-900">
+                                    <span className="block truncate">
+                                      {entry.description}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 font-mono text-gray-500">
+                                    {entry.card_tail
+                                      ? `***${entry.card_tail}`
+                                      : "-"}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-semibold text-gray-900">
+                                    {formatWon(entry.amount, locale)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+
+            {statement.warnings.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <h2 className="font-semibold">{t("ledger.warnings")}</h2>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {statement.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </>
       )}

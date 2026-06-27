@@ -83,6 +83,8 @@ class LedgerStatement:
     entries: list[LedgerEntry]
     categories: list[LedgerCategory]
     warnings: list[str]
+    statement_month: date | None = None
+    uploaded_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,338 @@ _OPENAI_MERCHANT_OCR_TEXT_FORMAT = {
         "required": ["merchants"],
     },
 }
+
+_CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "구독/디지털",
+        (
+            "ADOBE",
+            "ANTHROPIC",
+            "APPLE.COM",
+            "AWS",
+            "CHATGPT",
+            "CLAUDE",
+            "CLOUDFLARE",
+            "DISCORD",
+            "DROPBOX",
+            "FIGMA",
+            "GITHUB",
+            "GOOGLE",
+            "MICROSOFT",
+            "NETFLIX",
+            "NOTION",
+            "OPENAI",
+            "RENDER",
+            "SPOTIFY",
+            "STEAM",
+            "YOUTUBE",
+            "구독",
+            "멤버십",
+            "쿠팡와우",
+        ),
+    ),
+    (
+        "통신",
+        (
+            "0800",
+            "KT",
+            "LG U",
+            "LGU",
+            "SKT",
+            "SK텔레콤",
+            "U+",
+            "인터넷",
+            "케이티",
+            "통신",
+        ),
+    ),
+    (
+        "교통",
+        (
+            "BUS",
+            "KAKAO T",
+            "KORAIL",
+            "KTX",
+            "SRT",
+            "TAXI",
+            "TMAP",
+            "TRAIN",
+            "공항철도",
+            "버스",
+            "지하철",
+            "철도",
+            "카카오T",
+            "카카오택시",
+            "코레일",
+            "택시",
+            "티머니",
+        ),
+    ),
+    (
+        "주유/차량",
+        (
+            "GS칼텍스",
+            "PARKING",
+            "S-OIL",
+            "SK에너지",
+            "고속도로",
+            "세차",
+            "주유",
+            "주차",
+            "충전소",
+            "하이패스",
+            "현대오일뱅크",
+        ),
+    ),
+    (
+        "마트/식료품",
+        (
+            "COSTCO",
+            "EMART",
+            "GS THE FRESH",
+            "LOTTE MART",
+            "SSG푸드마켓",
+            "농협",
+            "롯데마트",
+            "마켓컬리",
+            "마트",
+            "슈퍼",
+            "이마트",
+            "지에스더프레시",
+            "코스트코",
+            "쿠팡프레시",
+            "컬리",
+            "트레이더스",
+            "하나로마트",
+            "홈플러스",
+        ),
+    ),
+    (
+        "편의점",
+        (
+            "CU",
+            "EMART24",
+            "GS25",
+            "미니스톱",
+            "세븐일레븐",
+            "씨유",
+            "이마트24",
+            "편의점",
+        ),
+    ),
+    (
+        "카페/간식",
+        (
+            "BASKIN",
+            "CAFE",
+            "COFFEE",
+            "STARBUCKS",
+            "공차",
+            "던킨",
+            "디저트",
+            "뚜레쥬르",
+            "메가커피",
+            "베스킨",
+            "배스킨",
+            "베이커리",
+            "빽다방",
+            "설빙",
+            "스타벅스",
+            "이디야",
+            "카페",
+            "커피",
+            "컴포즈",
+            "투썸",
+            "파리바게뜨",
+        ),
+    ),
+    (
+        "외식",
+        (
+            "KFC",
+            "MCDONALD",
+            "교촌",
+            "국밥",
+            "김밥",
+            "롯데리아",
+            "맥도날드",
+            "버거",
+            "버거킹",
+            "배달의민족",
+            "배민",
+            "보쌈",
+            "분식",
+            "서브웨이",
+            "식당",
+            "요기요",
+            "음식점",
+            "이자카야",
+            "족발",
+            "치킨",
+            "케이에프씨",
+            "쿠팡이츠",
+            "피자",
+            "한식",
+            "횟집",
+        ),
+    ),
+    (
+        "온라인쇼핑",
+        (
+            "11번가",
+            "ALIEXPRESS",
+            "AMAZON",
+            "COUPANG",
+            "G마켓",
+            "NAVER PAY",
+            "SSG.COM",
+            "TEMU",
+            "네이버페이",
+            "옥션",
+            "온라인",
+            "카카오페이",
+            "쿠팡",
+            "테무",
+        ),
+    ),
+    (
+        "생활/쇼핑",
+        (
+            "ABC마트",
+            "DAISO",
+            "H&M",
+            "OLIVE YOUNG",
+            "ZARA",
+            "다이소",
+            "무신사",
+            "생활용품",
+            "쇼핑",
+            "올리브영",
+            "유니클로",
+            "잡화",
+        ),
+    ),
+    (
+        "의료/약국",
+        (
+            "CLINIC",
+            "MEDICAL",
+            "PHARMACY",
+            "내과",
+            "병원",
+            "약국",
+            "안과",
+            "의원",
+            "이비인후과",
+            "치과",
+            "피부과",
+            "한의원",
+        ),
+    ),
+    (
+        "교육/도서",
+        (
+            "ALADIN",
+            "CLASS101",
+            "INFLEARN",
+            "UDEMY",
+            "YES24",
+            "강의",
+            "교보문고",
+            "도서",
+            "서점",
+            "알라딘",
+            "예스24",
+            "인프런",
+            "클래스101",
+            "학원",
+        ),
+    ),
+    (
+        "문화/여가",
+        (
+            "CGV",
+            "PC방",
+            "골프",
+            "공연",
+            "노래",
+            "롯데시네마",
+            "메가박스",
+            "스포츠",
+            "영화",
+            "티켓",
+            "필라테스",
+            "헬스",
+        ),
+    ),
+    (
+        "여행/숙박",
+        (
+            "AGODA",
+            "AIRBNB",
+            "BOOKING",
+            "HOTEL",
+            "대한항공",
+            "면세",
+            "모텔",
+            "숙박",
+            "아고다",
+            "아시아나",
+            "여행",
+            "제주항공",
+            "진에어",
+            "티웨이",
+            "항공",
+            "호텔",
+        ),
+    ),
+    (
+        "주거/공과금",
+        (
+            "관리비",
+            "도시가스",
+            "수도",
+            "아파트",
+            "월세",
+            "전기",
+            "한국전력",
+        ),
+    ),
+    (
+        "금융/보험/세금",
+        (
+            "국세",
+            "보험",
+            "세금",
+            "수수료",
+            "이자",
+            "지방세",
+        ),
+    ),
+    (
+        "미용",
+        (
+            "AORO",
+            "BARBER",
+            "HAIR",
+            "네일",
+            "미용",
+            "왁싱",
+            "피부관리",
+            "헤어",
+        ),
+    ),
+    (
+        "반려동물",
+        (
+            "PET",
+            "동물병원",
+            "반려",
+            "애견",
+            "펫",
+        ),
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -1036,26 +1370,30 @@ def _clean_description(value: str) -> str:
 
 
 def _categorize(description: str) -> str:
-    upper = description.upper()
-    if any(token in upper for token in ("GS THE FRESH", "KFC")):
-        return "식비/마트"
-    if any(token in upper for token in ("CU", "24")):
-        return "편의점"
-    if any(token in upper for token in ("KTX", "TAXI", "BUS", "TRAIN")):
-        return "교통"
-    if any(token in upper for token in ("KT", "SKT", "LG U", "0800")):
-        return "통신"
-    if any(
-        token in upper
-        for token in ("CLAUDE", "ANTHROPIC", "OPENAI", "RENDER", "GITHUB", "STEAM")
-    ):
-        return "구독/디지털"
-    if any(token in upper for token in ("HAIR", "AORO")):
-        return "미용"
+    return categorize_description(description)
+
+
+def categorize_description(description: str) -> str:
+    """Assign a display category from a merchant description."""
+    if description == _UNREADABLE_MERCHANT:
+        return "인식불가"
+    normalized = _normalize_category_text(description)
+    for category, tokens in _CATEGORY_RULES:
+        if any(_normalize_category_text(token) in normalized for token in tokens):
+            return category
     return "기타"
 
 
+def _normalize_category_text(value: str) -> str:
+    return re.sub(r"[\s._·•()/\\\\-]+", "", value.upper())
+
+
 def _category_totals(entries: list[LedgerEntry]) -> list[LedgerCategory]:
+    return category_totals(entries)
+
+
+def category_totals(entries: list[LedgerEntry]) -> list[LedgerCategory]:
+    """Aggregate ledger entries by category, largest amount first."""
     totals: dict[str, tuple[int, int]] = {}
     for entry in entries:
         amount, count = totals.get(entry.category, (0, 0))
