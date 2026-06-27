@@ -81,6 +81,17 @@ class LedgerStatement:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class _OcrMerchantRow:
+    index: int | None
+    used_on: date | None
+    amount: int | None
+    merchant: str
+
+
+_UNREADABLE_MERCHANT = "가맹점명 인식 불가"
+
+
 def resolve_statement_dir(configured_dir: str) -> Path:
     """Resolve a configured statement folder from common app working directories."""
     raw = Path(configured_dir).expanduser()
@@ -454,12 +465,14 @@ def _extract_openai_ocr_merchants_from_bytes(
             raise StatementError("card statement image OCR failed") from exc
         return []
 
-    merchants = _parse_openai_merchant_response(content)
-    if len(merchants) < len(transaction_lines):
-        if required:
-            raise StatementError("card statement image OCR did not return every merchant")
-        return []
-    return merchants[: len(transaction_lines)]
+    merchant_rows = _parse_openai_merchant_response(content)
+    if required and not merchant_rows:
+        raise StatementError("card statement image OCR did not return merchant rows")
+
+    merchants = _match_ocr_rows_to_transaction_lines(transaction_lines, merchant_rows)
+    if required and not any(merchant != _UNREADABLE_MERCHANT for merchant in merchants):
+        raise StatementError("card statement image OCR did not match merchant rows")
+    return merchants
 
 
 def _call_openai_merchant_ocr(
@@ -528,12 +541,14 @@ def _openai_merchant_ocr_prompt(transaction_lines: list[str]) -> str:
 Extract merchant names from this Korean card statement PDF.
 
 Return strict JSON only in this shape:
-{{"merchants":["merchant 1","merchant 2"]}}
+{{"transactions":[{{"index":1,"date":"YYYY-MM-DD","amount":17580,"merchant":"merchant"}}]}}
 
 Rules:
-- Return exactly {len(transaction_lines)} merchant names.
+- Return one object for each visible transaction row you can identify.
+- `index` is the 1-based parsed transaction line number below.
+- `date` must be YYYY-MM-DD and `amount` must be the billed KRW amount as an integer.
 - Preserve Korean merchant names exactly as shown in the PDF.
-- Keep the order aligned with the parsed transaction lines below.
+- Match rows by the parsed transaction lines below; use their index/date/amount.
 - Do not include dates, card numbers, amounts, approval numbers, installment
   labels, totals, or subtotals.
 - Skip overseas summary rows that duplicate a detailed overseas transaction row.
@@ -544,7 +559,7 @@ Parsed transaction lines:
 """
 
 
-def _parse_openai_merchant_response(content: str) -> list[str]:
+def _parse_openai_merchant_response(content: str) -> list[_OcrMerchantRow]:
     raw = content.strip()
     if raw.startswith("```"):
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
@@ -555,20 +570,111 @@ def _parse_openai_merchant_response(content: str) -> list[str]:
         return []
 
     if isinstance(parsed, dict):
-        values = parsed.get("merchants")
+        values = parsed.get("transactions") or parsed.get("rows") or parsed.get("merchants")
     else:
         values = parsed
     if not isinstance(values, list):
         return []
 
-    merchants: list[str] = []
-    for value in values:
-        if not isinstance(value, str):
+    rows: list[_OcrMerchantRow] = []
+    for position, value in enumerate(values, start=1):
+        if isinstance(value, str):
+            merchant = _clean_ocr_merchant(value)
+            if merchant:
+                rows.append(
+                    _OcrMerchantRow(
+                        index=position,
+                        used_on=None,
+                        amount=None,
+                        merchant=merchant,
+                    )
+                )
             continue
-        merchant = _clean_ocr_merchant(value)
+        if not isinstance(value, dict):
+            continue
+        merchant_value = value.get("merchant")
+        merchant = _clean_ocr_merchant(str(merchant_value or ""))
         if merchant:
-            merchants.append(merchant)
+            rows.append(
+                _OcrMerchantRow(
+                    index=_parse_optional_int(value.get("index")),
+                    used_on=_parse_ocr_row_date(value.get("date")),
+                    amount=_parse_ocr_row_amount(value.get("amount")),
+                    merchant=merchant,
+                )
+            )
+    return rows
+
+
+def _match_ocr_rows_to_transaction_lines(
+    transaction_lines: list[str],
+    rows: list[_OcrMerchantRow],
+) -> list[str]:
+    entries = [_parse_entry(line) for line in transaction_lines]
+    merchants = [_UNREADABLE_MERCHANT for _ in transaction_lines]
+    used_row_indexes: set[int] = set()
+
+    for row_index, row in enumerate(rows):
+        target = row.index - 1 if row.index is not None else None
+        if target is None or target < 0 or target >= len(entries):
+            continue
+        entry = entries[target]
+        if entry is None:
+            continue
+        if _ocr_row_matches_entry(row, entry):
+            merchants[target] = row.merchant
+            used_row_indexes.add(row_index)
+
+    for row_index, row in enumerate(rows):
+        if row_index in used_row_indexes or row.used_on is None or row.amount is None:
+            continue
+        for entry_index, entry in enumerate(entries):
+            if entry is None or merchants[entry_index] != _UNREADABLE_MERCHANT:
+                continue
+            if row.used_on == entry.date and row.amount == entry.amount:
+                merchants[entry_index] = row.merchant
+                used_row_indexes.add(row_index)
+                break
+
     return merchants
+
+
+def _ocr_row_matches_entry(row: _OcrMerchantRow, entry: LedgerEntry) -> bool:
+    date_matches = row.used_on is None or row.used_on == entry.date
+    amount_matches = row.amount is None or row.amount == entry.amount
+    return date_matches and amount_matches
+
+
+def _parse_optional_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        digits = re.sub(r"[^\d-]", "", value)
+        if digits:
+            try:
+                return int(digits)
+            except ValueError:
+                return None
+    return None
+
+
+def _parse_ocr_row_amount(value: object) -> int | None:
+    return _parse_optional_int(value)
+
+
+def _parse_ocr_row_date(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    numbers = [int(part) for part in re.findall(r"\d+", value)]
+    if len(numbers) < 3:
+        return None
+    year, month, day = numbers[:3]
+    if year < 100:
+        year = 2000 + year if year < 70 else 1900 + year
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 
 def _read_decrypted_pdf_bytes(pdf_path: Path, password: str | None) -> bytes:

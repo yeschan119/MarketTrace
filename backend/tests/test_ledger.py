@@ -93,7 +93,14 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
     class _FakeResponses:
         def create(self, **kwargs):
             seen.update(kwargs)
-            return SimpleNamespace(output_text='{"merchants":["지에스더프레시","케이에프씨"]}')
+            return SimpleNamespace(
+                output_text=(
+                    '{"transactions":['
+                    '{"index":2,"date":"2026-06-09","amount":11500,"merchant":"케이에프씨"},'
+                    '{"index":1,"date":"2026-05-26","amount":17580,"merchant":"지에스더프레시"}'
+                    ']}'
+                )
+            )
 
     class _FakeOpenAI:
         def __init__(self, *, api_key: str) -> None:
@@ -131,6 +138,22 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
         "image_url": "data:image/png;base64,test-image",
         "detail": "high",
     }
+
+
+def test_ocr_rows_match_by_date_amount_and_mark_unmatched() -> None:
+    rows = statement_mod._parse_openai_merchant_response(
+        '{"transactions":[{"date":"2026-06-09","amount":"11,500","merchant":"케이에프씨"}]}'
+    )
+
+    merchants = statement_mod._match_ocr_rows_to_transaction_lines(
+        [
+            "26.05.26 »Î069 broken text 17,580",
+            "26.06.09 »Î881 broken text 11,500",
+        ],
+        rows,
+    )
+
+    assert merchants == [statement_mod._UNREADABLE_MERCHANT, "케이에프씨"]
 
 
 def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) -> None:
