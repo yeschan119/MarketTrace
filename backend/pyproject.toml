@@ -17,6 +17,7 @@ dependencies = [
     "httpx",
     "polars",
     "pypdf",
+    "PyMuPDF",
     "python-multipart",
     "anthropic",
     "openai",

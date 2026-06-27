@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 import markettrace.api.ledger as ledger_api
@@ -16,6 +17,7 @@ from markettrace.ledger.statements import (
     LedgerCategory,
     LedgerEntry,
     LedgerStatement,
+    StatementError,
     parse_statement_text,
 )
 
@@ -101,10 +103,14 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
     fake_openai = SimpleNamespace(OpenAI=_FakeOpenAI)
     monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
+    monkeypatch.setattr(
+        statement_mod,
+        "_render_pdf_page_images",
+        lambda _: ["data:image/png;base64,test-image"],
+    )
 
     merchants = statement_mod._extract_openai_ocr_merchants_from_bytes(
         b"%PDF-1.7",
-        file_name="../statement.pdf",
         text="\n".join(
             [
                 "26.05.26 »Î069 broken text 17,580",
@@ -117,8 +123,12 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
     assert seen["api_key"] == "test-key"
     assert seen["model"] == "gpt-4o-mini"
     request = seen["input"][0]["content"]
-    assert request[0]["filename"] == "statement.pdf"
-    assert request[0]["file_data"].startswith("data:application/pdf;base64,")
+    assert request[0]["type"] == "input_text"
+    assert request[1] == {
+        "type": "input_image",
+        "image_url": "data:image/png;base64,test-image",
+        "detail": "high",
+    }
 
 
 def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) -> None:
@@ -148,6 +158,54 @@ def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) ->
     )
 
     assert merchants == ["스타벅스"]
+
+
+def test_required_openai_ocr_fails_instead_of_returning_broken_text(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        ledger_ocr_provider="openai",
+        openai_api_key="test-key",
+        ledger_ocr_model="gpt-4o-mini",
+    )
+
+    monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        statement_mod,
+        "_read_decrypted_pdf_bytes_from_bytes",
+        lambda *_: b"%PDF-1.7",
+    )
+    monkeypatch.setattr(
+        statement_mod,
+        "_render_pdf_page_images",
+        lambda _: ["data:image/png;base64,test-image"],
+    )
+    monkeypatch.setattr(
+        statement_mod,
+        "_call_openai_merchant_ocr",
+        lambda *_, **__: '{"merchants":[]}',
+    )
+
+    with pytest.raises(StatementError):
+        statement_mod._extract_ocr_merchants_from_bytes(
+            b"raw-pdf",
+            None,
+            text="26.05.26 garbled merchant text 5,000",
+            file_name="statement.pdf",
+        )
+
+
+def test_render_pdf_page_images_returns_png_data_urls() -> None:
+    import fitz
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "statement page")
+    data = document.tobytes()
+    document.close()
+
+    images = statement_mod._render_pdf_page_images(data)
+
+    assert len(images) == 1
+    assert images[0].startswith("data:image/png;base64,")
 
 
 class _Settings:

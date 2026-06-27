@@ -22,6 +22,8 @@ _PERIOD_RE = re.compile(
     r"(20\d{2})\.\s*(\d{2})\.\s*(\d{2})"
 )
 _OCR_DATE_RE = re.compile(r"^26[. ]*\d{2}[.: ]*\d{2}")
+_OPENAI_OCR_MAX_PAGES = 6
+_OPENAI_OCR_RENDER_ZOOM = 2.0
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -283,8 +285,8 @@ def _extract_ocr_merchants(pdf_path: Path, password: str | None, *, text: str) -
             return []
         return _extract_openai_ocr_merchants_from_bytes(
             pdf_bytes,
-            file_name=pdf_path.name,
             text=text,
+            required=provider == "openai",
         )
 
     return []
@@ -313,8 +315,8 @@ def _extract_ocr_merchants_from_bytes(
             return []
         return _extract_openai_ocr_merchants_from_bytes(
             pdf_bytes,
-            file_name=file_name,
             text=text,
+            required=provider == "openai",
         )
 
     return []
@@ -416,16 +418,20 @@ def _extract_swift_ocr_merchants_from_bytes(data: bytes, password: str | None) -
 def _extract_openai_ocr_merchants_from_bytes(
     data: bytes,
     *,
-    file_name: str,
     text: str,
+    required: bool = False,
 ) -> list[str]:
     try:
         from markettrace.config import get_settings
-    except ImportError:
+    except ImportError as exc:
+        if required:
+            raise StatementDependencyError("OpenAI OCR settings are unavailable") from exc
         return []
 
     settings = get_settings()
     if not settings.openai_api_key:
+        if required:
+            raise StatementDependencyError("OPENAI_API_KEY is required for card statement OCR")
         return []
 
     transaction_lines = _transaction_lines_from_text(text)
@@ -440,15 +446,18 @@ def _extract_openai_ocr_merchants_from_bytes(
             client=client,
             model=settings.ledger_ocr_model,
             data=data,
-            file_name=file_name,
             transaction_lines=transaction_lines,
         )
-    except Exception:
+    except Exception as exc:
         _LOGGER.warning("OpenAI merchant OCR failed", exc_info=True)
+        if required:
+            raise StatementError("card statement image OCR failed") from exc
         return []
 
     merchants = _parse_openai_merchant_response(content)
-    if not merchants:
+    if len(merchants) < len(transaction_lines):
+        if required:
+            raise StatementError("card statement image OCR did not return every merchant")
         return []
     return merchants[: len(transaction_lines)]
 
@@ -458,13 +467,9 @@ def _call_openai_merchant_ocr(
     client,
     model: str,
     data: bytes,
-    file_name: str,
     transaction_lines: list[str],
 ) -> str:
-    encoded_pdf = base64.b64encode(data).decode("ascii")
-    safe_file_name = Path(file_name).name or "statement.pdf"
-    if not safe_file_name.lower().endswith(".pdf"):
-        safe_file_name = f"{safe_file_name}.pdf"
+    page_images = _render_pdf_page_images(data)
     prompt = _openai_merchant_ocr_prompt(transaction_lines)
     response = client.responses.create(
         model=model,
@@ -472,18 +477,38 @@ def _call_openai_merchant_ocr(
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "input_file",
-                        "filename": safe_file_name,
-                        "file_data": f"data:application/pdf;base64,{encoded_pdf}",
-                    },
                     {"type": "input_text", "text": prompt},
+                    *[
+                        {"type": "input_image", "image_url": image_url, "detail": "high"}
+                        for image_url in page_images
+                    ],
                 ],
             }
         ],
         temperature=0,
     )
     return str(getattr(response, "output_text", "") or "")
+
+
+def _render_pdf_page_images(data: bytes) -> list[str]:
+    try:
+        import fitz
+    except ImportError as exc:  # pragma: no cover - deployment dependency guard.
+        raise StatementDependencyError("PyMuPDF is required for card statement OCR") from exc
+
+    images: list[str] = []
+    with fitz.open(stream=data, filetype="pdf") as document:
+        page_count = min(document.page_count, _OPENAI_OCR_MAX_PAGES)
+        matrix = fitz.Matrix(_OPENAI_OCR_RENDER_ZOOM, _OPENAI_OCR_RENDER_ZOOM)
+        for page_index in range(page_count):
+            page = document.load_page(page_index)
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            encoded = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
+            images.append(f"data:image/png;base64,{encoded}")
+
+    if not images:
+        raise StatementError("statement PDF did not contain renderable pages")
+    return images
 
 
 def _openai_merchant_ocr_prompt(transaction_lines: list[str]) -> str:
