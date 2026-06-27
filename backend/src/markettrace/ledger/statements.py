@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import logging
 import re
 import shutil
 import subprocess
@@ -20,6 +22,7 @@ _PERIOD_RE = re.compile(
     r"(20\d{2})\.\s*(\d{2})\.\s*(\d{2})"
 )
 _OCR_DATE_RE = re.compile(r"^26[. ]*\d{2}[.: ]*\d{2}")
+_LOGGER = logging.getLogger(__name__)
 
 
 class StatementError(Exception):
@@ -90,7 +93,7 @@ def parse_latest_statement(statement_dir: Path, password: str | None) -> LedgerS
     """Read and parse the newest ``*.pdf`` in ``statement_dir``."""
     pdf_path = _find_latest_pdf(statement_dir)
     text, encrypted = _extract_pdf_text(pdf_path, password)
-    merchant_overrides = _extract_ocr_merchants(pdf_path, password)
+    merchant_overrides = _extract_ocr_merchants(pdf_path, password, text=text)
     modified_at = datetime.fromtimestamp(pdf_path.stat().st_mtime, tz=UTC)
     return parse_statement_text(
         text=text,
@@ -106,7 +109,12 @@ def parse_statement_bytes(
 ) -> LedgerStatement:
     """Parse an uploaded statement PDF without persisting the upload."""
     text, encrypted = _extract_pdf_text_from_bytes(data, password, file_name=file_name)
-    merchant_overrides = _extract_ocr_merchants_from_bytes(data, password)
+    merchant_overrides = _extract_ocr_merchants_from_bytes(
+        data,
+        password,
+        text=text,
+        file_name=file_name,
+    )
     return parse_statement_text(
         text=text,
         file_name=file_name,
@@ -129,12 +137,10 @@ def parse_statement_text(
     period_start, period_end = _parse_period(text)
     billed_total, domestic_total, foreign_total = _parse_summary_totals(text)
 
-    date_lines = [line.strip() for line in text.splitlines() if _DATE_LINE_RE.match(line.strip())]
-    has_foreign_detail = any(_is_foreign_detail_line(line) for line in date_lines)
+    transaction_lines = _transaction_lines_from_text(text)
     entries = [
         entry
-        for line in date_lines
-        if not (has_foreign_detail and _is_foreign_summary_line(line))
+        for line in transaction_lines
         for entry in [_parse_entry(line)]
         if entry is not None
     ]
@@ -171,6 +177,20 @@ def parse_statement_text(
         categories=categories,
         warnings=warnings,
     )
+
+
+def _transaction_lines_from_text(text: str) -> list[str]:
+    date_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if _DATE_LINE_RE.match(line.strip())
+    ]
+    has_foreign_detail = any(_is_foreign_detail_line(line) for line in date_lines)
+    return [
+        line
+        for line in date_lines
+        if not (has_foreign_detail and _is_foreign_summary_line(line))
+    ]
 
 
 def _find_latest_pdf(statement_dir: Path) -> Path:
@@ -239,14 +259,84 @@ def _extract_pdf_text_from_reader(reader, password: str | None) -> tuple[str, bo
     return text, encrypted
 
 
-def _extract_ocr_merchants(pdf_path: Path, password: str | None) -> list[str]:
-    """Best-effort macOS Vision OCR for merchant names.
+def _extract_ocr_merchants(pdf_path: Path, password: str | None, *, text: str) -> list[str]:
+    """Best-effort OCR for merchant names.
 
     Card-statement text extraction preserves dates and amounts well, but this
     issuer's Korean merchant names are embedded with a custom font encoding.
-    On macOS, Vision can read the rendered statement and replace only that
-    presentation field. Non-macOS or missing Swift simply falls back to text.
+    OCR replaces only that presentation field when a local macOS Vision path or
+    the configured OpenAI fallback is available.
     """
+    if not _needs_merchant_ocr(text):
+        return []
+
+    provider = _ledger_ocr_provider()
+    if provider in ("auto", "swift"):
+        merchants = _extract_swift_ocr_merchants(pdf_path, password)
+        if merchants or provider == "swift":
+            return merchants
+
+    if provider in ("auto", "openai"):
+        try:
+            pdf_bytes = _read_decrypted_pdf_bytes(pdf_path, password)
+        except StatementError:
+            return []
+        return _extract_openai_ocr_merchants_from_bytes(
+            pdf_bytes,
+            file_name=pdf_path.name,
+            text=text,
+        )
+
+    return []
+
+
+def _extract_ocr_merchants_from_bytes(
+    data: bytes,
+    password: str | None,
+    *,
+    text: str,
+    file_name: str,
+) -> list[str]:
+    if not _needs_merchant_ocr(text):
+        return []
+
+    provider = _ledger_ocr_provider()
+    if provider in ("auto", "swift"):
+        merchants = _extract_swift_ocr_merchants_from_bytes(data, password)
+        if merchants or provider == "swift":
+            return merchants
+
+    if provider in ("auto", "openai"):
+        try:
+            pdf_bytes = _read_decrypted_pdf_bytes_from_bytes(data, password)
+        except StatementError:
+            return []
+        return _extract_openai_ocr_merchants_from_bytes(
+            pdf_bytes,
+            file_name=file_name,
+            text=text,
+        )
+
+    return []
+
+
+def _ledger_ocr_provider() -> str:
+    try:
+        from markettrace.config import get_settings
+    except ImportError:
+        return "none"
+
+    return get_settings().ledger_ocr_provider
+
+
+def _needs_merchant_ocr(text: str) -> bool:
+    transaction_lines = _transaction_lines_from_text(text)
+    if not transaction_lines:
+        return False
+    return "/Idiersis" in text or "»Î" in text
+
+
+def _extract_swift_ocr_merchants(pdf_path: Path, password: str | None) -> list[str]:
     swift = shutil.which("swift")
     script_path = Path(__file__).with_name("statement_ocr.swift")
     if not swift or not script_path.exists():
@@ -263,6 +353,7 @@ def _extract_ocr_merchants(pdf_path: Path, password: str | None) -> list[str]:
             timeout=25,
         )
     except (OSError, subprocess.SubprocessError, StatementError):
+        _LOGGER.debug("Swift merchant OCR failed", exc_info=True)
         return []
     finally:
         if temp_path:
@@ -274,7 +365,7 @@ def _extract_ocr_merchants(pdf_path: Path, password: str | None) -> list[str]:
     return _merchant_names_from_ocr(observations)
 
 
-def _extract_ocr_merchants_from_bytes(data: bytes, password: str | None) -> list[str]:
+def _extract_swift_ocr_merchants_from_bytes(data: bytes, password: str | None) -> list[str]:
     swift = shutil.which("swift")
     script_path = Path(__file__).with_name("statement_ocr.swift")
     if not swift or not script_path.exists():
@@ -291,6 +382,7 @@ def _extract_ocr_merchants_from_bytes(data: bytes, password: str | None) -> list
             timeout=25,
         )
     except (OSError, subprocess.SubprocessError, StatementError):
+        _LOGGER.debug("Swift merchant OCR failed", exc_info=True)
         return []
     finally:
         if temp_path:
@@ -300,6 +392,175 @@ def _extract_ocr_merchants_from_bytes(data: bytes, password: str | None) -> list
         return []
     observations = _parse_ocr_observations(proc.stdout)
     return _merchant_names_from_ocr(observations)
+
+
+def _extract_openai_ocr_merchants_from_bytes(
+    data: bytes,
+    *,
+    file_name: str,
+    text: str,
+) -> list[str]:
+    try:
+        from markettrace.config import get_settings
+    except ImportError:
+        return []
+
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return []
+
+    transaction_lines = _transaction_lines_from_text(text)
+    if not transaction_lines:
+        return []
+
+    try:
+        import openai
+
+        client = openai.OpenAI(api_key=settings.openai_api_key)
+        content = _call_openai_merchant_ocr(
+            client=client,
+            model=settings.ledger_ocr_model,
+            data=data,
+            file_name=file_name,
+            transaction_lines=transaction_lines,
+        )
+    except Exception:
+        _LOGGER.warning("OpenAI merchant OCR failed", exc_info=True)
+        return []
+
+    merchants = _parse_openai_merchant_response(content)
+    if not merchants:
+        return []
+    return merchants[: len(transaction_lines)]
+
+
+def _call_openai_merchant_ocr(
+    *,
+    client,
+    model: str,
+    data: bytes,
+    file_name: str,
+    transaction_lines: list[str],
+) -> str:
+    encoded_pdf = base64.b64encode(data).decode("ascii")
+    safe_file_name = Path(file_name).name or "statement.pdf"
+    if not safe_file_name.lower().endswith(".pdf"):
+        safe_file_name = f"{safe_file_name}.pdf"
+    prompt = _openai_merchant_ocr_prompt(transaction_lines)
+    response = client.responses.create(
+        model=model,
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_file",
+                        "filename": safe_file_name,
+                        "file_data": f"data:application/pdf;base64,{encoded_pdf}",
+                    },
+                    {"type": "input_text", "text": prompt},
+                ],
+            }
+        ],
+        temperature=0,
+    )
+    return str(getattr(response, "output_text", "") or "")
+
+
+def _openai_merchant_ocr_prompt(transaction_lines: list[str]) -> str:
+    indexed_lines = "\n".join(
+        f"{idx}. {line}" for idx, line in enumerate(transaction_lines, start=1)
+    )
+    return f"""\
+Extract merchant names from this Korean card statement PDF.
+
+Return strict JSON only in this shape:
+{{"merchants":["merchant 1","merchant 2"]}}
+
+Rules:
+- Return exactly {len(transaction_lines)} merchant names.
+- Preserve Korean merchant names exactly as shown in the PDF.
+- Keep the order aligned with the parsed transaction lines below.
+- Do not include dates, card numbers, amounts, approval numbers, installment
+  labels, totals, or subtotals.
+- Skip overseas summary rows that duplicate a detailed overseas transaction row.
+- If a merchant cannot be read, use "가맹점명 인식 불가".
+
+Parsed transaction lines:
+{indexed_lines}
+"""
+
+
+def _parse_openai_merchant_response(content: str) -> list[str]:
+    raw = content.strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(parsed, dict):
+        values = parsed.get("merchants")
+    else:
+        values = parsed
+    if not isinstance(values, list):
+        return []
+
+    merchants: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        merchant = _clean_ocr_merchant(value)
+        if merchant:
+            merchants.append(merchant)
+    return merchants
+
+
+def _read_decrypted_pdf_bytes(pdf_path: Path, password: str | None) -> bytes:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover - dependency already required upstream.
+        raise StatementDependencyError("pypdf is required to read card statement PDFs") from exc
+
+    reader = PdfReader(str(pdf_path))
+    return _read_decrypted_pdf_bytes_from_reader(reader, password)
+
+
+def _read_decrypted_pdf_bytes_from_bytes(data: bytes, password: str | None) -> bytes:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover - dependency already required upstream.
+        raise StatementDependencyError("pypdf is required to read card statement PDFs") from exc
+
+    reader = PdfReader(BytesIO(data))
+    return _read_decrypted_pdf_bytes_from_reader(reader, password)
+
+
+def _read_decrypted_pdf_bytes_from_reader(reader, password: str | None) -> bytes:
+    try:
+        from pypdf import PdfWriter
+        from pypdf.errors import FileNotDecryptedError
+    except ImportError as exc:  # pragma: no cover - dependency already required upstream.
+        raise StatementDependencyError("pypdf is required to read card statement PDFs") from exc
+
+    if reader.is_encrypted:
+        if not password:
+            raise StatementPasswordRequiredError("statement password is required")
+        if reader.decrypt(password) == 0:
+            raise StatementPasswordError("statement password is invalid")
+
+    writer = PdfWriter()
+    try:
+        for page in reader.pages:
+            writer.add_page(page)
+    except FileNotDecryptedError as exc:
+        raise StatementPasswordError("statement password is invalid") from exc
+
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()
 
 
 def _write_decrypted_temp_pdf(pdf_path: Path, password: str | None) -> str:
@@ -546,9 +807,12 @@ def _build_warnings(
     if not entries:
         warnings.append("거래 라인을 찾지 못했습니다.")
     if ("/Idiersis" in text or "»Î" in text) and not has_ocr_merchants:
-        warnings.append("PDF 내장 글꼴 인코딩 때문에 일부 한글 가맹점명이 깨질 수 있습니다.")
+        warnings.append(
+            "PDF 내장 글꼴 인코딩 때문에 일부 한글 가맹점명이 깨질 수 있습니다."
+        )
     if billed_total is not None and parsed_total != billed_total:
         warnings.append(
-            "청구금액과 파싱 거래 합계가 다릅니다. 할부, 수수료, 할인, 중복 상세 내역을 확인하세요."
+            "청구금액과 파싱 거래 합계가 다릅니다. "
+            "할부, 수수료, 할인, 중복 상세 내역을 확인하세요."
         )
     return warnings

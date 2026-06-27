@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import type { LedgerStatement } from "@/types/api";
@@ -37,7 +37,7 @@ function SummaryItem({
 }
 
 export default function LedgerPage() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const { t, locale } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [submittedFile, setSubmittedFile] = useState<File | null>(null);
@@ -46,23 +46,36 @@ export default function LedgerPage() {
     null
   );
   const [requestId, setRequestId] = useState(0);
+  const [authNotice, setAuthNotice] = useState("");
 
   const { data, isFetching, isError, error } = useQuery({
     queryKey: ["ledger-statement", requestId],
-    queryFn: () => {
+    queryFn: async () => {
       if (!submittedFile) throw new Error(t("ledger.missingFile"));
-      return api.uploadLedgerStatement(
-        token ?? "",
-        submittedFile,
-        submittedPassword ?? ""
-      );
+      try {
+        return await api.uploadLedgerStatement(
+          token ?? "",
+          submittedFile,
+          submittedPassword ?? ""
+        );
+      } catch (err) {
+        if (isApiError(err) && err.status === 401) {
+          const message = t("ledger.sessionExpired");
+          setAuthNotice(message);
+          logout();
+          throw new Error(message);
+        }
+        throw err;
+      }
     },
     enabled: Boolean(token && submittedFile && requestId > 0),
+    retry: false,
   });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!file) return;
+    setAuthNotice("");
     setSubmittedFile(file);
     setSubmittedPassword(password);
     setRequestId((value) => value + 1);
@@ -71,7 +84,7 @@ export default function LedgerPage() {
   if (!token) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-600 shadow-sm">
-        {t("ledger.loginRequired")}
+        {authNotice || t("ledger.loginRequired")}
       </div>
     );
   }

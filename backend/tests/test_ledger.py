@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 import markettrace.api.ledger as ledger_api
+import markettrace.ledger.statements as statement_mod
 from markettrace.api.auth import create_token
 from markettrace.api.main import create_app
 from markettrace.ledger.statements import (
@@ -61,6 +63,64 @@ def test_parse_statement_text_extracts_summary_entries_and_categories() -> None:
     }
 
 
+def test_parse_statement_text_applies_merchant_overrides() -> None:
+    statement = parse_statement_text(
+        text=_sample_statement_text(),
+        file_name="statement.pdf",
+        file_modified_at=datetime(2026, 6, 26, tzinfo=UTC),
+        merchant_overrides=["지에스더프레시", "오픈AI 구독", "케이에프씨"],
+    )
+
+    assert [entry.description for entry in statement.entries] == [
+        "지에스더프레시",
+        "케이에프씨",
+        "오픈AI 구독",
+    ]
+    assert statement.warnings == [
+        "청구금액과 파싱 거래 합계가 다릅니다. 할부, 수수료, 할인, 중복 상세 내역을 확인하세요."
+    ]
+
+
+def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        openai_api_key="test-key",
+        ledger_ocr_model="gpt-4o-mini",
+    )
+    seen: dict[str, object] = {}
+
+    class _FakeResponses:
+        def create(self, **kwargs):
+            seen.update(kwargs)
+            return SimpleNamespace(output_text='{"merchants":["지에스더프레시","케이에프씨"]}')
+
+    class _FakeOpenAI:
+        def __init__(self, *, api_key: str) -> None:
+            seen["api_key"] = api_key
+            self.responses = _FakeResponses()
+
+    fake_openai = SimpleNamespace(OpenAI=_FakeOpenAI)
+    monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
+
+    merchants = statement_mod._extract_openai_ocr_merchants_from_bytes(
+        b"%PDF-1.7",
+        file_name="../statement.pdf",
+        text="\n".join(
+            [
+                "26.05.26 »Î069 broken text 17,580",
+                "26.06.09 »Î881 broken text 11,500",
+            ]
+        ),
+    )
+
+    assert merchants == ["지에스더프레시", "케이에프씨"]
+    assert seen["api_key"] == "test-key"
+    assert seen["model"] == "gpt-4o-mini"
+    request = seen["input"][0]["content"]
+    assert request[0]["filename"] == "statement.pdf"
+    assert request[0]["file_data"].startswith("data:application/pdf;base64,")
+
+
 class _Settings:
     admin_username = "testadmin"
     admin_password = "testpass"
@@ -68,6 +128,9 @@ class _Settings:
     cors_allow_origins = "http://localhost:3000"
     card_statement_dir = "card_statement"
     card_statement_password = None
+    ledger_ocr_provider = "auto"
+    ledger_ocr_model = "gpt-4o-mini"
+    openai_api_key = None
 
     @property
     def cors_origins_list(self) -> list[str]:

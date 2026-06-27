@@ -11,11 +11,48 @@ import type {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly url: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
+
+async function buildApiError(res: Response, url: string): Promise<ApiError> {
+  let detail = "";
+  try {
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      } else if (body.detail != null) {
+        detail = JSON.stringify(body.detail);
+      }
+    } else {
+      detail = await res.text();
+    }
+  } catch {
+    detail = "";
+  }
+
+  const reason = detail || res.statusText || "Request failed";
+  return new ApiError(res.status, `API error ${res.status}: ${reason} (${url})`, url);
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
+    throw await buildApiError(res, url);
   }
   return res.json() as Promise<T>;
 }
@@ -36,7 +73,7 @@ async function apiPost<T>(
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
+    throw await buildApiError(res, url);
   }
   return res.json() as Promise<T>;
 }
@@ -55,7 +92,7 @@ async function apiPostForm<T>(
     body,
   });
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${res.statusText} (${url})`);
+    throw await buildApiError(res, url);
   }
   return res.json() as Promise<T>;
 }

@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # Local card-statement PDFs used by the login-gated ledger view.
     card_statement_dir: str = "card_statement"
     card_statement_password: str | None = None
+    # Merchant-name OCR for card statements. "auto" uses local macOS Vision when
+    # available, then OpenAI when OPENAI_API_KEY is configured.
+    ledger_ocr_provider: Literal["auto", "none", "swift", "openai"] = "auto"
+    ledger_ocr_model: str = "gpt-4o-mini"
 
     @field_validator("database_url")
     @classmethod

@@ -59,6 +59,10 @@ services:
         sync: false                     # login-gated ingest; set in Render dashboard
       - key: AUTH_SECRET
         sync: false                     # token signing secret; set in Render dashboard
+      - key: LEDGER_OCR_PROVIDER
+        value: openai                   # Render/Linux cannot use macOS Vision OCR
+      - key: LEDGER_OCR_MODEL
+        value: gpt-4o-mini
 
   # ---- Next.js web frontend ----
   - type: web

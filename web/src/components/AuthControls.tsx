@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import type { EventSummary } from "@/types/api";
@@ -77,7 +77,7 @@ export function AuthControls() {
       await api.ingest(token);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("ingest.failed");
-      if (msg.includes("401")) {
+      if (isApiError(err) && err.status === 401) {
         logout();
         setIngestMessage(t("ingest.sessionExpired"));
       } else {
