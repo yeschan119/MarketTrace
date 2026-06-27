@@ -15,7 +15,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly url: string
+    public readonly url: string,
+    public readonly detail: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -45,7 +46,12 @@ async function buildApiError(res: Response, url: string): Promise<ApiError> {
   }
 
   const reason = detail || res.statusText || "Request failed";
-  return new ApiError(res.status, `API error ${res.status}: ${reason} (${url})`, url);
+  return new ApiError(
+    res.status,
+    `API error ${res.status}: ${reason} (${url})`,
+    url,
+    reason
+  );
 }
 
 async function apiFetch<T>(path: string): Promise<T> {

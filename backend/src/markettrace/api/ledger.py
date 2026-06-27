@@ -29,7 +29,7 @@ def get_ledger_statement(
 ) -> LedgerStatementOut:
     """Return a parsed ledger from the newest local card-statement PDF."""
     settings = get_settings()
-    password = payload.password or settings.card_statement_password
+    password = _resolve_statement_password(payload.password, settings.card_statement_password)
     statement_dir = resolve_statement_dir(settings.card_statement_dir)
 
     try:
@@ -51,14 +51,14 @@ async def upload_ledger_statement(
     if not file_name.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF file required")
 
+    settings = get_settings()
+    statement_password = _resolve_statement_password(password, settings.card_statement_password)
+
     data = await file.read(_MAX_LEDGER_UPLOAD_BYTES + 1)
     if not data:
         raise HTTPException(status_code=400, detail="empty statement file")
     if len(data) > _MAX_LEDGER_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="statement PDF is too large")
-
-    settings = get_settings()
-    statement_password = password or settings.card_statement_password
 
     try:
         statement = await run_in_threadpool(
@@ -71,6 +71,17 @@ async def upload_ledger_statement(
         raise _statement_http_exception(exc) from exc
 
     return LedgerStatementOut.model_validate(statement)
+
+
+def _resolve_statement_password(
+    supplied_password: str | None, configured_password: str | None
+) -> str:
+    password = (supplied_password or "").strip() or (configured_password or "").strip()
+    if not password:
+        raise _statement_http_exception(
+            StatementPasswordRequiredError("statement password is required")
+        )
+    return password
 
 
 def _statement_http_exception(exc: StatementError) -> HTTPException:

@@ -455,6 +455,32 @@ def test_ledger_statement_returns_parsed_statement(monkeypatch) -> None:
     assert data["entries"][0]["description"] == "TEST MERCHANT"
 
 
+def test_ledger_statement_requires_statement_password(monkeypatch) -> None:
+    settings = _Settings()
+    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
+    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
+    monkeypatch.setattr(ledger_api, "resolve_statement_dir", lambda _: SimpleNamespace())
+
+    def fail_parse_statement(*_) -> LedgerStatement:
+        raise AssertionError("parser should not run without a statement password")
+
+    monkeypatch.setattr(ledger_api, "parse_latest_statement", fail_parse_statement)
+
+    token = create_token()
+    app = create_app()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/ledger/statement",
+            json={},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "statement password required"
+
+
 def test_ledger_statement_upload_requires_auth(monkeypatch) -> None:
     settings = _Settings()
     monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
@@ -470,6 +496,33 @@ def test_ledger_statement_upload_requires_auth(monkeypatch) -> None:
         )
 
     assert resp.status_code == 401
+
+
+def test_ledger_statement_upload_requires_statement_password(monkeypatch) -> None:
+    settings = _Settings()
+    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
+    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
+
+    def fail_parse_statement_bytes(
+        *, data: bytes, file_name: str, password: str | None
+    ) -> LedgerStatement:
+        raise AssertionError("parser should not run without a statement password")
+
+    monkeypatch.setattr(ledger_api, "parse_statement_bytes", fail_parse_statement_bytes)
+
+    token = create_token()
+    app = create_app()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/ledger/statement/upload",
+            files={"file": ("statement.pdf", b"%PDF-1.7", "application/pdf")},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "statement password required"
 
 
 def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
@@ -516,3 +569,38 @@ def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
         "password": "pw",
         "threaded": True,
     }
+
+
+def test_ledger_statement_upload_uses_configured_password(monkeypatch) -> None:
+    settings = _Settings()
+    settings.card_statement_password = "configured-pw"
+    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
+    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
+
+    seen: dict[str, object] = {}
+
+    def fake_parse_statement_bytes(
+        *, data: bytes, file_name: str, password: str | None
+    ) -> LedgerStatement:
+        seen["password"] = password
+        return _fake_statement()
+
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_api, "parse_statement_bytes", fake_parse_statement_bytes)
+    monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
+
+    token = create_token()
+    app = create_app()
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/ledger/statement/upload",
+            files={"file": ("uploaded.pdf", b"%PDF-1.7", "application/pdf")},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    assert seen == {"password": "configured-pw"}

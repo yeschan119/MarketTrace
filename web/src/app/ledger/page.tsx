@@ -47,6 +47,7 @@ export default function LedgerPage() {
   );
   const [requestId, setRequestId] = useState(0);
   const [authNotice, setAuthNotice] = useState("");
+  const [validationError, setValidationError] = useState("");
 
   const { data, isFetching, isError, error } = useQuery({
     queryKey: ["ledger-statement", requestId],
@@ -65,6 +66,12 @@ export default function LedgerPage() {
           logout();
           throw new Error(message);
         }
+        if (isApiError(err) && err.detail === "statement password required") {
+          throw new Error(t("ledger.passwordRequired"));
+        }
+        if (isApiError(err) && err.detail === "invalid statement password") {
+          throw new Error(t("ledger.invalidPassword"));
+        }
         throw err;
       }
     },
@@ -74,10 +81,19 @@ export default function LedgerPage() {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!file) return;
+    if (!file) {
+      setValidationError(t("ledger.missingFile"));
+      return;
+    }
+    const nextPassword = password.trim();
+    if (!nextPassword) {
+      setValidationError(t("ledger.passwordRequired"));
+      return;
+    }
     setAuthNotice("");
+    setValidationError("");
     setSubmittedFile(file);
-    setSubmittedPassword(password);
+    setSubmittedPassword(nextPassword);
     setRequestId((value) => value + 1);
   }
 
@@ -90,6 +106,13 @@ export default function LedgerPage() {
   }
 
   const statement: LedgerStatement | undefined = data;
+  const errorMessage = validationError
+    ? validationError
+    : isError
+      ? error instanceof Error
+        ? error.message
+        : t("common.unknownError")
+      : "";
 
   return (
     <div className="space-y-6">
@@ -109,6 +132,7 @@ export default function LedgerPage() {
 
       <form
         onSubmit={handleSubmit}
+        noValidate
         className="grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)_auto] md:items-end"
       >
         <label>
@@ -119,7 +143,11 @@ export default function LedgerPage() {
             type="file"
             accept="application/pdf,.pdf"
             required
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            disabled={isFetching}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setValidationError("");
+            }}
             className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
           />
           <span className="mt-1 block truncate text-xs text-gray-500">
@@ -133,7 +161,12 @@ export default function LedgerPage() {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isFetching}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setValidationError("");
+            }}
             placeholder={t("ledger.passwordPlaceholder")}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
@@ -141,18 +174,36 @@ export default function LedgerPage() {
         <button
           type="submit"
           disabled={isFetching || !file}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isFetching ? t("ledger.loading") : t("ledger.load")}
+          {isFetching && (
+            <span
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            />
+          )}
+          <span>{isFetching ? t("ledger.parsing") : t("ledger.load")}</span>
         </button>
       </form>
 
-      {isError && (
+      {isFetching && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-700"
+        >
+          <span
+            aria-hidden="true"
+            className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"
+          />
+          <span>{t("ledger.parsing")}</span>
+        </div>
+      )}
+
+      {errorMessage && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
           <p className="font-semibold">{t("ledger.failTitle")}</p>
-          <p className="mt-1 text-sm">
-            {error instanceof Error ? error.message : t("common.unknownError")}
-          </p>
+          <p className="mt-1 text-sm">{errorMessage}</p>
         </div>
       )}
 
