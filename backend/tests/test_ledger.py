@@ -121,6 +121,35 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
     assert request[0]["file_data"].startswith("data:application/pdf;base64,")
 
 
+def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        ledger_ocr_provider="openai",
+        openai_api_key="test-key",
+        ledger_ocr_model="gpt-4o-mini",
+    )
+
+    monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        statement_mod,
+        "_read_decrypted_pdf_bytes_from_bytes",
+        lambda *_: b"%PDF-1.7",
+    )
+    monkeypatch.setattr(
+        statement_mod,
+        "_extract_openai_ocr_merchants_from_bytes",
+        lambda *_, **__: ["스타벅스"],
+    )
+
+    merchants = statement_mod._extract_ocr_merchants_from_bytes(
+        b"raw-pdf",
+        None,
+        text="26.05.26 garbled merchant text 5,000",
+        file_name="statement.pdf",
+    )
+
+    assert merchants == ["스타벅스"]
+
+
 class _Settings:
     admin_username = "testadmin"
     admin_password = "testpass"

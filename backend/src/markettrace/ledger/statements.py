@@ -267,10 +267,10 @@ def _extract_ocr_merchants(pdf_path: Path, password: str | None, *, text: str) -
     OCR replaces only that presentation field when a local macOS Vision path or
     the configured OpenAI fallback is available.
     """
-    if not _needs_merchant_ocr(text):
+    provider = _ledger_ocr_provider()
+    if not _should_attempt_merchant_ocr(provider, text):
         return []
 
-    provider = _ledger_ocr_provider()
     if provider in ("auto", "swift"):
         merchants = _extract_swift_ocr_merchants(pdf_path, password)
         if merchants or provider == "swift":
@@ -297,10 +297,10 @@ def _extract_ocr_merchants_from_bytes(
     text: str,
     file_name: str,
 ) -> list[str]:
-    if not _needs_merchant_ocr(text):
+    provider = _ledger_ocr_provider()
+    if not _should_attempt_merchant_ocr(provider, text):
         return []
 
-    provider = _ledger_ocr_provider()
     if provider in ("auto", "swift"):
         merchants = _extract_swift_ocr_merchants_from_bytes(data, password)
         if merchants or provider == "swift":
@@ -334,6 +334,25 @@ def _needs_merchant_ocr(text: str) -> bool:
     if not transaction_lines:
         return False
     return "/Idiersis" in text or "»Î" in text
+
+
+def _should_attempt_merchant_ocr(provider: str, text: str) -> bool:
+    if provider == "none" or not _transaction_lines_from_text(text):
+        return False
+    if provider in ("swift", "openai"):
+        return True
+    if provider == "auto":
+        return _needs_merchant_ocr(text) or _has_openai_ocr_config()
+    return False
+
+
+def _has_openai_ocr_config() -> bool:
+    try:
+        from markettrace.config import get_settings
+    except ImportError:
+        return False
+
+    return bool(get_settings().openai_api_key)
 
 
 def _extract_swift_ocr_merchants(pdf_path: Path, password: str | None) -> list[str]:
