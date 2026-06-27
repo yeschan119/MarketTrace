@@ -22,8 +22,12 @@ _PERIOD_RE = re.compile(
     r"(20\d{2})\.\s*(\d{2})\.\s*(\d{2})"
 )
 _OCR_DATE_RE = re.compile(r"^26[. ]*\d{2}[.: ]*\d{2}")
-_OPENAI_OCR_RENDER_ZOOM = 1.5
+_OPENAI_OCR_RENDER_ZOOM = 3.0
+_OPENAI_OCR_MAX_OUTPUT_TOKENS = 2000
 _OPENAI_OCR_TIMEOUT_SECONDS = 45
+_OPENAI_OCR_TABLE_CROP = (0.03, 0.08, 0.62, 0.97)
+_OPENAI_OCR_TABLE_VERTICAL_SPLITS = 3
+_OPENAI_OCR_TABLE_Y_OVERLAP = 0.015
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -90,6 +94,28 @@ class _OcrMerchantRow:
 
 
 _UNREADABLE_MERCHANT = "가맹점명 인식 불가"
+_OPENAI_MERCHANT_OCR_TEXT_FORMAT = {
+    "type": "json_schema",
+    "name": "card_statement_merchant_list",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "merchants": {
+                "type": "array",
+                "items": {"type": "string"},
+            }
+        },
+        "required": ["merchants"],
+    },
+}
+
+
+@dataclass(frozen=True)
+class _OcrImageChunk:
+    transaction_lines: list[str]
+    image_url: str
 
 
 def resolve_statement_dir(configured_dir: str) -> Path:
@@ -203,6 +229,12 @@ def _transaction_lines_from_text(text: str) -> list[str]:
         line
         for line in date_lines
         if not (has_foreign_detail and _is_foreign_summary_line(line))
+    ]
+
+
+def _parseable_transaction_lines_from_text(text: str) -> list[str]:
+    return [
+        line for line in _transaction_lines_from_text(text) if _parse_entry(line) is not None
     ]
 
 
@@ -445,64 +477,145 @@ def _extract_openai_ocr_merchants_from_bytes(
             raise StatementDependencyError("OPENAI_API_KEY is required for card statement OCR")
         return []
 
-    transaction_lines = _transaction_lines_from_text(text)
+    transaction_lines = _parseable_transaction_lines_from_text(text)
     if not transaction_lines:
         return []
 
     try:
         import openai
 
-        client = openai.OpenAI(api_key=settings.openai_api_key)
-        content = _call_openai_merchant_ocr(
-            client=client,
-            model=settings.ledger_ocr_model,
-            data=data,
-            transaction_lines=transaction_lines,
-        )
-    except Exception as exc:
-        _LOGGER.warning("OpenAI merchant OCR failed", exc_info=True)
+        chunks = _render_pdf_ocr_chunks(data, transaction_lines)
+        client = openai.OpenAI(api_key=settings.openai_api_key, max_retries=0)
+    except Exception:
+        _LOGGER.warning("OpenAI merchant OCR setup failed", exc_info=True)
         if required:
-            raise StatementError("card statement image OCR failed") from exc
+            return [_UNREADABLE_MERCHANT for _ in transaction_lines]
         return []
 
-    merchant_rows = _parse_openai_merchant_response(content)
-    if required and not merchant_rows:
-        raise StatementError("card statement image OCR did not return merchant rows")
+    merchants: list[str] = []
+    for chunk in chunks:
+        try:
+            content = _call_openai_merchant_ocr(
+                client=client,
+                model=settings.ledger_ocr_model,
+                image_url=chunk.image_url,
+                expected_count=len(chunk.transaction_lines),
+            )
+            chunk_merchants = _merchant_names_from_openai_response(content)
+        except Exception:
+            _LOGGER.warning("OpenAI merchant OCR failed", exc_info=True)
+            chunk_merchants = []
+        merchants.extend(_fit_merchant_count(chunk_merchants, len(chunk.transaction_lines)))
 
-    merchants = _match_ocr_rows_to_transaction_lines(transaction_lines, merchant_rows)
-    if required and not any(merchant != _UNREADABLE_MERCHANT for merchant in merchants):
-        raise StatementError("card statement image OCR did not match merchant rows")
-    return merchants
+    if not merchants:
+        return [_UNREADABLE_MERCHANT for _ in transaction_lines] if required else []
+    return _fit_merchant_count(merchants, len(transaction_lines))
 
 
 def _call_openai_merchant_ocr(
     *,
     client,
     model: str,
-    data: bytes,
-    transaction_lines: list[str],
+    image_url: str,
+    expected_count: int,
 ) -> str:
-    page_images = _render_pdf_page_images(data)
-    prompt = _openai_merchant_ocr_prompt(transaction_lines)
+    prompt = _openai_merchant_ocr_prompt(expected_count)
     response = client.responses.create(
         model=model,
-        max_output_tokens=2000,
+        max_output_tokens=_OPENAI_OCR_MAX_OUTPUT_TOKENS,
         input=[
             {
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": prompt},
-                    *[
-                        {"type": "input_image", "image_url": image_url, "detail": "high"}
-                        for image_url in page_images
-                    ],
+                    {"type": "input_image", "image_url": image_url, "detail": "high"},
                 ],
             }
         ],
         temperature=0,
+        text={"format": _OPENAI_MERCHANT_OCR_TEXT_FORMAT},
         timeout=_OPENAI_OCR_TIMEOUT_SECONDS,
     )
-    return str(getattr(response, "output_text", "") or "")
+    return _response_output_text(response)
+
+
+def _response_output_text(response: object) -> str:
+    output_text = getattr(response, "output_text", None)
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text
+
+    fragments: list[str] = []
+    output = _object_value(response, "output")
+    if isinstance(output, list):
+        for item in output:
+            content = _object_value(item, "content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                text = _object_value(part, "text")
+                if isinstance(text, str):
+                    fragments.append(text)
+
+    return "".join(fragments) or str(output_text or "")
+
+
+def _object_value(value: object, key: str) -> object:
+    if isinstance(value, dict):
+        return value.get(key)
+    return getattr(value, key, None)
+
+
+def _render_pdf_ocr_chunks(
+    data: bytes,
+    transaction_lines: list[str],
+) -> list[_OcrImageChunk]:
+    try:
+        import fitz
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover - deployment dependency guard.
+        raise StatementDependencyError("PyMuPDF and pypdf are required for card OCR") from exc
+
+    chunks: list[_OcrImageChunk] = []
+    reader = PdfReader(BytesIO(data))
+    with fitz.open(stream=data, filetype="pdf") as document:
+        matrix = fitz.Matrix(_OPENAI_OCR_RENDER_ZOOM, _OPENAI_OCR_RENDER_ZOOM)
+        for page_index in _openai_ocr_page_indexes(document.page_count):
+            if page_index >= len(reader.pages):
+                continue
+            page_lines = _parseable_transaction_lines_from_text(
+                reader.pages[page_index].extract_text() or ""
+            )
+            if not page_lines:
+                continue
+            page = document.load_page(page_index)
+            clips = _openai_ocr_table_clips(fitz, page.rect)
+            for line_chunk, clip in zip(
+                _split_sequence(page_lines, len(clips)),
+                clips,
+                strict=False,
+            ):
+                if not line_chunk:
+                    continue
+                pixmap = page.get_pixmap(matrix=matrix, alpha=False, clip=clip)
+                encoded = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
+                chunks.append(
+                    _OcrImageChunk(
+                        transaction_lines=line_chunk,
+                        image_url=f"data:image/png;base64,{encoded}",
+                    )
+                )
+
+    chunk_line_count = sum(len(chunk.transaction_lines) for chunk in chunks)
+    if chunk_line_count != len(transaction_lines):
+        raise StatementError("card statement OCR row count did not match parsed entries")
+    return chunks
+
+
+def _split_sequence(values: list[str], count: int) -> list[list[str]]:
+    if count <= 0:
+        return [values]
+    chunk_size = (len(values) + count - 1) // count
+    return [values[index : index + chunk_size] for index in range(0, len(values), chunk_size)]
 
 
 def _render_pdf_page_images(data: bytes) -> list[str]:
@@ -516,13 +629,36 @@ def _render_pdf_page_images(data: bytes) -> list[str]:
         matrix = fitz.Matrix(_OPENAI_OCR_RENDER_ZOOM, _OPENAI_OCR_RENDER_ZOOM)
         for page_index in _openai_ocr_page_indexes(document.page_count):
             page = document.load_page(page_index)
-            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-            encoded = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
-            images.append(f"data:image/png;base64,{encoded}")
+            for clip in _openai_ocr_table_clips(fitz, page.rect):
+                pixmap = page.get_pixmap(matrix=matrix, alpha=False, clip=clip)
+                encoded = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
+                images.append(f"data:image/png;base64,{encoded}")
 
     if not images:
         raise StatementError("statement PDF did not contain renderable pages")
     return images
+
+
+def _openai_ocr_table_clips(fitz, page_rect) -> list:
+    left, top, right, bottom = _OPENAI_OCR_TABLE_CROP
+    table_height = bottom - top
+    clips = []
+    for split_index in range(_OPENAI_OCR_TABLE_VERTICAL_SPLITS):
+        band_top = top + table_height * split_index / _OPENAI_OCR_TABLE_VERTICAL_SPLITS
+        band_bottom = top + table_height * (split_index + 1) / _OPENAI_OCR_TABLE_VERTICAL_SPLITS
+        if split_index > 0:
+            band_top -= _OPENAI_OCR_TABLE_Y_OVERLAP
+        if split_index < _OPENAI_OCR_TABLE_VERTICAL_SPLITS - 1:
+            band_bottom += _OPENAI_OCR_TABLE_Y_OVERLAP
+        clips.append(
+            fitz.Rect(
+                page_rect.x0 + page_rect.width * left,
+                page_rect.y0 + page_rect.height * max(top, band_top),
+                page_rect.x0 + page_rect.width * right,
+                page_rect.y0 + page_rect.height * min(bottom, band_bottom),
+            )
+        )
+    return clips
 
 
 def _openai_ocr_page_indexes(page_count: int) -> list[int]:
@@ -533,29 +669,23 @@ def _openai_ocr_page_indexes(page_count: int) -> list[int]:
     return list(range(page_count))
 
 
-def _openai_merchant_ocr_prompt(transaction_lines: list[str]) -> str:
-    indexed_lines = "\n".join(
-        f"{idx}. {line}" for idx, line in enumerate(transaction_lines, start=1)
-    )
+def _openai_merchant_ocr_prompt(expected_count: int) -> str:
     return f"""\
-Extract merchant names from this Korean card statement PDF.
+Extract only merchant names from this cropped PNG section of a Korean card statement
+transaction table.
 
-Return strict JSON only in this shape:
-{{"transactions":[{{"index":1,"date":"YYYY-MM-DD","amount":17580,"merchant":"merchant"}}]}}
+Return JSON only in this shape:
+{{"merchants":["merchant 1","merchant 2"]}}
 
 Rules:
-- Return one object for each visible transaction row you can identify.
-- `index` is the 1-based parsed transaction line number below.
-- `date` must be YYYY-MM-DD and `amount` must be the billed KRW amount as an integer.
-- Preserve Korean merchant names exactly as shown in the PDF.
-- Match rows by the parsed transaction lines below; use their index/date/amount.
+- This image section contains exactly {expected_count} transaction rows.
+- Return exactly {expected_count} merchant strings in row order.
+- Keep duplicate merchant rows. Keep rows with 0 amount or benefits.
+- Preserve merchant names exactly as shown in the PDF.
+- Prefer your best-effort Korean reading over "가맹점명 인식 불가" when text is visible.
 - Do not include dates, card numbers, amounts, approval numbers, installment
-  labels, totals, or subtotals.
-- Skip overseas summary rows that duplicate a detailed overseas transaction row.
+  labels, benefits, point rates, totals, subtotals, or headers.
 - If a merchant cannot be read, use "가맹점명 인식 불가".
-
-Parsed transaction lines:
-{indexed_lines}
 """
 
 
@@ -567,7 +697,9 @@ def _parse_openai_merchant_response(content: str) -> list[_OcrMerchantRow]:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        return []
+        parsed = _decode_embedded_json(raw)
+        if parsed is None:
+            return []
 
     if isinstance(parsed, dict):
         values = parsed.get("transactions") or parsed.get("rows") or parsed.get("merchants")
@@ -604,6 +736,30 @@ def _parse_openai_merchant_response(content: str) -> list[_OcrMerchantRow]:
                 )
             )
     return rows
+
+
+def _merchant_names_from_openai_response(content: str) -> list[str]:
+    return [row.merchant for row in _parse_openai_merchant_response(content)]
+
+
+def _fit_merchant_count(merchants: list[str], expected_count: int) -> list[str]:
+    fitted = merchants[:expected_count]
+    if len(fitted) < expected_count:
+        fitted.extend([_UNREADABLE_MERCHANT] * (expected_count - len(fitted)))
+    return fitted
+
+
+def _decode_embedded_json(raw: str) -> object | None:
+    decoder = json.JSONDecoder()
+    for start, char in enumerate(raw):
+        if char not in "[{":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(raw[start:])
+        except json.JSONDecodeError:
+            continue
+        return parsed
+    return None
 
 
 def _match_ocr_rows_to_transaction_lines(
@@ -969,6 +1125,8 @@ def _build_warnings(
         warnings.append(
             "PDF 내장 글꼴 인코딩 때문에 일부 한글 가맹점명이 깨질 수 있습니다."
         )
+    if any(entry.description == _UNREADABLE_MERCHANT for entry in entries):
+        warnings.append("일부 가맹점명을 OCR로 읽지 못했습니다.")
     if billed_total is not None and parsed_total != billed_total:
         warnings.append(
             "청구금액과 파싱 거래 합계가 다릅니다. "

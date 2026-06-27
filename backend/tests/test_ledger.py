@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import base64
 import sys
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-import pytest
 from fastapi.testclient import TestClient
 
 import markettrace.api.ledger as ledger_api
@@ -17,7 +17,6 @@ from markettrace.ledger.statements import (
     LedgerCategory,
     LedgerEntry,
     LedgerStatement,
-    StatementError,
     parse_statement_text,
 )
 
@@ -95,32 +94,36 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
             seen.update(kwargs)
             return SimpleNamespace(
                 output_text=(
-                    '{"transactions":['
-                    '{"index":2,"date":"2026-06-09","amount":11500,"merchant":"케이에프씨"},'
-                    '{"index":1,"date":"2026-05-26","amount":17580,"merchant":"지에스더프레시"}'
-                    ']}'
+                    '{"merchants":["지에스더프레시","케이에프씨"]}'
                 )
             )
 
     class _FakeOpenAI:
-        def __init__(self, *, api_key: str) -> None:
+        def __init__(self, *, api_key: str, max_retries: int) -> None:
             seen["api_key"] = api_key
+            seen["max_retries"] = max_retries
             self.responses = _FakeResponses()
 
     fake_openai = SimpleNamespace(OpenAI=_FakeOpenAI)
     monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
-    monkeypatch.setattr(
-        statement_mod,
-        "_render_pdf_page_images",
-        lambda _: ["data:image/png;base64,test-image"],
-    )
+    def fake_render_chunks(data, transaction_lines):
+        seen["transaction_lines"] = transaction_lines
+        return [
+            statement_mod._OcrImageChunk(
+                transaction_lines=transaction_lines,
+                image_url="data:image/png;base64,test-image",
+            )
+        ]
+
+    monkeypatch.setattr(statement_mod, "_render_pdf_ocr_chunks", fake_render_chunks)
 
     merchants = statement_mod._extract_openai_ocr_merchants_from_bytes(
         b"%PDF-1.7",
         text="\n".join(
             [
                 "26.05.26 »Î069 broken text 17,580",
+                "26.05.26 »Î069 broken text 800",
                 "26.06.09 »Î881 broken text 11,500",
             ]
         ),
@@ -128,11 +131,18 @@ def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
 
     assert merchants == ["지에스더프레시", "케이에프씨"]
     assert seen["api_key"] == "test-key"
+    assert seen["max_retries"] == 0
+    assert seen["transaction_lines"] == [
+        "26.05.26 »Î069 broken text 17,580",
+        "26.06.09 »Î881 broken text 11,500",
+    ]
     assert seen["model"] == "gpt-4o-mini"
-    assert seen["max_output_tokens"] == 2000
+    assert seen["max_output_tokens"] == statement_mod._OPENAI_OCR_MAX_OUTPUT_TOKENS
+    assert seen["text"] == {"format": statement_mod._OPENAI_MERCHANT_OCR_TEXT_FORMAT}
     assert seen["timeout"] == statement_mod._OPENAI_OCR_TIMEOUT_SECONDS
     request = seen["input"][0]["content"]
     assert request[0]["type"] == "input_text"
+    assert "exactly 2 transaction rows" in request[0]["text"]
     assert request[1] == {
         "type": "input_image",
         "image_url": "data:image/png;base64,test-image",
@@ -154,6 +164,46 @@ def test_ocr_rows_match_by_date_amount_and_mark_unmatched() -> None:
     )
 
     assert merchants == [statement_mod._UNREADABLE_MERCHANT, "케이에프씨"]
+
+
+def test_openai_response_text_reads_output_content_without_helper_property() -> None:
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(
+                content=[
+                    SimpleNamespace(
+                        type="output_text",
+                        text='{"transactions":[{"index":1,"date":"2026-06-09",',
+                    ),
+                    {
+                        "type": "output_text",
+                        "text": '"amount":11500,"merchant":"케이에프씨"}]}',
+                    },
+                ]
+            )
+        ]
+    )
+
+    assert statement_mod._response_output_text(response) == (
+        '{"transactions":[{"index":1,"date":"2026-06-09",'
+        '"amount":11500,"merchant":"케이에프씨"}]}'
+    )
+
+
+def test_parse_openai_merchant_response_extracts_embedded_json() -> None:
+    rows = statement_mod._parse_openai_merchant_response(
+        'Result: {"transactions":[{"index":1,"date":"2026-06-09",'
+        '"amount":11500,"merchant":"케이에프씨"}]}'
+    )
+
+    assert rows == [
+        statement_mod._OcrMerchantRow(
+            index=1,
+            used_on=datetime(2026, 6, 9, tzinfo=UTC).date(),
+            amount=11_500,
+            merchant="케이에프씨",
+        )
+    ]
 
 
 def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) -> None:
@@ -185,7 +235,7 @@ def test_openai_provider_runs_even_without_known_garbled_markers(monkeypatch) ->
     assert merchants == ["스타벅스"]
 
 
-def test_required_openai_ocr_fails_instead_of_returning_broken_text(monkeypatch) -> None:
+def test_required_openai_ocr_returns_unreadable_placeholder_without_rows(monkeypatch) -> None:
     settings = SimpleNamespace(
         ledger_ocr_provider="openai",
         openai_api_key="test-key",
@@ -200,8 +250,13 @@ def test_required_openai_ocr_fails_instead_of_returning_broken_text(monkeypatch)
     )
     monkeypatch.setattr(
         statement_mod,
-        "_render_pdf_page_images",
-        lambda _: ["data:image/png;base64,test-image"],
+        "_render_pdf_ocr_chunks",
+        lambda _, lines: [
+            statement_mod._OcrImageChunk(
+                transaction_lines=lines,
+                image_url="data:image/png;base64,test-image",
+            )
+        ],
     )
     monkeypatch.setattr(
         statement_mod,
@@ -209,13 +264,61 @@ def test_required_openai_ocr_fails_instead_of_returning_broken_text(monkeypatch)
         lambda *_, **__: '{"merchants":[]}',
     )
 
-    with pytest.raises(StatementError):
-        statement_mod._extract_ocr_merchants_from_bytes(
-            b"raw-pdf",
-            None,
-            text="26.05.26 garbled merchant text 5,000",
-            file_name="statement.pdf",
-        )
+    merchants = statement_mod._extract_ocr_merchants_from_bytes(
+        b"raw-pdf",
+        None,
+        text="26.05.26 garbled merchant text 5,000",
+        file_name="statement.pdf",
+    )
+
+    assert merchants == [statement_mod._UNREADABLE_MERCHANT]
+
+
+def test_required_openai_ocr_returns_unreadable_placeholder_on_failure(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        openai_api_key="test-key",
+        ledger_ocr_model="gpt-4o-mini",
+    )
+
+    class _FakeResponses:
+        def create(self, **kwargs):
+            raise TimeoutError("ocr timed out")
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs) -> None:
+            self.responses = _FakeResponses()
+
+    monkeypatch.setattr("markettrace.config.get_settings", lambda: settings)
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    monkeypatch.setattr(
+        statement_mod,
+        "_render_pdf_ocr_chunks",
+        lambda _, lines: [
+            statement_mod._OcrImageChunk(
+                transaction_lines=lines,
+                image_url="data:image/png;base64,test-image",
+            )
+        ],
+    )
+
+    merchants = statement_mod._extract_openai_ocr_merchants_from_bytes(
+        b"%PDF-1.7",
+        text="26.05.26 »Î069 broken text 17,580",
+        required=True,
+    )
+
+    assert merchants == [statement_mod._UNREADABLE_MERCHANT]
+
+
+def test_parse_statement_text_warns_about_unreadable_ocr_merchants() -> None:
+    statement = parse_statement_text(
+        text="26.05.26 »Î069 broken text 17,580",
+        file_name="statement.pdf",
+        file_modified_at=datetime(2026, 6, 26, tzinfo=UTC),
+        merchant_overrides=[statement_mod._UNREADABLE_MERCHANT],
+    )
+
+    assert "일부 가맹점명을 OCR로 읽지 못했습니다." in statement.warnings
 
 
 def test_render_pdf_page_images_returns_png_data_urls() -> None:
@@ -229,8 +332,31 @@ def test_render_pdf_page_images_returns_png_data_urls() -> None:
 
     images = statement_mod._render_pdf_page_images(data)
 
-    assert len(images) == 1
-    assert images[0].startswith("data:image/png;base64,")
+    assert len(images) == statement_mod._OPENAI_OCR_TABLE_VERTICAL_SPLITS
+    assert all(image.startswith("data:image/png;base64,") for image in images)
+
+
+def test_render_pdf_page_images_crops_transaction_table_area() -> None:
+    import fitz
+
+    document = fitz.open()
+    page = document.new_page(width=600, height=800)
+    page.insert_text((72, 72), "statement page")
+    data = document.tobytes()
+    document.close()
+
+    image_url = statement_mod._render_pdf_page_images(data)[0]
+    encoded = image_url.split(",", 1)[1]
+    png_data = base64.b64decode(encoded)
+
+    image_doc = fitz.open(stream=png_data, filetype="png")
+    try:
+        rendered_rect = image_doc.load_page(0).rect
+    finally:
+        image_doc.close()
+
+    assert rendered_rect.width < 600 * statement_mod._OPENAI_OCR_RENDER_ZOOM
+    assert rendered_rect.height < 800 * statement_mod._OPENAI_OCR_RENDER_ZOOM
 
 
 def test_render_pdf_page_images_limits_to_statement_detail_pages() -> None:
@@ -245,7 +371,7 @@ def test_render_pdf_page_images_limits_to_statement_detail_pages() -> None:
 
     images = statement_mod._render_pdf_page_images(data)
 
-    assert len(images) == 2
+    assert len(images) == 2 * statement_mod._OPENAI_OCR_TABLE_VERTICAL_SPLITS
     assert all(image.startswith("data:image/png;base64,") for image in images)
 
 
