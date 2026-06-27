@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from markettrace.api.auth import require_auth
-from markettrace.api.schemas import LedgerRequest, LedgerStatementOut
+from markettrace.api.deps import get_db
+from markettrace.api.schemas import (
+    LedgerRequest,
+    LedgerStatementOut,
+    LedgerStatementSummaryOut,
+)
 from markettrace.config import get_settings
 from markettrace.ledger.statements import (
     StatementDependencyError,
@@ -18,6 +26,13 @@ from markettrace.ledger.statements import (
     parse_statement_bytes,
     resolve_statement_dir,
 )
+from markettrace.ledger.storage import (
+    get_ledger_statement as get_saved_ledger_statement,
+)
+from markettrace.ledger.storage import (
+    list_ledger_statements,
+    save_ledger_statement,
+)
 
 router = APIRouter()
 _MAX_LEDGER_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -25,9 +40,11 @@ _MAX_LEDGER_UPLOAD_BYTES = 10 * 1024 * 1024
 
 @router.post("/ledger/statement", response_model=LedgerStatementOut)
 def get_ledger_statement(
-    payload: LedgerRequest, _: None = Depends(require_auth)
+    payload: LedgerRequest,
+    _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
 ) -> LedgerStatementOut:
-    """Return a parsed ledger from the newest local card-statement PDF."""
+    """Parse, save, and return the newest local card-statement PDF."""
     settings = get_settings()
     password = _resolve_statement_password(payload.password, settings.card_statement_password)
     statement_dir = resolve_statement_dir(settings.card_statement_dir)
@@ -37,7 +54,8 @@ def get_ledger_statement(
     except StatementError as exc:
         raise _statement_http_exception(exc) from exc
 
-    return LedgerStatementOut.model_validate(statement)
+    saved = save_ledger_statement(db, statement)
+    return LedgerStatementOut.model_validate(saved)
 
 
 @router.post("/ledger/statement/upload", response_model=LedgerStatementOut)
@@ -45,8 +63,9 @@ async def upload_ledger_statement(
     file: UploadFile = File(...),
     password: str | None = Form(default=None),
     _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
 ) -> LedgerStatementOut:
-    """Return a parsed ledger from an uploaded card-statement PDF."""
+    """Parse, save, and return an uploaded card-statement PDF."""
     file_name = file.filename or ""
     if not file_name.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF file required")
@@ -70,7 +89,33 @@ async def upload_ledger_statement(
     except StatementError as exc:
         raise _statement_http_exception(exc) from exc
 
-    return LedgerStatementOut.model_validate(statement)
+    saved = save_ledger_statement(db, statement)
+    return LedgerStatementOut.model_validate(saved)
+
+
+@router.get("/ledger/statements", response_model=list[LedgerStatementSummaryOut])
+def list_saved_statements(
+    _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> list[LedgerStatementSummaryOut]:
+    """Return saved statements by month, newest first."""
+    return [
+        LedgerStatementSummaryOut.model_validate(row)
+        for row in list_ledger_statements(db)
+    ]
+
+
+@router.get("/ledger/statements/{statement_month}", response_model=LedgerStatementOut)
+def get_saved_statement(
+    statement_month: str,
+    _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> LedgerStatementOut:
+    """Return a saved statement for ``YYYY-MM``."""
+    row = get_saved_ledger_statement(db, _parse_statement_month(statement_month))
+    if row is None:
+        raise HTTPException(status_code=404, detail="statement not found")
+    return LedgerStatementOut.model_validate(row)
 
 
 def _resolve_statement_password(
@@ -82,6 +127,20 @@ def _resolve_statement_password(
             StatementPasswordRequiredError("statement password is required")
         )
     return password
+
+
+def _parse_statement_month(value: str) -> date:
+    parts = value.split("-")
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="statement month must be YYYY-MM")
+    try:
+        year = int(parts[0])
+        month = int(parts[1])
+        return date(year, month, 1)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="statement month must be YYYY-MM"
+        ) from exc
 
 
 def _statement_http_exception(exc: StatementError) -> HTTPException:

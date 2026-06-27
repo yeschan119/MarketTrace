@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import type { LedgerStatement } from "@/types/api";
+import type { LedgerStatement, LedgerStatementSummary } from "@/types/api";
 
 function formatWon(value: number | null, locale: string): string {
   if (value == null) return "-";
@@ -15,6 +15,18 @@ function formatWon(value: number | null, locale: string): string {
 function formatDate(value: string | null, locale: string): string {
   if (!value) return "-";
   return new Date(value).toLocaleDateString(locale);
+}
+
+function formatMonth(value: string | null, locale: string): string {
+  if (!value) return "-";
+  return new Date(`${toMonthValue(value)}-01T00:00:00`).toLocaleDateString(
+    locale,
+    { year: "numeric", month: "long" }
+  );
+}
+
+function toMonthValue(value: string): string {
+  return value.slice(0, 7);
 }
 
 function SummaryItem({
@@ -39,44 +51,89 @@ function SummaryItem({
 export default function LedgerPage() {
   const { token, logout } = useAuth();
   const { t, locale } = useI18n();
+  const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
-  const [submittedFile, setSubmittedFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
-  const [submittedPassword, setSubmittedPassword] = useState<string | null>(
-    null
-  );
-  const [requestId, setRequestId] = useState(0);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState("");
   const [validationError, setValidationError] = useState("");
 
-  const { data, isFetching, isError, error } = useQuery({
-    queryKey: ["ledger-statement", requestId],
+  function toLedgerErrorMessage(err: unknown): string {
+    if (isApiError(err) && err.status === 401) {
+      const message = t("ledger.sessionExpired");
+      setAuthNotice(message);
+      logout();
+      return message;
+    }
+    if (isApiError(err) && err.detail === "statement password required") {
+      return t("ledger.passwordRequired");
+    }
+    if (isApiError(err) && err.detail === "invalid statement password") {
+      return t("ledger.invalidPassword");
+    }
+    return err instanceof Error ? err.message : t("common.unknownError");
+  }
+
+  const statementSummaries = useQuery({
+    queryKey: ["ledger-statements"],
     queryFn: async () => {
-      if (!submittedFile) throw new Error(t("ledger.missingFile"));
+      try {
+        return await api.listLedgerStatements(token ?? "");
+      } catch (err) {
+        throw new Error(toLedgerErrorMessage(err));
+      }
+    },
+    enabled: Boolean(token),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (selectedMonth || !statementSummaries.data?.length) return;
+    setSelectedMonth(toMonthValue(statementSummaries.data[0].statement_month));
+  }, [selectedMonth, statementSummaries.data]);
+
+  const selectedStatement = useQuery({
+    queryKey: ["ledger-statement", selectedMonth],
+    queryFn: async () => {
+      if (!selectedMonth) throw new Error(t("ledger.noSavedStatements"));
+      try {
+        return await api.getLedgerStatementByMonth(token ?? "", selectedMonth);
+      } catch (err) {
+        throw new Error(toLedgerErrorMessage(err));
+      }
+    },
+    enabled: Boolean(token && selectedMonth),
+    retry: false,
+  });
+
+  const uploadStatement = useMutation({
+    mutationFn: async ({
+      nextFile,
+      nextPassword,
+    }: {
+      nextFile: File;
+      nextPassword: string;
+    }) => {
       try {
         return await api.uploadLedgerStatement(
           token ?? "",
-          submittedFile,
-          submittedPassword ?? ""
+          nextFile,
+          nextPassword
         );
       } catch (err) {
-        if (isApiError(err) && err.status === 401) {
-          const message = t("ledger.sessionExpired");
-          setAuthNotice(message);
-          logout();
-          throw new Error(message);
-        }
-        if (isApiError(err) && err.detail === "statement password required") {
-          throw new Error(t("ledger.passwordRequired"));
-        }
-        if (isApiError(err) && err.detail === "invalid statement password") {
-          throw new Error(t("ledger.invalidPassword"));
-        }
-        throw err;
+        throw new Error(toLedgerErrorMessage(err));
       }
     },
-    enabled: Boolean(token && submittedFile && requestId > 0),
-    retry: false,
+    onSuccess: (statement) => {
+      const month = statement.statement_month
+        ? toMonthValue(statement.statement_month)
+        : null;
+      if (month) {
+        queryClient.setQueryData(["ledger-statement", month], statement);
+        setSelectedMonth(month);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["ledger-statements"] });
+    },
   });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -92,9 +149,7 @@ export default function LedgerPage() {
     }
     setAuthNotice("");
     setValidationError("");
-    setSubmittedFile(file);
-    setSubmittedPassword(nextPassword);
-    setRequestId((value) => value + 1);
+    uploadStatement.mutate({ nextFile: file, nextPassword });
   }
 
   if (!token) {
@@ -105,14 +160,25 @@ export default function LedgerPage() {
     );
   }
 
-  const statement: LedgerStatement | undefined = data;
+  const summaries: LedgerStatementSummary[] = statementSummaries.data ?? [];
+  const selectedMonthUpload =
+    uploadStatement.data?.statement_month &&
+    toMonthValue(uploadStatement.data.statement_month) === selectedMonth
+      ? uploadStatement.data
+      : undefined;
+  const statement: LedgerStatement | undefined =
+    selectedStatement.data ?? selectedMonthUpload;
+  const isFetching = selectedStatement.isFetching || statementSummaries.isFetching;
+  const isParsing = uploadStatement.isPending;
   const errorMessage = validationError
     ? validationError
-    : isError
-      ? error instanceof Error
-        ? error.message
-        : t("common.unknownError")
-      : "";
+    : uploadStatement.isError && uploadStatement.error instanceof Error
+      ? uploadStatement.error.message
+      : selectedStatement.isError && selectedStatement.error instanceof Error
+        ? selectedStatement.error.message
+        : statementSummaries.isError && statementSummaries.error instanceof Error
+          ? statementSummaries.error.message
+          : "";
 
   return (
     <div className="space-y-6">
@@ -123,12 +189,38 @@ export default function LedgerPage() {
           </h1>
           <p className="mt-2 text-sm text-gray-500">{t("ledger.subtitle")}</p>
         </div>
-        {statement && (
+        {summaries.length > 0 && (
           <span className="text-sm text-gray-500">
-            {t("ledger.entries", { n: statement.entry_count })}
+            {t("ledger.savedMonths", { n: summaries.length })}
           </span>
         )}
       </div>
+
+      {summaries.length > 0 && (
+        <label className="block max-w-xs">
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            {t("ledger.monthLabel")}
+          </span>
+          <select
+            value={selectedMonth ?? ""}
+            disabled={isParsing}
+            onChange={(e) => {
+              setValidationError("");
+              setSelectedMonth(e.target.value || null);
+            }}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            {summaries.map((summary) => {
+              const monthValue = toMonthValue(summary.statement_month);
+              return (
+                <option key={monthValue} value={monthValue}>
+                  {formatMonth(summary.statement_month, locale)}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      )}
 
       <form
         onSubmit={handleSubmit}
@@ -143,7 +235,7 @@ export default function LedgerPage() {
             type="file"
             accept="application/pdf,.pdf"
             required
-            disabled={isFetching}
+            disabled={isParsing}
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
               setValidationError("");
@@ -162,7 +254,7 @@ export default function LedgerPage() {
             type="password"
             value={password}
             required
-            disabled={isFetching}
+            disabled={isParsing}
             onChange={(e) => {
               setPassword(e.target.value);
               setValidationError("");
@@ -173,20 +265,20 @@ export default function LedgerPage() {
         </label>
         <button
           type="submit"
-          disabled={isFetching || !file}
+          disabled={isParsing || !file}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isFetching && (
+          {isParsing && (
             <span
               aria-hidden="true"
               className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
             />
           )}
-          <span>{isFetching ? t("ledger.parsing") : t("ledger.load")}</span>
+          <span>{isParsing ? t("ledger.parsing") : t("ledger.load")}</span>
         </button>
       </form>
 
-      {isFetching && (
+      {(isParsing || isFetching) && (
         <div
           role="status"
           aria-live="polite"
@@ -196,7 +288,13 @@ export default function LedgerPage() {
             aria-hidden="true"
             className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"
           />
-          <span>{t("ledger.parsing")}</span>
+          <span>
+            {isParsing
+              ? t("ledger.parsing")
+              : selectedMonth
+                ? t("ledger.detailLoading")
+                : t("ledger.listLoading")}
+          </span>
         </div>
       )}
 
@@ -209,8 +307,16 @@ export default function LedgerPage() {
 
       {statement && (
         <>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <SummaryItem
+              label={t("ledger.statementMonth")}
+              value={formatMonth(statement.statement_month, locale)}
+            />
             <SummaryItem label={t("ledger.file")} value={statement.file_name} />
+            <SummaryItem
+              label={t("ledger.uploadedAt")}
+              value={formatDate(statement.uploaded_at, locale)}
+            />
             <SummaryItem
               label={t("ledger.period")}
               value={`${formatDate(statement.period_start, locale)} - ${formatDate(
@@ -332,6 +438,12 @@ export default function LedgerPage() {
             </aside>
           </div>
         </>
+      )}
+
+      {!isFetching && !isParsing && !errorMessage && !statement && (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-sm text-gray-500">
+          {t("ledger.noSavedStatements")}
+        </div>
       )}
     </div>
   );

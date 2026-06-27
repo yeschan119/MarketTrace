@@ -149,8 +149,10 @@ class LedgerCategoryOut(BaseModel):
 class LedgerStatementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    statement_month: date | None = None
     file_name: str
     file_modified_at: datetime
+    uploaded_at: datetime | None = None
     encrypted: bool
     payment_due_date: date | None
     period_start: date | None
@@ -163,3 +165,17 @@ class LedgerStatementOut(BaseModel):
     entries: list[LedgerEntryOut]
     categories: list[LedgerCategoryOut]
     warnings: list[str]
+
+
+class LedgerStatementSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    statement_month: date
+    file_name: str
+    uploaded_at: datetime
+    period_start: date | None
+    period_end: date | None
+    payment_due_date: date | None
+    billed_total: int | None
+    parsed_total: int
+    entry_count: int

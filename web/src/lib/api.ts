@@ -4,6 +4,7 @@ import type {
   EventTypeStat,
   InstrumentTimeline,
   LedgerStatement,
+  LedgerStatementSummary,
   MacroObservation,
   HealthResponse,
 } from "@/types/api";
@@ -54,9 +55,11 @@ async function buildApiError(res: Response, url: string): Promise<ApiError> {
   );
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
+async function apiFetch<T>(path: string, token?: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
-  const res = await fetch(url);
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     throw await buildApiError(res, url);
   }
@@ -143,6 +146,20 @@ export const api = {
     return apiPost<LedgerStatement>(
       "/ledger/statement",
       { password: password || undefined },
+      token
+    );
+  },
+
+  listLedgerStatements(token: string): Promise<LedgerStatementSummary[]> {
+    return apiFetch<LedgerStatementSummary[]>("/ledger/statements", token);
+  },
+
+  getLedgerStatementByMonth(
+    token: string,
+    statementMonth: string
+  ): Promise<LedgerStatement> {
+    return apiFetch<LedgerStatement>(
+      `/ledger/statements/${encodeURIComponent(statementMonth)}`,
       token
     );
   },

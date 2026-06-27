@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -222,3 +223,28 @@ class MacroObservation(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     source: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class LedgerStatementRecord(Base):
+    __tablename__ = "ledger_statements"
+    __table_args__ = (
+        UniqueConstraint("statement_month", name="uq_ledger_statements_month"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    statement_month: Mapped[date] = mapped_column(Date, nullable=False)
+    file_name: Mapped[str] = mapped_column(String, nullable=False)
+    file_modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    encrypted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    payment_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    billed_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    domestic_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    foreign_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    parsed_total: Mapped[int] = mapped_column(Integer, nullable=False)
+    entry_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    entries: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    categories: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)

@@ -4,15 +4,23 @@ from __future__ import annotations
 
 import base64
 import sys
-from datetime import UTC, datetime
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import replace
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import markettrace.api.ledger as ledger_api
 import markettrace.ledger.statements as statement_mod
 from markettrace.api.auth import create_token
+from markettrace.api.deps import get_db
 from markettrace.api.main import create_app
+from markettrace.db.models import Base, LedgerStatementRecord
 from markettrace.ledger.statements import (
     LedgerCategory,
     LedgerEntry,
@@ -391,6 +399,38 @@ class _Settings:
         return ["http://localhost:3000"]
 
 
+@contextmanager
+def _ledger_client(
+    monkeypatch, settings: _Settings | None = None
+) -> Iterator[tuple[TestClient, Session, _Settings]]:
+    settings = settings or _Settings()
+    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
+    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
+
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    session = factory()
+    app = create_app()
+
+    def override_get_db() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            yield client, session, settings
+    finally:
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
 def _fake_statement() -> LedgerStatement:
     return LedgerStatement(
         file_name="statement.pdf",
@@ -419,47 +459,34 @@ def _fake_statement() -> LedgerStatement:
 
 
 def test_ledger_statement_requires_auth(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, _, _):
         resp = client.post("/ledger/statement", json={"password": "pw"})
 
     assert resp.status_code == 401
 
 
 def test_ledger_statement_returns_parsed_statement(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
     monkeypatch.setattr(ledger_api, "resolve_statement_dir", lambda _: SimpleNamespace())
     monkeypatch.setattr(ledger_api, "parse_latest_statement", lambda *_: _fake_statement())
 
-    token = create_token()
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        token = create_token()
         resp = client.post(
             "/ledger/statement",
             json={"password": "pw"},
             headers={"Authorization": f"Bearer {token}"},
         )
+        saved_count = session.query(LedgerStatementRecord).count()
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["entry_count"] == 1
     assert data["entries"][0]["description"] == "TEST MERCHANT"
+    assert data["statement_month"] == "2026-06-01"
+    assert saved_count == 1
 
 
 def test_ledger_statement_requires_statement_password(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
     monkeypatch.setattr(ledger_api, "resolve_statement_dir", lambda _: SimpleNamespace())
 
     def fail_parse_statement(*_) -> LedgerStatement:
@@ -467,10 +494,8 @@ def test_ledger_statement_requires_statement_password(monkeypatch) -> None:
 
     monkeypatch.setattr(ledger_api, "parse_latest_statement", fail_parse_statement)
 
-    token = create_token()
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, _, _):
+        token = create_token()
         resp = client.post(
             "/ledger/statement",
             json={},
@@ -482,13 +507,7 @@ def test_ledger_statement_requires_statement_password(monkeypatch) -> None:
 
 
 def test_ledger_statement_upload_requires_auth(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, _, _):
         resp = client.post(
             "/ledger/statement/upload",
             files={"file": ("statement.pdf", b"%PDF-1.7", "application/pdf")},
@@ -499,11 +518,6 @@ def test_ledger_statement_upload_requires_auth(monkeypatch) -> None:
 
 
 def test_ledger_statement_upload_requires_statement_password(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
-
     def fail_parse_statement_bytes(
         *, data: bytes, file_name: str, password: str | None
     ) -> LedgerStatement:
@@ -511,10 +525,8 @@ def test_ledger_statement_upload_requires_statement_password(monkeypatch) -> Non
 
     monkeypatch.setattr(ledger_api, "parse_statement_bytes", fail_parse_statement_bytes)
 
-    token = create_token()
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, _, _):
+        token = create_token()
         resp = client.post(
             "/ledger/statement/upload",
             files={"file": ("statement.pdf", b"%PDF-1.7", "application/pdf")},
@@ -526,11 +538,6 @@ def test_ledger_statement_upload_requires_statement_password(monkeypatch) -> Non
 
 
 def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
-    settings = _Settings()
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
-
     seen: dict[str, object] = {}
 
     def fake_parse_statement_bytes(
@@ -539,7 +546,7 @@ def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
         seen["data"] = data
         seen["file_name"] = file_name
         seen["password"] = password
-        return _fake_statement()
+        return replace(_fake_statement(), file_name=file_name)
 
     async def fake_run_in_threadpool(func, *args, **kwargs):
         seen["threaded"] = True
@@ -548,35 +555,37 @@ def test_ledger_statement_upload_returns_parsed_statement(monkeypatch) -> None:
     monkeypatch.setattr(ledger_api, "parse_statement_bytes", fake_parse_statement_bytes)
     monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
 
-    token = create_token()
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        token = create_token()
         resp = client.post(
             "/ledger/statement/upload",
             files={"file": ("uploaded.pdf", b"%PDF-1.7", "application/pdf")},
             data={"password": "pw"},
             headers={"Authorization": f"Bearer {token}"},
         )
+        row = session.query(LedgerStatementRecord).one()
+        saved_file_name = row.file_name
+        saved_description = row.entries[0]["description"]
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["entry_count"] == 1
     assert data["entries"][0]["description"] == "TEST MERCHANT"
+    assert data["statement_month"] == "2026-06-01"
+    assert data["uploaded_at"] is not None
     assert seen == {
         "data": b"%PDF-1.7",
         "file_name": "uploaded.pdf",
         "password": "pw",
         "threaded": True,
     }
+    assert saved_file_name == "uploaded.pdf"
+    assert saved_description == "TEST MERCHANT"
 
 
 def test_ledger_statement_upload_uses_configured_password(monkeypatch) -> None:
     settings = _Settings()
     settings.card_statement_password = "configured-pw"
-    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: settings)
-    monkeypatch.setattr("markettrace.api.main.get_settings", lambda: settings)
-    monkeypatch.setattr(ledger_api, "get_settings", lambda: settings)
 
     seen: dict[str, object] = {}
 
@@ -592,10 +601,8 @@ def test_ledger_statement_upload_uses_configured_password(monkeypatch) -> None:
     monkeypatch.setattr(ledger_api, "parse_statement_bytes", fake_parse_statement_bytes)
     monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
 
-    token = create_token()
-    app = create_app()
-
-    with TestClient(app) as client:
+    with _ledger_client(monkeypatch, settings) as (client, _, _):
+        token = create_token()
         resp = client.post(
             "/ledger/statement/upload",
             files={"file": ("uploaded.pdf", b"%PDF-1.7", "application/pdf")},
@@ -604,3 +611,100 @@ def test_ledger_statement_upload_uses_configured_password(monkeypatch) -> None:
 
     assert resp.status_code == 200
     assert seen == {"password": "configured-pw"}
+
+
+def test_ledger_statements_list_and_month_lookup(monkeypatch) -> None:
+    monkeypatch.setattr(ledger_api, "parse_statement_bytes", lambda **_: _fake_statement())
+
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
+
+    with _ledger_client(monkeypatch) as (client, _, _):
+        token = create_token()
+        upload = client.post(
+            "/ledger/statement/upload",
+            files={"file": ("uploaded.pdf", b"%PDF-1.7", "application/pdf")},
+            data={"password": "pw"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        summaries = client.get(
+            "/ledger/statements", headers={"Authorization": f"Bearer {token}"}
+        )
+        detail = client.get(
+            "/ledger/statements/2026-06",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert upload.status_code == 200
+    assert summaries.status_code == 200
+    assert summaries.json() == [
+        {
+            "statement_month": "2026-06-01",
+            "file_name": "statement.pdf",
+            "uploaded_at": upload.json()["uploaded_at"],
+            "period_start": None,
+            "period_end": None,
+            "payment_due_date": None,
+            "billed_total": None,
+            "parsed_total": 1000,
+            "entry_count": 1,
+        }
+    ]
+    assert detail.status_code == 200
+    assert detail.json()["entries"][0]["description"] == "TEST MERCHANT"
+
+
+def test_ledger_statement_upload_replaces_same_month(monkeypatch) -> None:
+    first = _fake_statement()
+    second = LedgerStatement(
+        file_name="second.pdf",
+        file_modified_at=datetime(2026, 6, 30, tzinfo=UTC),
+        encrypted=True,
+        payment_due_date=None,
+        period_start=None,
+        period_end=None,
+        billed_total=None,
+        domestic_total=None,
+        foreign_total=None,
+        parsed_total=2500,
+        entry_count=1,
+        entries=[
+            LedgerEntry(
+                date=date(2026, 6, 2),
+                card_tail="123",
+                description="SECOND MERCHANT",
+                amount=2500,
+                category="기타",
+            )
+        ],
+        categories=[LedgerCategory(category="기타", amount=2500, count=1)],
+        warnings=[],
+    )
+    statements = [first, second]
+
+    def fake_parse_statement_bytes(**_) -> LedgerStatement:
+        return statements.pop(0)
+
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_api, "parse_statement_bytes", fake_parse_statement_bytes)
+    monkeypatch.setattr(ledger_api, "run_in_threadpool", fake_run_in_threadpool)
+
+    with _ledger_client(monkeypatch) as (client, session, _):
+        token = create_token()
+        for file_name in ("first.pdf", "second.pdf"):
+            resp = client.post(
+                "/ledger/statement/upload",
+                files={"file": (file_name, b"%PDF-1.7", "application/pdf")},
+                data={"password": "pw"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert resp.status_code == 200
+
+        rows = session.query(LedgerStatementRecord).all()
+        saved_rows = [(row.file_name, row.parsed_total) for row in rows]
+
+    assert saved_rows == [("second.pdf", 2500)]

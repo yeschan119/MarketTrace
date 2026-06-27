@@ -95,8 +95,10 @@ export interface LedgerCategory {
 }
 
 export interface LedgerStatement {
+  statement_month: string | null;
   file_name: string;
   file_modified_at: string;
+  uploaded_at: string | null;
   encrypted: boolean;
   payment_due_date: string | null;
   period_start: string | null;
@@ -109,4 +111,16 @@ export interface LedgerStatement {
   entries: LedgerEntry[];
   categories: LedgerCategory[];
   warnings: string[];
+}
+
+export interface LedgerStatementSummary {
+  statement_month: string;
+  file_name: string;
+  uploaded_at: string;
+  period_start: string | null;
+  period_end: string | null;
+  payment_due_date: string | null;
+  billed_total: number | null;
+  parsed_total: number;
+  entry_count: number;
 }
