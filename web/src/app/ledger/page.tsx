@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { LedgerCategoryChart } from "@/components/LedgerCategoryChart";
 import type {
   LedgerEntry,
   LedgerStatement,
@@ -417,12 +418,16 @@ export default function LedgerPage() {
               />
             </div>
 
+            {selectedMonth && (
+              <LedgerCategoryChart token={token} month={selectedMonth} />
+            )}
+
             {statement.entries.length === 0 ? (
               <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
                 {t("ledger.empty")}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
                 {categorySections.map((section, sectionIndex) => {
                   const isExpanded = expandedCategories.has(section.category);
                   const sectionId = `ledger-category-${sectionIndex}`;

@@ -25,6 +25,7 @@ from markettrace.ledger.statements import (
     LedgerCategory,
     LedgerEntry,
     LedgerStatement,
+    categorize_description,
     parse_statement_text,
 )
 
@@ -143,6 +144,32 @@ def test_parse_statement_text_uses_granular_korean_categories() -> None:
         "여행/숙박",
         "인식불가",
     ]
+
+
+def test_categorize_description_dining_keywords() -> None:
+    for merchant in (
+        "소바",
+        "우래옥 밥상",
+        "키친리허설",
+        "쌈밥집",
+        "두부마을",
+        "집밥백선생",
+        "종가집 김치",
+        "마포갈비",
+        "달걀가게",
+    ):
+        assert categorize_description(merchant) == "외식"
+
+
+def test_categorize_description_routes_delivery_apps_to_delivery() -> None:
+    for merchant in ("우아한형제들", "배달의민족", "배민", "요기요", "쿠팡이츠"):
+        assert categorize_description(merchant) == "배달"
+    # Coupang's shopping arm stays in online shopping, not delivery.
+    assert categorize_description("쿠팡") == "온라인쇼핑"
+
+
+def test_categorize_description_apple_korea_is_subscription() -> None:
+    assert categorize_description("애플코리아") == "구독/디지털"
 
 
 def test_openai_ocr_fallback_extracts_merchant_names(monkeypatch) -> None:
@@ -775,6 +802,96 @@ def test_saved_statement_detail_recategorizes_existing_entries(monkeypatch) -> N
         "온라인쇼핑",
         "인식불가",
     }
+
+
+def _saved_record(month: date, entries: list[dict]) -> LedgerStatementRecord:
+    return LedgerStatementRecord(
+        statement_month=month,
+        file_name=f"{month:%Y-%m}.pdf",
+        file_modified_at=datetime(month.year, month.month, 26, tzinfo=UTC),
+        uploaded_at=datetime(month.year, month.month, 27, tzinfo=UTC),
+        encrypted=True,
+        payment_due_date=None,
+        period_start=None,
+        period_end=None,
+        billed_total=None,
+        domestic_total=None,
+        foreign_total=None,
+        parsed_total=sum(entry["amount"] for entry in entries),
+        entry_count=len(entries),
+        entries=entries,
+        categories=[],
+        warnings=[],
+    )
+
+
+def _entry(used_on: str, description: str, amount: int) -> dict:
+    return {
+        "date": used_on,
+        "card_tail": "881",
+        "description": description,
+        "amount": amount,
+        "category": "기타",
+    }
+
+
+def test_category_breakdown_month_uses_single_month(monkeypatch) -> None:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        session.add_all(
+            [
+                _saved_record(
+                    date(2026, 6, 1),
+                    [_entry("2026-06-01", "스타벅스", 3000)],
+                ),
+                _saved_record(
+                    date(2026, 5, 1),
+                    [_entry("2026-05-01", "쿠팡", 7000)],
+                ),
+            ]
+        )
+        session.commit()
+        token = create_token()
+
+        resp = client.get(
+            "/ledger/categories",
+            params={"month": "2026-06", "window": "month"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == [{"category": "카페/간식", "amount": 3000, "count": 1}]
+
+
+def test_category_breakdown_year_aggregates_trailing_12_months(monkeypatch) -> None:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        session.add_all(
+            [
+                _saved_record(
+                    date(2026, 6, 1),
+                    [_entry("2026-06-01", "스타벅스", 3000)],
+                ),
+                _saved_record(
+                    date(2026, 1, 1),
+                    [_entry("2026-01-01", "이디야", 2000)],
+                ),
+                # Outside the trailing 12-month window (2025-06 .. 2026-06).
+                _saved_record(
+                    date(2025, 5, 1),
+                    [_entry("2025-05-01", "투썸", 9999)],
+                ),
+            ]
+        )
+        session.commit()
+        token = create_token()
+
+        resp = client.get(
+            "/ledger/categories",
+            params={"month": "2026-06", "window": "year"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == [{"category": "카페/간식", "amount": 5000, "count": 2}]
 
 
 def test_ledger_statement_upload_replaces_same_month(monkeypatch) -> None:

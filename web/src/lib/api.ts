@@ -3,6 +3,7 @@ import type {
   EventDetail,
   EventTypeStat,
   InstrumentTimeline,
+  LedgerCategory,
   LedgerStatement,
   LedgerStatementSummary,
   MacroObservation,
@@ -160,6 +161,18 @@ export const api = {
   ): Promise<LedgerStatement> {
     return apiFetch<LedgerStatement>(
       `/ledger/statements/${encodeURIComponent(statementMonth)}`,
+      token
+    );
+  },
+
+  getLedgerCategories(
+    token: string,
+    month: string,
+    window: "month" | "year"
+  ): Promise<LedgerCategory[]> {
+    const query = new URLSearchParams({ month, window });
+    return apiFetch<LedgerCategory[]>(
+      `/ledger/categories?${query.toString()}`,
       token
     );
   },

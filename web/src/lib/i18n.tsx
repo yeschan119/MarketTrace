@@ -169,6 +169,13 @@ const en: Dict = {
       amount: "Amount",
     },
     empty: "No parsed ledger entries.",
+    chartTitle: "Top spending categories",
+    chartSubtitle: "Top 10 categories by amount",
+    windowMonth: "This month",
+    windowYear: "Last 12 months",
+    chartLoading: "Loading category totals...",
+    chartEmpty: "No category totals to chart yet.",
+    chartAmount: "Amount",
   },
 };
 
@@ -327,6 +334,13 @@ const ko: Dict = {
       amount: "금액",
     },
     empty: "파싱된 거래 내역이 없습니다.",
+    chartTitle: "카드값 순위",
+    chartSubtitle: "금액 기준 상위 10개 카테고리",
+    windowMonth: "이번 달",
+    windowYear: "최근 1년",
+    chartLoading: "카테고리 합계 불러오는 중...",
+    chartEmpty: "그래프로 표시할 카테고리 합계가 없습니다.",
+    chartAmount: "금액",
   },
 };
 

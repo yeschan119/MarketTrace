@@ -73,6 +73,31 @@ def list_ledger_statements(session: Session) -> list[LedgerStatementRecord]:
     )
 
 
+def _shift_months(value: date, months: int) -> date:
+    """Return the first-of-month ``months`` before ``value``."""
+    index = value.year * 12 + (value.month - 1) - months
+    return date(index // 12, index % 12 + 1, 1)
+
+
+def aggregate_ledger_categories(
+    session: Session, *, month: date, window: str
+) -> list[LedgerCategory]:
+    """Aggregate category totals for a single month or a trailing 12 months."""
+    start = _shift_months(month, 11) if window == "year" else month
+    rows = session.scalars(
+        select(LedgerStatementRecord)
+        .where(
+            LedgerStatementRecord.statement_month >= start,
+            LedgerStatementRecord.statement_month <= month,
+        )
+        .order_by(LedgerStatementRecord.statement_month)
+    )
+    entries = [
+        _entry_from_payload(entry) for row in rows for entry in row.entries
+    ]
+    return category_totals(entries)
+
+
 def get_ledger_statement(
     session: Session, statement_month: date
 ) -> LedgerStatementRecord | None:

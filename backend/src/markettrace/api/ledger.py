@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from markettrace.api.auth import require_auth
 from markettrace.api.deps import get_db
 from markettrace.api.schemas import (
+    LedgerCategoryOut,
     LedgerRequest,
     LedgerStatementOut,
     LedgerStatementSummaryOut,
@@ -27,6 +29,7 @@ from markettrace.ledger.statements import (
     resolve_statement_dir,
 )
 from markettrace.ledger.storage import (
+    aggregate_ledger_categories,
     build_ledger_statement_from_record,
     list_ledger_statements,
     save_ledger_statement,
@@ -103,6 +106,21 @@ def list_saved_statements(
     return [
         LedgerStatementSummaryOut.model_validate(row)
         for row in list_ledger_statements(db)
+    ]
+
+
+@router.get("/ledger/categories", response_model=list[LedgerCategoryOut])
+def get_category_breakdown(
+    month: str = Query(..., description="anchor month as YYYY-MM"),
+    window: Literal["month", "year"] = Query("month"),
+    _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> list[LedgerCategoryOut]:
+    """Aggregate category totals for one month or the trailing 12 months."""
+    bucket = _parse_statement_month(month)
+    return [
+        LedgerCategoryOut.model_validate(category)
+        for category in aggregate_ledger_categories(db, month=bucket, window=window)
     ]
 
 
