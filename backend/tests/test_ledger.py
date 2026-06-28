@@ -894,6 +894,71 @@ def test_category_breakdown_year_aggregates_trailing_12_months(monkeypatch) -> N
     assert resp.json() == [{"category": "카페/간식", "amount": 5000, "count": 2}]
 
 
+def test_top_entries_month_ranks_by_amount(monkeypatch) -> None:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        session.add(
+            _saved_record(
+                date(2026, 6, 1),
+                [
+                    _entry("2026-06-01", "스타벅스", 3000),
+                    _entry("2026-06-02", "이마트", 50_000),
+                    _entry("2026-06-03", "올리브영", 12_000),
+                ],
+            )
+        )
+        session.commit()
+        token = create_token()
+
+        resp = client.get(
+            "/ledger/entries/top",
+            params={"month": "2026-06", "window": "month", "limit": 2},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [(row["description"], row["amount"]) for row in data] == [
+        ("이마트", 50_000),
+        ("올리브영", 12_000),
+    ]
+
+
+def test_top_entries_year_aggregates_across_months(monkeypatch) -> None:
+    with _ledger_client(monkeypatch) as (client, session, _):
+        session.add_all(
+            [
+                _saved_record(
+                    date(2026, 6, 1),
+                    [_entry("2026-06-01", "스타벅스", 3000)],
+                ),
+                _saved_record(
+                    date(2026, 2, 1),
+                    [_entry("2026-02-01", "이마트", 80_000)],
+                ),
+                # Outside the trailing 12-month window.
+                _saved_record(
+                    date(2025, 5, 1),
+                    [_entry("2025-05-01", "면세점", 999_999)],
+                ),
+            ]
+        )
+        session.commit()
+        token = create_token()
+
+        resp = client.get(
+            "/ledger/entries/top",
+            params={"month": "2026-06", "window": "year"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [(row["date"], row["description"], row["amount"]) for row in data] == [
+        ("2026-02-01", "이마트", 80_000),
+        ("2026-06-01", "스타벅스", 3000),
+    ]
+
+
 def test_ledger_statement_upload_replaces_same_month(monkeypatch) -> None:
     first = _fake_statement()
     second = LedgerStatement(

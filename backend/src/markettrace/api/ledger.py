@@ -13,6 +13,7 @@ from markettrace.api.auth import require_auth
 from markettrace.api.deps import get_db
 from markettrace.api.schemas import (
     LedgerCategoryOut,
+    LedgerEntryOut,
     LedgerRequest,
     LedgerStatementOut,
     LedgerStatementSummaryOut,
@@ -33,6 +34,7 @@ from markettrace.ledger.storage import (
     build_ledger_statement_from_record,
     list_ledger_statements,
     save_ledger_statement,
+    top_ledger_entries,
 )
 from markettrace.ledger.storage import (
     get_ledger_statement as get_saved_ledger_statement,
@@ -121,6 +123,22 @@ def get_category_breakdown(
     return [
         LedgerCategoryOut.model_validate(category)
         for category in aggregate_ledger_categories(db, month=bucket, window=window)
+    ]
+
+
+@router.get("/ledger/entries/top", response_model=list[LedgerEntryOut])
+def get_top_entries(
+    month: str = Query(..., description="anchor month as YYYY-MM"),
+    window: Literal["month", "year"] = Query("month"),
+    limit: int = Query(10, ge=1, le=50),
+    _: None = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> list[LedgerEntryOut]:
+    """Return the highest-amount entries for one month or the trailing year."""
+    bucket = _parse_statement_month(month)
+    return [
+        LedgerEntryOut.model_validate(entry)
+        for entry in top_ledger_entries(db, month=bucket, window=window, limit=limit)
     ]
 
 

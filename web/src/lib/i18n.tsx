@@ -176,6 +176,9 @@ const en: Dict = {
     chartLoading: "Loading category totals...",
     chartEmpty: "No category totals to chart yet.",
     chartAmount: "Amount",
+    topTitle: "Biggest spends",
+    topSubtitle: "Top 10 transactions by amount (date + place)",
+    topEmpty: "No transactions to rank yet.",
   },
 };
 
@@ -329,7 +332,7 @@ const ko: Dict = {
     th: {
       date: "일자",
       category: "분류",
-      description: "가맹점",
+      description: "사용처",
       card: "카드",
       amount: "금액",
     },
@@ -341,6 +344,9 @@ const ko: Dict = {
     chartLoading: "카테고리 합계 불러오는 중...",
     chartEmpty: "그래프로 표시할 카테고리 합계가 없습니다.",
     chartAmount: "금액",
+    topTitle: "최다 지출 내역",
+    topSubtitle: "금액 기준 상위 10건 (날짜 + 사용처)",
+    topEmpty: "순위로 표시할 거래가 없습니다.",
   },
 };
 

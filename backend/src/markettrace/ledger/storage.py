@@ -79,10 +79,10 @@ def _shift_months(value: date, months: int) -> date:
     return date(index // 12, index % 12 + 1, 1)
 
 
-def aggregate_ledger_categories(
+def _entries_for_window(
     session: Session, *, month: date, window: str
-) -> list[LedgerCategory]:
-    """Aggregate category totals for a single month or a trailing 12 months."""
+) -> list[LedgerEntry]:
+    """Return ledger entries for a single month or a trailing 12 months."""
     start = _shift_months(month, 11) if window == "year" else month
     rows = session.scalars(
         select(LedgerStatementRecord)
@@ -92,10 +92,23 @@ def aggregate_ledger_categories(
         )
         .order_by(LedgerStatementRecord.statement_month)
     )
-    entries = [
-        _entry_from_payload(entry) for row in rows for entry in row.entries
-    ]
-    return category_totals(entries)
+    return [_entry_from_payload(entry) for row in rows for entry in row.entries]
+
+
+def aggregate_ledger_categories(
+    session: Session, *, month: date, window: str
+) -> list[LedgerCategory]:
+    """Aggregate category totals for a single month or a trailing 12 months."""
+    return category_totals(_entries_for_window(session, month=month, window=window))
+
+
+def top_ledger_entries(
+    session: Session, *, month: date, window: str, limit: int = 10
+) -> list[LedgerEntry]:
+    """Return the highest-amount entries for a single month or a trailing year."""
+    entries = _entries_for_window(session, month=month, window=window)
+    entries.sort(key=lambda entry: (-entry.amount, entry.date, entry.description))
+    return entries[:limit]
 
 
 def get_ledger_statement(

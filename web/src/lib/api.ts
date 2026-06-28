@@ -4,6 +4,7 @@ import type {
   EventTypeStat,
   InstrumentTimeline,
   LedgerCategory,
+  LedgerEntry,
   LedgerStatement,
   LedgerStatementSummary,
   MacroObservation,
@@ -173,6 +174,23 @@ export const api = {
     const query = new URLSearchParams({ month, window });
     return apiFetch<LedgerCategory[]>(
       `/ledger/categories?${query.toString()}`,
+      token
+    );
+  },
+
+  getLedgerTopEntries(
+    token: string,
+    month: string,
+    window: "month" | "year",
+    limit = 10
+  ): Promise<LedgerEntry[]> {
+    const query = new URLSearchParams({
+      month,
+      window,
+      limit: String(limit),
+    });
+    return apiFetch<LedgerEntry[]>(
+      `/ledger/entries/top?${query.toString()}`,
       token
     );
   },

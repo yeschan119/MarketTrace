@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import type { LedgerCategory } from "@/types/api";
+import type { LedgerCategory, LedgerEntry } from "@/types/api";
 
 type LedgerWindow = "month" | "year";
 
@@ -46,13 +46,26 @@ export function LedgerCategoryChart({ token, month }: Props) {
     retry: false,
   });
 
+  const topEntries = useQuery({
+    queryKey: ["ledger-top-entries", month, window],
+    queryFn: () => api.getLedgerTopEntries(token, month, window, 10),
+    enabled: Boolean(token && month),
+    retry: false,
+  });
+
   const topCategories = (categories.data ?? [])
     .slice()
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10);
+  const rankedEntries: LedgerEntry[] = topEntries.data ?? [];
 
   const chartHeight = Math.max(200, topCategories.length * 40);
   const formatWon = (value: number) => `${value.toLocaleString(locale)}원`;
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleDateString(locale, {
+      month: "short",
+      day: "numeric",
+    });
   const compact = new Intl.NumberFormat(locale, { notation: "compact" });
 
   return (
@@ -141,6 +154,47 @@ export function LedgerCategoryChart({ token, month }: Props) {
             </BarChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      <div className="mt-6 border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-semibold text-gray-900">
+          {t("ledger.topTitle")}
+        </h3>
+        <p className="mt-1 text-xs text-gray-500">{t("ledger.topSubtitle")}</p>
+
+        <div className="mt-3">
+          {topEntries.isFetching ? (
+            <div className="flex h-24 items-center justify-center text-sm text-gray-500">
+              {t("ledger.chartLoading")}
+            </div>
+          ) : rankedEntries.length === 0 ? (
+            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+              {t("ledger.topEmpty")}
+            </div>
+          ) : (
+            <ol className="space-y-1">
+              {rankedEntries.map((entry, index) => (
+                <li
+                  key={`${entry.date}-${entry.description}-${entry.amount}-${index}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 odd:bg-gray-50"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 font-mono text-xs font-semibold text-indigo-700">
+                    {index + 1}
+                  </span>
+                  <span className="w-16 shrink-0 text-xs text-gray-500">
+                    {formatDate(entry.date)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                    {entry.description}
+                  </span>
+                  <span className="shrink-0 font-mono text-sm font-semibold text-gray-900">
+                    {formatWon(entry.amount)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </div>
   );
