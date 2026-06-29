@@ -7,6 +7,11 @@ import type {
   LedgerEntry,
   LedgerStatement,
   LedgerStatementSummary,
+  PassbookCategory,
+  PassbookDirection,
+  PassbookEntry,
+  PassbookStatement,
+  PassbookStatementSummary,
   MacroObservation,
   HealthResponse,
 } from "@/types/api";
@@ -204,5 +209,65 @@ export const api = {
     form.append("file", file);
     if (password) form.append("password", password);
     return apiPostForm<LedgerStatement>("/ledger/statement/upload", form, token);
+  },
+
+  listPassbookStatements(token: string): Promise<PassbookStatementSummary[]> {
+    return apiFetch<PassbookStatementSummary[]>("/passbook/statements", token);
+  },
+
+  getPassbookStatementByMonth(
+    token: string,
+    statementMonth: string
+  ): Promise<PassbookStatement> {
+    return apiFetch<PassbookStatement>(
+      `/passbook/statements/${encodeURIComponent(statementMonth)}`,
+      token
+    );
+  },
+
+  getPassbookCategories(
+    token: string,
+    month: string,
+    window: "month" | "year"
+  ): Promise<PassbookCategory[]> {
+    const query = new URLSearchParams({ month, window });
+    return apiFetch<PassbookCategory[]>(
+      `/passbook/categories?${query.toString()}`,
+      token
+    );
+  },
+
+  getPassbookTopEntries(
+    token: string,
+    month: string,
+    window: "month" | "year",
+    direction: PassbookDirection,
+    limit = 10
+  ): Promise<PassbookEntry[]> {
+    const query = new URLSearchParams({
+      month,
+      window,
+      direction,
+      limit: String(limit),
+    });
+    return apiFetch<PassbookEntry[]>(
+      `/passbook/entries/top?${query.toString()}`,
+      token
+    );
+  },
+
+  uploadPassbookStatement(
+    token: string,
+    file: File,
+    password?: string
+  ): Promise<PassbookStatement> {
+    const form = new FormData();
+    form.append("file", file);
+    if (password) form.append("password", password);
+    return apiPostForm<PassbookStatement>(
+      "/passbook/statement/upload",
+      form,
+      token
+    );
   },
 };
