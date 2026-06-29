@@ -91,7 +91,9 @@ def test_parse_passbook_text_reassembles_wrapped_rows() -> None:
     # 적요 wrapped across two lines: "타행모바일" + "뱅킹".
     wrapped_summary = by_amount[70_000]
     assert wrapped_summary.summary == "타행모바일뱅킹"
-    assert wrapped_summary.category == "타행이체"
+    # The reassembled 적요 maps to 타행이체, though here 강응찬 (self) overrides it.
+    assert categorize_summary(wrapped_summary.summary) == "타행이체"
+    assert wrapped_summary.category == "본인이체"
     assert wrapped_summary.direction == "in"
 
 
@@ -134,8 +136,9 @@ def test_categorize_lets_counterparty_override_summary() -> None:
     assert categorize("인터넷뱅킹", "아동수당관악구") == "정부지원금"
     assert categorize("타행인터넷뱅킹", "주식회사코리안클로") == "급여"
     assert categorize("펌뱅킹 이체", "이건우") == "월세"
+    assert categorize("효성CD", "강응찬") == "본인이체"
+    assert categorize("신한카드", "마이신한포인트") == "카드캐시백"
     # An unmapped counterparty keeps the 적요-based category.
-    assert categorize("효성CD", "강응찬") == "ATM/CD"
     assert categorize("카드결제", "신한카드") == "카드결제"
 
 
