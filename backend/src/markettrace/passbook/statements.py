@@ -120,6 +120,16 @@ _SUMMARY_CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("자동이체", ("자동이체",)),
 )
 
+# Known counterparties (내용) refine the 적요-based bucket — e.g. a deposit whose
+# 적요 is merely "타행인터넷뱅킹" is really payroll when it comes from 코리안클로.
+# These take priority over the 적요 rules above.
+_DESCRIPTION_CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("배달", ("우아한청년들",)),
+    ("정부지원금", ("관악구",)),
+    ("급여", ("코리안클로",)),
+    ("월세", ("이건우",)),
+)
+
 
 def resolve_passbook_dir(configured_dir: str) -> Path:
     """Resolve a configured passbook folder from common app working directories."""
@@ -277,7 +287,7 @@ def _parse_record(record: str) -> PassbookEntry | None:
         description=description or "내용 없음",
         balance=balance,
         branch=branch,
-        category=categorize_summary(summary),
+        category=categorize(summary, description),
     )
 
 
@@ -305,6 +315,16 @@ def _find_balance_index(tail: list[str]) -> int | None:
 
 def _to_int(token: str) -> int:
     return int(token.replace(",", ""))
+
+
+def categorize(summary: str, description: str) -> str:
+    """Pick a category, letting a known counterparty (내용) override the 적요."""
+    normalized_desc = _normalize_category_text(description or "")
+    if normalized_desc:
+        for category, tokens in _DESCRIPTION_CATEGORY_RULES:
+            if any(_normalize_category_text(token) in normalized_desc for token in tokens):
+                return category
+    return categorize_summary(summary)
 
 
 def categorize_summary(summary: str) -> str:

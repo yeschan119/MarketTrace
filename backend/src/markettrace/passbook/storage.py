@@ -12,7 +12,7 @@ from markettrace.passbook.statements import (
     PassbookCategory,
     PassbookEntry,
     PassbookStatement,
-    categorize_summary,
+    categorize,
     category_totals,
 )
 
@@ -175,6 +175,7 @@ def _category_payload(category: PassbookCategory) -> dict:
 
 def _entry_from_payload(value: dict) -> PassbookEntry:
     summary = str(value.get("summary") or "")
+    description = str(value.get("description") or "")
     withdrawal = int(value.get("withdrawal") or 0)
     deposit = int(value.get("deposit") or 0)
     balance_raw = value.get("balance")
@@ -186,8 +187,8 @@ def _entry_from_payload(value: dict) -> PassbookEntry:
         amount=int(value.get("amount") or (withdrawal if withdrawal > 0 else deposit)),
         withdrawal=withdrawal,
         deposit=deposit,
-        description=str(value.get("description") or ""),
+        description=description,
         balance=int(balance_raw) if balance_raw is not None else None,
         branch=str(value.get("branch") or ""),
-        category=categorize_summary(summary),
+        category=categorize(summary, description),
     )

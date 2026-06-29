@@ -20,6 +20,7 @@ from markettrace.db.models import Base, PassbookStatementRecord
 from markettrace.passbook.statements import (
     PassbookEntry,
     PassbookStatement,
+    categorize,
     categorize_summary,
     parse_passbook_text,
 )
@@ -124,6 +125,29 @@ def test_parse_passbook_text_splits_withdrawal_and_deposit() -> None:
     assert interest.description == "03.21~06.19"
     assert interest.balance == 4_493_401
     assert interest.category == "이자"
+
+
+def test_categorize_lets_counterparty_override_summary() -> None:
+    # 내용 (counterparty) refines the broad 적요 bucket.
+    assert categorize("인터넷뱅킹", "우아한청년들") == "배달"
+    assert categorize("인터넷뱅킹", "부모급여관악구") == "정부지원금"
+    assert categorize("인터넷뱅킹", "아동수당관악구") == "정부지원금"
+    assert categorize("타행인터넷뱅킹", "주식회사코리안클로") == "급여"
+    assert categorize("펌뱅킹 이체", "이건우") == "월세"
+    # An unmapped counterparty keeps the 적요-based category.
+    assert categorize("효성CD", "강응찬") == "ATM/CD"
+    assert categorize("카드결제", "신한카드") == "카드결제"
+
+
+def test_parse_passbook_text_applies_counterparty_categories() -> None:
+    statement = parse_passbook_text(
+        text=_sample_passbook_text(),
+        file_name="passbook.pdf",
+        file_modified_at=datetime(2026, 6, 29, tzinfo=UTC),
+    )
+    by_amount = {entry.amount: entry for entry in statement.entries}
+    # 우아한청년들 deposit (적요 인터넷뱅킹) is delivery income, not 인터넷뱅킹.
+    assert by_amount[34_415].category == "배달"
 
 
 def test_categorize_summary_groups_and_falls_back() -> None:
