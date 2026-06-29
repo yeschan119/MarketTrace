@@ -179,3 +179,69 @@ class LedgerStatementSummaryOut(BaseModel):
     billed_total: int | None
     parsed_total: int
     entry_count: int
+
+
+class PassbookRequest(BaseModel):
+    password: str | None = None
+
+
+class PassbookEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date
+    time: str
+    summary: str
+    direction: str
+    amount: int
+    withdrawal: int
+    deposit: int
+    description: str
+    balance: int | None
+    branch: str
+    category: str
+
+
+class PassbookCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    category: str
+    withdrawal: int
+    deposit: int
+    count: int
+
+
+class PassbookStatementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    statement_month: date | None = None
+    file_name: str
+    file_modified_at: datetime
+    uploaded_at: datetime | None = None
+    encrypted: bool
+    account_no: str | None
+    account_holder: str | None
+    period_start: date | None
+    period_end: date | None
+    closing_balance: int | None
+    withdrawal_total: int
+    deposit_total: int
+    entry_count: int
+    entries: list[PassbookEntryOut]
+    categories: list[PassbookCategoryOut]
+    warnings: list[str]
+
+
+class PassbookStatementSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    statement_month: date
+    file_name: str
+    uploaded_at: datetime
+    account_no: str | None
+    account_holder: str | None
+    period_start: date | None
+    period_end: date | None
+    closing_balance: int | None
+    withdrawal_total: int
+    deposit_total: int
+    entry_count: int

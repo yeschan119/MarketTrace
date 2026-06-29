@@ -124,3 +124,59 @@ export interface LedgerStatementSummary {
   parsed_total: number;
   entry_count: number;
 }
+
+export type PassbookDirection = "out" | "in";
+
+export interface PassbookEntry {
+  date: string;
+  time: string;
+  summary: string;
+  direction: PassbookDirection;
+  amount: number;
+  withdrawal: number;
+  deposit: number;
+  description: string;
+  balance: number | null;
+  branch: string;
+  category: string;
+}
+
+export interface PassbookCategory {
+  category: string;
+  withdrawal: number;
+  deposit: number;
+  count: number;
+}
+
+export interface PassbookStatement {
+  statement_month: string | null;
+  file_name: string;
+  file_modified_at: string;
+  uploaded_at: string | null;
+  encrypted: boolean;
+  account_no: string | null;
+  account_holder: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  closing_balance: number | null;
+  withdrawal_total: number;
+  deposit_total: number;
+  entry_count: number;
+  entries: PassbookEntry[];
+  categories: PassbookCategory[];
+  warnings: string[];
+}
+
+export interface PassbookStatementSummary {
+  statement_month: string;
+  file_name: string;
+  uploaded_at: string;
+  account_no: string | null;
+  account_holder: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  closing_balance: number | null;
+  withdrawal_total: number;
+  deposit_total: number;
+  entry_count: number;
+}

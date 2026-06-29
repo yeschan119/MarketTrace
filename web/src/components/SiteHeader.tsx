@@ -36,6 +36,12 @@ export function SiteHeader() {
         >
           {t("nav.ledger")}
         </a>
+        <a
+          href="/passbook"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.passbook")}
+        </a>
         {/* Language toggle sits immediately left of the auth / Ingest controls. */}
         <div className="ml-auto flex items-center gap-3">
           <LanguageToggle />

@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # available, then OpenAI when OPENAI_API_KEY is configured.
     ledger_ocr_provider: Literal["auto", "none", "swift", "openai"] = "auto"
     ledger_ocr_model: str = "gpt-4o-mini"
+    # Local bank-account (passbook) PDFs used by the login-gated passbook view.
+    passbook_dir: str = "passbook"
+    passbook_password: str | None = None
 
     @field_validator("database_url")
     @classmethod
