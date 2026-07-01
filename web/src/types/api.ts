@@ -9,6 +9,7 @@ export interface EventSummary {
   published_at: string;
   primary_ticker: string;
   instrument_name: string;
+  market: string | null;
 }
 
 export interface Outcome {
@@ -26,6 +27,24 @@ export interface EventTypeStat {
   count: number;
   mean_abnormal_return: number | null;
   std_abnormal_return: number | null;
+}
+
+export type BacktestModel = "event_type_history" | "llm_direction";
+
+export interface BacktestResult {
+  model: BacktestModel | string;
+  horizon_days: number;
+  min_train_per_type: number;
+  n_events_total: number;
+  n_dropped_no_outcome: number;
+  n_events: number;
+  n_predictions: number;
+  hit_rate: number | null;
+  mean_strategy_return: number | null;
+  mean_strategy_return_net: number | null;
+  information_coefficient: number | null;
+  commission_per_trade: number;
+  slippage_per_trade: number;
 }
 
 export interface MacroObservation {

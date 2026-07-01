@@ -1,4 +1,6 @@
 import type {
+  BacktestModel,
+  BacktestResult,
   EventSummary,
   EventDetail,
   EventTypeStat,
@@ -132,6 +134,11 @@ export const api = {
 
   getEventTypeStats(): Promise<EventTypeStat[]> {
     return apiFetch<EventTypeStat[]>("/stats/event-types");
+  },
+
+  getBacktest(model: BacktestModel = "event_type_history"): Promise<BacktestResult[]> {
+    const query = new URLSearchParams({ model });
+    return apiFetch<BacktestResult[]>(`/stats/backtest?${query}`);
   },
 
   getMacroObservations(): Promise<MacroObservation[]> {
