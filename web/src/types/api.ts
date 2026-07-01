@@ -29,6 +29,18 @@ export interface EventTypeStat {
   std_abnormal_return: number | null;
 }
 
+export interface EventContribution {
+  event_id: number;
+  event_type: string;
+  horizon_days: number;
+  abnormal_return: number | null;
+  direction: "positive" | "negative" | "neutral" | string;
+  published_at: string;
+  primary_ticker: string | null;
+  instrument_name: string | null;
+  market: string | null;
+}
+
 export type BacktestModel = "event_type_history" | "llm_direction";
 
 export interface BacktestResult {

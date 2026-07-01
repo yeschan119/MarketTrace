@@ -290,6 +290,42 @@ def test_macro_observations_series_filter(client, ts_session):
     assert [r["series_id"] for r in data] == ["UNRATE"]
 
 
+def test_event_type_contributions_expose_per_event_returns(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    # Two earnings EventImpacts at D+5 with distinct abnormal returns; the
+    # /stats/event-types mean over them must be reconstructable from the
+    # per-event contributions the endpoint returns.
+    event_id = seeded["event_id"]
+    instrument_id = seeded["instrument_id"]
+    ts_session.add(
+        EventImpact(
+            event_id=event_id,
+            instrument_id=instrument_id,
+            event_type="earnings",
+            direction="positive",
+            horizon_days=5,
+            abnormal_return=0.04,
+            computed_at=_now(),
+        )
+    )
+    ts_session.flush()
+
+    resp = client.get("/stats/event-types/contributions")
+    assert resp.status_code == 200
+    data = resp.json()
+    earnings_d5 = [
+        c for c in data if c["event_type"] == "earnings" and c["horizon_days"] == 5
+    ]
+    assert len(earnings_d5) == 1
+    row = earnings_d5[0]
+    assert row["event_id"] == int(event_id)
+    assert row["abnormal_return"] == pytest.approx(0.04)
+    assert row["primary_ticker"] == "AAPL"
+    assert row["market"] == "US"
+    assert row["direction"] == "positive"
+
+
 def test_backtest_route_exposes_cost_and_coverage_fields(client: TestClient) -> None:
     resp = client.get("/stats/backtest")
     assert resp.status_code == 200

@@ -8,7 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import type {
   EventTypeStat,
-  EventSummary,
+  EventContribution,
   BacktestResult,
   BacktestModel,
 } from "@/types/api";
@@ -25,7 +25,11 @@ function formatIc(v: number | null): string {
 
 export default function StatsPage() {
   const { t, locale } = useI18n();
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  // A statistic is one (event_type, horizon) row; select that exact bucket.
+  const [selected, setSelected] = useState<{
+    type: string;
+    horizon: number;
+  } | null>(null);
   const [model, setModel] = useState<BacktestModel>("event_type_history");
 
   const { data, isLoading, isError, error } = useQuery({
@@ -33,10 +37,11 @@ export default function StatsPage() {
     queryFn: () => api.getEventTypeStats(),
   });
 
-  // Task 2: fetch all events once, filter client-side by selected event_type.
-  const { data: eventsData } = useQuery({
-    queryKey: ["events"],
-    queryFn: () => api.listEvents(),
+  // Task 2: fetch every event's per-horizon abnormal return once, then filter
+  // to the selected (event_type, horizon) so the stat's mean is auditable.
+  const { data: contribData } = useQuery({
+    queryKey: ["event-type-contributions"],
+    queryFn: () => api.getEventTypeContributions(),
   });
 
   if (isLoading) {
@@ -59,16 +64,25 @@ export default function StatsPage() {
   }
 
   const stats: EventTypeStat[] = data ?? [];
-  const allEvents: EventSummary[] = eventsData ?? [];
-  const relatedEvents: EventSummary[] = selectedType
-    ? allEvents
-        .filter((e) => e.event_type === selectedType)
+  const allContribs: EventContribution[] = contribData ?? [];
+  const related: EventContribution[] = selected
+    ? allContribs
+        .filter(
+          (c) =>
+            c.event_type === selected.type &&
+            c.horizon_days === selected.horizon
+        )
         .sort(
-          (a, b) =>
-            new Date(b.published_at).getTime() -
-            new Date(a.published_at).getTime()
+          (a, b) => (b.abnormal_return ?? -Infinity) - (a.abnormal_return ?? -Infinity)
         )
     : [];
+  // Mean of the contributions the user is looking at — reconstructs the stat row.
+  const relatedValues = related
+    .map((c) => c.abnormal_return)
+    .filter((v): v is number => v != null);
+  const relatedMean = relatedValues.length
+    ? relatedValues.reduce((sum, v) => sum + v, 0) / relatedValues.length
+    : null;
 
   return (
     <div className="space-y-6">
@@ -101,7 +115,9 @@ export default function StatsPage() {
               <tbody>
                 {stats.map((s) => {
                   const positive = (s.mean_abnormal_return ?? 0) >= 0;
-                  const active = s.event_type === selectedType;
+                  const active =
+                    selected?.type === s.event_type &&
+                    selected?.horizon === s.horizon_days;
                   return (
                     <tr
                       key={`${s.event_type}-${s.horizon_days}`}
@@ -113,7 +129,11 @@ export default function StatsPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            setSelectedType(active ? null : s.event_type)
+                            setSelected(
+                              active
+                                ? null
+                                : { type: s.event_type, horizon: s.horizon_days }
+                            )
                           }
                           aria-pressed={active}
                           className={`w-full rounded px-3 py-2 text-left font-medium transition-colors ${
@@ -148,45 +168,65 @@ export default function StatsPage() {
             </table>
           </div>
 
-          {selectedType && (
+          {selected && (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
-              <div className="flex items-baseline justify-between">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-semibold text-gray-900">
-                  {t("stats.relatedTitle")}
-                  <span className="ml-2 font-mono font-normal text-indigo-600">
-                    {selectedType}
-                  </span>
+                  {t("stats.relatedTitle", {
+                    type: selected.type,
+                    horizon: selected.horizon,
+                  })}
                 </h2>
                 <span className="text-xs text-gray-500">
-                  {t("stats.relatedCount", { n: relatedEvents.length })}
+                  {t("stats.relatedCount", { n: related.length })}
                 </span>
               </div>
-              {relatedEvents.length === 0 ? (
+
+              {related.length === 0 ? (
                 <p className="mt-3 text-sm text-gray-500">
                   {t("stats.relatedEmpty")}
                 </p>
               ) : (
-                <ul className="mt-3 divide-y divide-indigo-100">
-                  {relatedEvents.map((e) => (
-                    <li key={e.id} className="py-2">
-                      <Link
-                        href={`/events/${e.id}`}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1 hover:bg-white"
-                      >
-                        <span className="font-mono text-sm font-semibold text-gray-900">
-                          {e.primary_ticker}
-                        </span>
-                        <span className="text-sm text-gray-700">
-                          {e.instrument_name}
-                        </span>
-                        <DirectionBadge direction={e.direction} />
-                        <span className="ml-auto text-xs text-gray-500">
-                          {new Date(e.published_at).toLocaleDateString(locale)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="mt-1 text-sm text-gray-700">
+                    {t("stats.relatedSummary", {
+                      n: relatedValues.length,
+                      mean: formatPct(relatedMean),
+                    })}
+                  </p>
+                  <ul className="mt-3 divide-y divide-indigo-100">
+                    {related.map((c) => {
+                      const positive = (c.abnormal_return ?? 0) >= 0;
+                      return (
+                        <li key={c.event_id} className="py-2">
+                          <Link
+                            href={`/events/${c.event_id}`}
+                            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1 hover:bg-white"
+                          >
+                            <span className="font-mono text-sm font-semibold text-gray-900">
+                              {c.primary_ticker}
+                            </span>
+                            <span className="text-sm text-gray-700">
+                              {c.instrument_name}
+                            </span>
+                            <DirectionBadge direction={c.direction} />
+                            <span className="ml-auto text-xs text-gray-500">
+                              {new Date(c.published_at).toLocaleDateString(locale)}
+                            </span>
+                            <span
+                              className={`w-20 text-right font-mono text-sm font-medium ${
+                                positive ? "text-emerald-600" : "text-red-600"
+                              }`}
+                              title={t("stats.relatedReturn")}
+                            >
+                              {formatPct(c.abnormal_return)}
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
               )}
             </div>
           )}

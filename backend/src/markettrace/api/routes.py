@@ -10,6 +10,7 @@ from markettrace.api.deps import get_db
 from markettrace.api.schemas import (
     BacktestResultOut,
     DocumentOut,
+    EventContributionOut,
     EventDetail,
     EventSummary,
     EventTypeSignificanceOut,
@@ -33,7 +34,10 @@ from markettrace.impact.backtest import (
 )
 from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
 from markettrace.impact.significance import compute_event_type_significance
-from markettrace.impact.statistics import compute_event_type_statistics
+from markettrace.impact.statistics import (
+    compute_event_type_statistics,
+    event_type_contributions,
+)
 
 # Standard event-study horizons (trading days) reported by the backtest.
 _BACKTEST_HORIZONS = (1, 5, 20, 60)
@@ -134,6 +138,19 @@ def get_event_type_stats(db: Session = Depends(get_db)) -> list[EventTypeStatOut
     """Mean and dispersion of abnormal returns per (event_type, horizon)."""
     stats = compute_event_type_statistics(db)
     return [EventTypeStatOut.model_validate(s) for s in stats]
+
+
+@router.get("/stats/event-types/contributions", response_model=list[EventContributionOut])
+def get_event_type_contributions(
+    db: Session = Depends(get_db),
+) -> list[EventContributionOut]:
+    """Per-event abnormal returns behind each (event_type, horizon) statistic.
+
+    The frontend filters these by (event_type, horizon_days) to reveal exactly
+    which events — and which returns — a given statistic's mean is computed from.
+    """
+    contributions = event_type_contributions(db)
+    return [EventContributionOut.model_validate(c) for c in contributions]
 
 
 @router.get("/stats/significance", response_model=list[EventTypeSignificanceOut])

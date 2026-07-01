@@ -86,6 +86,20 @@ class EventTypeStatOut(BaseModel):
     std_abnormal_return: float | None
 
 
+class EventContributionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: int
+    event_type: str
+    horizon_days: int
+    abnormal_return: float | None
+    direction: str
+    published_at: datetime
+    primary_ticker: str | None
+    instrument_name: str | None
+    market: str | None
+
+
 class EventTypeSignificanceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

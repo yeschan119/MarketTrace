@@ -85,9 +85,12 @@ const en: Dict = {
       mean: "Mean Abnormal Return",
       std: "Std Dev",
     },
-    relatedHint: "Select an event type to see the events this statistic is computed from.",
-    relatedTitle: "Underlying events",
+    relatedHint:
+      "Select a row to see the exact events its statistic is averaged over — each with its own abnormal return.",
+    relatedTitle: "Events behind {type} · D+{horizon}",
     relatedCount: "{n} events",
+    relatedSummary: "Mean of these {n} = {mean}",
+    relatedReturn: "Abnormal Return",
     relatedEmpty: "No matching events.",
     backtest: {
       title: "Walk-Forward Backtest",
@@ -349,9 +352,12 @@ const ko: Dict = {
       mean: "평균 초과수익률",
       std: "표준편차",
     },
-    relatedHint: "이벤트 유형을 선택하면 이 통계의 근거가 된 이벤트를 볼 수 있습니다.",
-    relatedTitle: "근거 이벤트",
+    relatedHint:
+      "행을 선택하면 그 통계가 평균 낸 실제 이벤트들을 각각의 초과수익률과 함께 볼 수 있습니다.",
+    relatedTitle: "{type} · D+{horizon} 의 근거 이벤트",
     relatedCount: "이벤트 {n}건",
+    relatedSummary: "이 {n}건의 평균 = {mean}",
+    relatedReturn: "초과수익률",
     relatedEmpty: "일치하는 이벤트가 없습니다.",
     backtest: {
       title: "워크포워드 백테스트",
