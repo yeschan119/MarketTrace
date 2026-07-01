@@ -52,6 +52,7 @@ def _event_summary(event: Event, document: Document) -> EventSummary:
         published_at=document.published_at,
         primary_ticker=instrument.ticker if instrument else None,
         instrument_name=instrument.name if instrument else None,
+        market=instrument.market if instrument else None,
     )
 
 

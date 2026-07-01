@@ -37,6 +37,7 @@ class EventSummary(BaseModel):
     published_at: datetime
     primary_ticker: str | None
     instrument_name: str | None
+    market: str | None
 
 
 class EventDetail(BaseModel):
