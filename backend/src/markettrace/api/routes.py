@@ -19,6 +19,7 @@ from markettrace.api.schemas import (
     MacroObservationOut,
     OutcomeOut,
 )
+from markettrace.config import get_settings
 from markettrace.db.models import (
     Document,
     Event,
@@ -26,7 +27,11 @@ from markettrace.db.models import (
     MacroObservation,
     Outcome,
 )
-from markettrace.impact.backtest import run_walk_forward_backtest
+from markettrace.impact.backtest import (
+    DEFAULT_MIN_TRAIN_PER_TYPE,
+    run_walk_forward_backtest,
+)
+from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
 from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import compute_event_type_statistics
 
@@ -141,10 +146,31 @@ def get_event_type_significance(
 
 
 @router.get("/stats/backtest", response_model=list[BacktestResultOut])
-def get_backtest(db: Session = Depends(get_db)) -> list[BacktestResultOut]:
+def get_backtest(
+    model: str = "event_type_history", db: Session = Depends(get_db)
+) -> list[BacktestResultOut]:
     """Walk-forward, look-ahead-blocked out-of-sample backtest per horizon:
-    hit rate, mean strategy return, and information coefficient."""
-    results = [run_walk_forward_backtest(db, horizon_days=h) for h in _BACKTEST_HORIZONS]
+    hit rate, gross and net-of-cost strategy return, and information coefficient.
+
+    ``?model=`` selects the signal: ``event_type_history`` (default, learns each
+    type's mean reaction) or ``llm_direction`` (trades the event's own direction).
+    """
+    if model not in SIGNAL_MODEL_NAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown model {model!r}; choose one of {list(SIGNAL_MODEL_NAMES)}",
+        )
+    settings = get_settings()
+    results = [
+        run_walk_forward_backtest(
+            db,
+            horizon_days=h,
+            commission_per_trade=settings.backtest_commission_per_trade,
+            slippage_per_trade=settings.backtest_slippage_per_trade,
+            model=make_signal_model(model, min_train=DEFAULT_MIN_TRAIN_PER_TYPE),
+        )
+        for h in _BACKTEST_HORIZONS
+    ]
     return [BacktestResultOut.model_validate(r) for r in results]
 
 

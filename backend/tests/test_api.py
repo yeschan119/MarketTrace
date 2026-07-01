@@ -288,3 +288,33 @@ def test_macro_observations_series_filter(client, ts_session):
     assert resp.status_code == 200
     data = resp.json()
     assert [r["series_id"] for r in data] == ["UNRATE"]
+
+
+def test_backtest_route_exposes_cost_and_coverage_fields(client: TestClient) -> None:
+    resp = client.get("/stats/backtest")
+    assert resp.status_code == 200
+    data = resp.json()
+    # One result per standard horizon.
+    assert [r["horizon_days"] for r in data] == [1, 5, 20, 60]
+    for row in data:
+        # Default model is the history model.
+        assert row["model"] == "event_type_history"
+        # Cost + net-of-cost fields (Phase 4 "거래 현실 반영") are surfaced.
+        assert "mean_strategy_return_net" in row
+        assert row["commission_per_trade"] >= 0.0
+        assert row["slippage_per_trade"] >= 0.0
+        # Coverage honesty: totals reconcile with dropped/usable split.
+        assert row["n_events_total"] == row["n_events"] + row["n_dropped_no_outcome"]
+
+
+def test_backtest_route_selects_direction_model(client: TestClient) -> None:
+    resp = client.get("/stats/backtest", params={"model": "llm_direction"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [r["horizon_days"] for r in data] == [1, 5, 20, 60]
+    assert all(r["model"] == "llm_direction" for r in data)
+
+
+def test_backtest_route_rejects_unknown_model(client: TestClient) -> None:
+    resp = client.get("/stats/backtest", params={"model": "bogus"})
+    assert resp.status_code == 400

@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # Local bank-account (passbook) PDFs used by the login-gated passbook view.
     passbook_dir: str = "passbook"
     passbook_password: str | None = None
+    # Round-trip trading frictions applied by the walk-forward backtest, in return
+    # units per position (0.001 = 10 bps). A signal is only worth trading if its
+    # out-of-sample return survives these; defaults are conservative retail-ish.
+    backtest_commission_per_trade: float = 0.0005
+    backtest_slippage_per_trade: float = 0.0005
 
     @field_validator("database_url")
     @classmethod

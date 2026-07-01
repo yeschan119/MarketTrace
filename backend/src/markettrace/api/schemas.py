@@ -102,13 +102,19 @@ class EventTypeSignificanceOut(BaseModel):
 class BacktestResultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    model: str
     horizon_days: int
     min_train_per_type: int
+    n_events_total: int
+    n_dropped_no_outcome: int
     n_events: int
     n_predictions: int
     hit_rate: float | None
     mean_strategy_return: float | None
+    mean_strategy_return_net: float | None
     information_coefficient: float | None
+    commission_per_trade: float
+    slippage_per_trade: float
 
 
 class MacroObservationOut(BaseModel):

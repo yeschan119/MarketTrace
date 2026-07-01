@@ -15,6 +15,7 @@ from markettrace.impact.backtest import (
     run_walk_forward_backtest,
     walk_forward_backtest,
 )
+from markettrace.impact.signal import DirectionSignal
 
 
 def _ev(day: int, event_type: str, ar: float | None) -> BacktestEvent:
@@ -22,6 +23,15 @@ def _ev(day: int, event_type: str, ar: float | None) -> BacktestEvent:
         occurred_at=datetime(2026, 1, day, tzinfo=UTC),
         event_type=event_type,
         abnormal_return=ar,
+    )
+
+
+def _dir_ev(day: int, direction: str, ar: float | None) -> BacktestEvent:
+    return BacktestEvent(
+        occurred_at=datetime(2026, 1, day, tzinfo=UTC),
+        event_type="x",
+        abnormal_return=ar,
+        direction=direction,
     )
 
 
@@ -118,7 +128,131 @@ def test_empty_input() -> None:
     assert result.n_predictions == 0
     assert result.hit_rate is None
     assert result.mean_strategy_return is None
+    assert result.mean_strategy_return_net is None
     assert result.information_coefficient is None
+
+
+# ---------------------------------------------------------------------------
+# Trading costs (commission + slippage) — mean_strategy_return_net
+# ---------------------------------------------------------------------------
+
+
+def test_net_equals_gross_when_costs_are_zero() -> None:
+    events = [_ev(d, "earnings", 0.02) for d in range(1, 8)]
+    result = walk_forward_backtest(events, horizon_days=5, min_train_per_type=3)
+    assert result.commission_per_trade == 0.0
+    assert result.slippage_per_trade == 0.0
+    assert result.mean_strategy_return_net == result.mean_strategy_return
+
+
+def test_costs_reduce_net_by_round_trip_on_every_entered_position() -> None:
+    # 4 predictions, all entered (sign != 0). Round-trip cost = 0.001 + 0.0005.
+    events = [_ev(d, "earnings", 0.02) for d in range(1, 8)]
+    result = walk_forward_backtest(
+        events,
+        horizon_days=5,
+        min_train_per_type=3,
+        commission_per_trade=0.001,
+        slippage_per_trade=0.0005,
+    )
+    assert result.n_predictions == 4
+    assert result.mean_strategy_return == pytest.approx(0.02)
+    # Every one of the 4 predictions is a +ve position -> full round-trip cost each.
+    assert result.mean_strategy_return_net == pytest.approx(0.02 - 0.0015)
+
+
+def test_flat_signal_positions_pay_no_cost() -> None:
+    # A type whose prior mean is exactly 0 -> predicted sign 0 -> no position, no cost.
+    events = [_ev(1, "x", 0.02), _ev(2, "x", -0.02), _ev(3, "x", 0.03), _ev(4, "x", -0.03)]
+    result = walk_forward_backtest(
+        events,
+        horizon_days=1,
+        min_train_per_type=2,
+        commission_per_trade=0.01,
+        slippage_per_trade=0.01,
+    )
+    # Predictions for events 3 and 4. Event 3 prior mean = (0.02-0.02)/2 = 0 -> flat.
+    # Event 4 prior mean = (0.02-0.02+0.03)/3 > 0 -> entered, pays cost.
+    assert result.n_predictions == 2
+    # Only one position entered -> net = gross - (1/2)*round_trip_cost.
+    round_trip = 0.02
+    assert result.mean_strategy_return_net == pytest.approx(
+        result.mean_strategy_return - round_trip / 2
+    )
+
+
+# ---------------------------------------------------------------------------
+# Coverage honesty — delisted/halted events (missing outcome) are counted
+# ---------------------------------------------------------------------------
+
+
+def test_missing_outcomes_are_counted_not_hidden() -> None:
+    # Two of five events have no realised return (e.g. delisted/halted over horizon).
+    events = [
+        _ev(1, "x", 0.02),
+        _ev(2, "x", None),
+        _ev(3, "x", 0.02),
+        _ev(4, "x", None),
+        _ev(5, "x", 0.02),
+    ]
+    result = walk_forward_backtest(events, horizon_days=1, min_train_per_type=2)
+    assert result.n_events_total == 5
+    assert result.n_dropped_no_outcome == 2
+    assert result.n_events == 3
+    assert result.n_events_total == result.n_events + result.n_dropped_no_outcome
+
+
+def test_no_missing_outcomes_reports_zero_dropped() -> None:
+    events = [_ev(d, "x", 0.01 * d) for d in range(1, 5)]
+    result = walk_forward_backtest(events, horizon_days=1, min_train_per_type=2)
+    assert result.n_dropped_no_outcome == 0
+    assert result.n_events_total == result.n_events == 4
+
+
+# ---------------------------------------------------------------------------
+# Model selection & the DirectionSignal (LLM direction as a t=0 signal)
+# ---------------------------------------------------------------------------
+
+
+def test_default_model_is_event_type_history() -> None:
+    result = walk_forward_backtest([_ev(1, "x", 0.02)], horizon_days=1)
+    assert result.model == "event_type_history"
+
+
+def test_direction_signal_scores_from_t0_with_no_training() -> None:
+    events = [
+        _dir_ev(1, "positive", 0.03),   # long, +ve realised -> hit, +0.03
+        _dir_ev(2, "positive", -0.02),  # long, -ve realised -> miss, -0.02
+        _dir_ev(3, "negative", -0.04),  # short, -ve realised -> hit, +0.04
+        _dir_ev(4, "neutral", 0.10),    # flat -> no position, contributes 0
+    ]
+    result = walk_forward_backtest(events, horizon_days=1, model=DirectionSignal())
+    assert result.model == "llm_direction"
+    # Every event yields a call from day 1 (no training gate).
+    assert result.n_predictions == 4
+    # Neutral is excluded from directional hit rate; 2 of the 3 directional hit.
+    assert result.hit_rate == pytest.approx(2 / 3)
+    # (0.03 - 0.02 + 0.04 + 0) / 4
+    assert result.mean_strategy_return == pytest.approx(0.0125)
+
+
+def test_direction_signal_costs_only_hit_entered_positions() -> None:
+    events = [
+        _dir_ev(1, "positive", 0.03),
+        _dir_ev(2, "neutral", 0.10),  # flat -> pays no cost
+    ]
+    result = walk_forward_backtest(
+        events,
+        horizon_days=1,
+        model=DirectionSignal(),
+        commission_per_trade=0.001,
+        slippage_per_trade=0.001,
+    )
+    # 2 predictions, only 1 entered (the positive). Round-trip cost = 0.002.
+    assert result.n_predictions == 2
+    # gross = (0.03 + 0) / 2 = 0.015 ; net = (0.03 - 0.002 + 0) / 2
+    assert result.mean_strategy_return == pytest.approx(0.015)
+    assert result.mean_strategy_return_net == pytest.approx((0.03 - 0.002) / 2)
 
 
 # ---------------------------------------------------------------------------
