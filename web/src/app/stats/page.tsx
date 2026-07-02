@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import type {
   EventTypeStat,
@@ -23,8 +24,37 @@ function formatIc(v: number | null): string {
   return v.toFixed(2);
 }
 
+// The stats API returns one row per (event_type, horizon). We show fixed
+// horizons as columns so each event type is a single, non-repeating row.
+const HORIZONS = [1, 5, 20, 60] as const;
+
+type TypeGroup = {
+  event_type: string;
+  total: number;
+  cells: Map<number, EventTypeStat>;
+};
+
+// Collapse the flat (event_type × horizon) rows into one row per event type,
+// then order by sample count so types with real evidence lead and n=1 noise
+// sinks. This is what kills the "same thing over and over" feeling.
+function groupByType(stats: EventTypeStat[]): TypeGroup[] {
+  const byType = new Map<string, TypeGroup>();
+  for (const s of stats) {
+    let g = byType.get(s.event_type);
+    if (!g) {
+      g = { event_type: s.event_type, total: 0, cells: new Map() };
+      byType.set(s.event_type, g);
+    }
+    g.cells.set(s.horizon_days, s);
+    g.total += s.count;
+  }
+  return [...byType.values()].sort(
+    (a, b) => b.total - a.total || a.event_type.localeCompare(b.event_type)
+  );
+}
+
 export default function StatsPage() {
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   // A statistic is one (event_type, horizon) row; select that exact bucket.
   const [selected, setSelected] = useState<{
     type: string;
@@ -84,6 +114,15 @@ export default function StatsPage() {
     ? relatedValues.reduce((sum, v) => sum + v, 0) / relatedValues.length
     : null;
 
+  const groups = groupByType(stats);
+  const selectedInfo = selected ? describeEventType(selected.type, lang) : null;
+  const toggleCell = (type: string, horizon: number) =>
+    setSelected((prev) =>
+      prev?.type === type && prev?.horizon === horizon
+        ? null
+        : { type, horizon }
+    );
+
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
@@ -100,80 +139,134 @@ export default function StatsPage() {
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-500">{t("stats.relatedHint")}</p>
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">
+              {t("stats.howToRead")}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-600">
+              {t("stats.howToReadBody")}
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-3">{t("stats.th.eventType")}</th>
-                  <th className="px-4 py-3">{t("stats.th.horizon")}</th>
-                  <th className="px-4 py-3 text-right">{t("stats.th.samples")}</th>
-                  <th className="px-4 py-3 text-right">{t("stats.th.mean")}</th>
-                  <th className="px-4 py-3 text-right">{t("stats.th.std")}</th>
+                <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
+                    {t("stats.th.eventType")}
+                  </th>
+                  <th rowSpan={2} className="px-4 py-3 text-right align-bottom">
+                    {t("stats.th.total")}
+                  </th>
+                  <th
+                    colSpan={HORIZONS.length}
+                    className="border-b border-gray-100 px-4 py-2 text-center font-medium normal-case tracking-normal text-gray-400"
+                  >
+                    {t("stats.th.horizonGroup")}
+                  </th>
+                </tr>
+                <tr className="border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {HORIZONS.map((h) => (
+                    <th key={h} className="px-3 py-2 text-right font-mono">
+                      D+{h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {stats.map((s) => {
-                  const positive = (s.mean_abnormal_return ?? 0) >= 0;
-                  const active =
-                    selected?.type === s.event_type &&
-                    selected?.horizon === s.horizon_days;
+                {groups.map((g) => {
+                  const info = describeEventType(g.event_type, lang);
                   return (
-                    <tr
-                      key={`${s.event_type}-${s.horizon_days}`}
-                      className={`border-b border-gray-100 last:border-0 ${
-                        active ? "bg-indigo-50" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelected(
+                  <tr
+                    key={g.event_type}
+                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
+                  >
+                    <td className="px-4 py-2" title={info.desc || undefined}>
+                      <span className="block font-medium text-gray-900">
+                        {info.label}
+                      </span>
+                      {info.desc && (
+                        <span className="block text-xs text-gray-500">
+                          {info.desc}
+                        </span>
+                      )}
+                      <span className="block font-mono text-[10px] text-gray-400">
+                        {g.event_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right text-gray-500">
+                      {g.total}
+                    </td>
+                    {HORIZONS.map((h) => {
+                      const cell = g.cells.get(h);
+                      const value = cell?.mean_abnormal_return ?? null;
+                      const hasData =
+                        cell != null && cell.count > 0 && value != null;
+                      const active =
+                        selected?.type === g.event_type &&
+                        selected?.horizon === h;
+                      if (!hasData) {
+                        return (
+                          <td
+                            key={h}
+                            className="px-3 py-2 text-right font-mono text-gray-300"
+                            title={t("stats.noData")}
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      const positive = value >= 0;
+                      return (
+                        <td key={h} className="p-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => toggleCell(g.event_type, h)}
+                            aria-pressed={active}
+                            title={`${t("stats.th.std")}: ${formatPct(
+                              cell.std_abnormal_return
+                            )}`}
+                            className={`w-full rounded px-2 py-1.5 text-right font-mono transition-colors ${
                               active
-                                ? null
-                                : { type: s.event_type, horizon: s.horizon_days }
-                            )
-                          }
-                          aria-pressed={active}
-                          className={`w-full rounded px-3 py-2 text-left font-medium transition-colors ${
-                            active
-                              ? "text-indigo-700"
-                              : "text-gray-900 hover:text-indigo-600"
-                          }`}
-                        >
-                          {s.event_type}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-gray-600">
-                        D+{s.horizon_days}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600">
-                        {s.count}
-                      </td>
-                      <td
-                        className={`px-4 py-3 text-right font-mono font-medium ${
-                          positive ? "text-emerald-600" : "text-red-600"
-                        }`}
-                      >
-                        {formatPct(s.mean_abnormal_return)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-500">
-                        {formatPct(s.std_abnormal_return)}
-                      </td>
-                    </tr>
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "hover:bg-indigo-50"
+                            }`}
+                          >
+                            <span
+                              className={`block font-medium ${
+                                active
+                                  ? "text-white"
+                                  : positive
+                                    ? "text-emerald-600"
+                                    : "text-red-600"
+                              }`}
+                            >
+                              {formatPct(value)}
+                            </span>
+                            <span
+                              className={`block text-[10px] ${
+                                active ? "text-indigo-100" : "text-gray-400"
+                              }`}
+                            >
+                              n={cell.count}
+                            </span>
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          <p className="text-xs text-gray-500">{t("stats.relatedHint")}</p>
 
           {selected && (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-semibold text-gray-900">
                   {t("stats.relatedTitle", {
-                    type: selected.type,
+                    type: selectedInfo?.label ?? selected.type,
                     horizon: selected.horizon,
                   })}
                 </h2>
@@ -181,6 +274,10 @@ export default function StatsPage() {
                   {t("stats.relatedCount", { n: related.length })}
                 </span>
               </div>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {selectedInfo?.desc ? `${selectedInfo.desc} · ` : ""}
+                <span className="font-mono">{selected.type}</span>
+              </p>
 
               {related.length === 0 ? (
                 <p className="mt-3 text-sm text-gray-500">

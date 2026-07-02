@@ -5,10 +5,11 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 
 export default function InstrumentTimelinePage() {
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   const params = useParams();
   const id = params.id as string;
 
@@ -87,7 +88,9 @@ export default function InstrumentTimelinePage() {
             {/* Timeline line */}
             <div className="absolute left-2 top-2 h-full w-0.5 bg-gray-200" />
 
-            {events.map((event) => (
+            {events.map((event) => {
+              const info = describeEventType(event.event_type, lang);
+              return (
               <div key={event.id} className="relative">
                 {/* Dot */}
                 <div
@@ -107,6 +110,12 @@ export default function InstrumentTimelinePage() {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-medium text-gray-900">
+                        {info.label}
+                      </p>
+                      {info.desc && (
+                        <p className="text-xs text-gray-500">{info.desc}</p>
+                      )}
+                      <p className="font-mono text-[10px] text-gray-400">
                         {event.event_type}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500">
@@ -126,7 +135,8 @@ export default function InstrumentTimelinePage() {
                   </div>
                 </Link>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

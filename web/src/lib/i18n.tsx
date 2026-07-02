@@ -78,15 +78,21 @@ const en: Dict = {
     subtitle:
       "Mean and dispersion of market-adjusted abnormal returns, grouped by event type and post-announcement horizon (trading days).",
     empty: "No statistics yet — ingest some events first.",
+    howToRead: "How to read this",
+    howToReadBody:
+      "Each row is one event type. Each cell is the average move of the stock, relative to the market, over the N trading days after that type of filing — green is up, red is down, and n is how many filings it averages. Click a cell to see the actual filings behind that number.",
     th: {
       eventType: "Event Type",
       horizon: "Horizon",
       samples: "Samples",
+      total: "Samples",
+      horizonGroup: "Trading days after filing",
       mean: "Mean Abnormal Return",
       std: "Std Dev",
     },
+    noData: "no data",
     relatedHint:
-      "Select a row to see the exact events its statistic is averaged over — each with its own abnormal return.",
+      "Select a cell to see the exact filings its average is computed over — each with its own abnormal return.",
     relatedTitle: "Events behind {type} · D+{horizon}",
     relatedCount: "{n} events",
     relatedSummary: "Mean of these {n} = {mean}",
@@ -345,15 +351,21 @@ const ko: Dict = {
     subtitle:
       "이벤트 유형과 공시 후 기간(거래일)별로 묶은 시장조정 초과수익률의 평균과 분산.",
     empty: "아직 통계가 없습니다 — 먼저 이벤트를 수집하세요.",
+    howToRead: "읽는 법",
+    howToReadBody:
+      "한 줄이 한 이벤트 유형입니다. 각 칸은 그 유형의 공시가 나온 뒤 N거래일 동안 주가가 시장 대비 평균 몇 % 움직였는지를 뜻합니다 — 초록은 상승, 빨강은 하락, n은 평균에 들어간 공시 건수입니다. 칸을 누르면 그 숫자의 근거가 된 실제 공시들이 펼쳐집니다.",
     th: {
       eventType: "이벤트 유형",
       horizon: "기간",
       samples: "표본 수",
+      total: "표본",
+      horizonGroup: "공시 후 기간(거래일)",
       mean: "평균 초과수익률",
       std: "표준편차",
     },
+    noData: "데이터 없음",
     relatedHint:
-      "행을 선택하면 그 통계가 평균 낸 실제 이벤트들을 각각의 초과수익률과 함께 볼 수 있습니다.",
+      "칸을 선택하면 그 평균에 들어간 실제 공시들을 각각의 초과수익률과 함께 볼 수 있습니다.",
     relatedTitle: "{type} · D+{horizon} 의 근거 이벤트",
     relatedCount: "이벤트 {n}건",
     relatedSummary: "이 {n}건의 평균 = {mean}",

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import type { EventSummary } from "@/types/api";
 
@@ -17,7 +18,7 @@ interface CompanyGroup {
 }
 
 export default function EventsPage() {
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["events"],
     queryFn: () => api.listEvents(),
@@ -186,7 +187,9 @@ export default function EventsPage() {
 
                 {isOpen && (
                   <div className="divide-y divide-gray-100 border-t border-gray-200">
-                    {group.events.map((event) => (
+                    {group.events.map((event) => {
+                      const info = describeEventType(event.event_type, lang);
+                      return (
                       <div
                         key={event.id}
                         className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-gray-50"
@@ -194,9 +197,20 @@ export default function EventsPage() {
                         <div className="flex min-w-0 items-center gap-3">
                           <Link
                             href={`/events/${event.id}`}
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                            className="min-w-0"
+                            title={info.desc || undefined}
                           >
-                            {event.event_type}
+                            <span className="block text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">
+                              {info.label}
+                            </span>
+                            {info.desc && (
+                              <span className="block text-xs text-gray-500">
+                                {info.desc}
+                              </span>
+                            )}
+                            <span className="block font-mono text-[10px] text-gray-400">
+                              {event.event_type}
+                            </span>
                           </Link>
                           <DirectionBadge direction={event.direction} />
                         </div>
@@ -217,7 +231,8 @@ export default function EventsPage() {
                           </Link>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

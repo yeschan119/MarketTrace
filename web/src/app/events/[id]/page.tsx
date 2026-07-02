@@ -5,12 +5,13 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { AbnormalReturnChart } from "@/components/AbnormalReturnChart";
 import { ScoreBars } from "@/components/ScoreBars";
 
 export default function EventDetailPage() {
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   const params = useParams();
   const id = params.id as string;
 
@@ -43,6 +44,8 @@ export default function EventDetailPage() {
     return null;
   }
 
+  const typeInfo = describeEventType(event.event_type, lang);
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -64,8 +67,17 @@ export default function EventDetailPage() {
               </h1>
               <DirectionBadge direction={event.direction} />
             </div>
-            <p className="mt-1 text-sm text-gray-500">
-              {event.event_type} &middot;{" "}
+            <p className="mt-1 text-base font-medium text-gray-900">
+              {typeInfo.label}
+            </p>
+            {typeInfo.desc && (
+              <p className="text-sm text-gray-500">{typeInfo.desc}</p>
+            )}
+            <p className="mt-0.5 text-sm text-gray-500">
+              <span className="font-mono text-xs text-gray-400">
+                {event.event_type}
+              </span>{" "}
+              &middot;{" "}
               {new Date(event.document.published_at).toLocaleDateString(locale, {
                 year: "numeric",
                 month: "long",
