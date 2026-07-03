@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from markettrace.api.deps import get_db
 from markettrace.api.schemas import (
     BacktestResultOut,
+    CalibrationReportOut,
     DocumentOut,
     EventContributionOut,
     EventDetail,
@@ -34,6 +35,7 @@ from markettrace.impact.backtest import (
     run_macro_decomposition,
     run_walk_forward_backtest,
 )
+from markettrace.impact.calibration import compute_confidence_calibration
 from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
 from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import (
@@ -213,6 +215,18 @@ def get_macro_decomposition(
         slippage_per_trade=settings.backtest_slippage_per_trade,
     )
     return [MacroSeriesBacktestOut.model_validate(r) for r in results]
+
+
+@router.get("/stats/calibration", response_model=list[CalibrationReportOut])
+def get_calibration(db: Session = Depends(get_db)) -> list[CalibrationReportOut]:
+    """Reliability of the LLM ``confidence`` as a directional-hit probability, per horizon.
+
+    For each horizon, bins directional predictions by their stated confidence and
+    compares the mean confidence in each bin to the observed hit rate, plus a
+    sample-weighted Expected Calibration Error and Brier score. Answers the
+    blueprint §8 bar: does a confidence of 0.7 actually hit ~70%?"""
+    reports = compute_confidence_calibration(db, horizons=_BACKTEST_HORIZONS)
+    return [CalibrationReportOut.model_validate(r) for r in reports]
 
 
 @router.get("/macro/observations", response_model=list[MacroObservationOut])

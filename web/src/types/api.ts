@@ -85,6 +85,29 @@ export interface MacroSeriesBacktest {
   information_coefficient: number | null;
 }
 
+export interface CalibrationBin {
+  lower: number;
+  upper: number;
+  count: number;
+  mean_confidence: number | null;
+  hit_rate: number | null;
+  gap: number | null;
+}
+
+export interface CalibrationReport {
+  horizon_days: number;
+  n_bins: number;
+  n_events_total: number;
+  n_dropped_neutral: number;
+  n_dropped_no_outcome: number;
+  n_predictions: number;
+  mean_confidence: number | null;
+  hit_rate: number | null;
+  expected_calibration_error: number | null;
+  brier_score: number | null;
+  bins: CalibrationBin[];
+}
+
 export interface MacroObservation {
   series_id: string;
   reference_date: string;

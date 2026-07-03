@@ -143,6 +143,33 @@ class MacroSeriesBacktestOut(BaseModel):
     information_coefficient: float | None
 
 
+class CalibrationBinOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    lower: float
+    upper: float
+    count: int
+    mean_confidence: float | None
+    hit_rate: float | None
+    gap: float | None
+
+
+class CalibrationReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    horizon_days: int
+    n_bins: int
+    n_events_total: int
+    n_dropped_neutral: int
+    n_dropped_no_outcome: int
+    n_predictions: int
+    mean_confidence: float | None
+    hit_rate: float | None
+    expected_calibration_error: float | None
+    brier_score: float | None
+    bins: list[CalibrationBinOut]
+
+
 class MacroObservationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

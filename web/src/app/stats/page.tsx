@@ -14,6 +14,7 @@ import type {
   BacktestResult,
   BacktestModel,
   MacroSeriesBacktest,
+  CalibrationReport,
 } from "@/types/api";
 
 // Friendly labels for the deployed FRED macro series (raw id shown alongside).
@@ -380,6 +381,7 @@ export default function StatsPage() {
       )}
 
       <BacktestSection model={model} setModel={setModel} />
+      <CalibrationSection />
       <MacroDecompositionSection />
     </div>
   );
@@ -650,6 +652,180 @@ function BacktestSection({
             </tbody>
           </table>
         </div>
+      )}
+    </section>
+  );
+}
+
+// Confidence calibration: does a stated confidence of 0.7 actually hit ~70%? Bins
+// the LLM's directional calls by confidence and plots observed hit rate against it,
+// per horizon — the blueprint §8 bar that must be met before confidence can be
+// trusted to weight or combine signals.
+function CalibrationSection() {
+  const { t } = useI18n();
+  const [horizon, setHorizon] = useState<number>(5);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["calibration"],
+    queryFn: () => api.getCalibration(),
+  });
+
+  const reports: CalibrationReport[] = data ?? [];
+  const horizons = reports.length
+    ? reports.map((r) => r.horizon_days)
+    : [...HORIZONS];
+  const report = reports.find((r) => r.horizon_days === horizon) ?? null;
+  const filledBins = report ? report.bins.filter((b) => b.count > 0) : [];
+
+  // Verdict from the overall confidence-vs-accuracy gap (in fraction units).
+  let verdict: string | null = null;
+  if (report && report.mean_confidence != null && report.hit_rate != null) {
+    const gap = report.mean_confidence - report.hit_rate;
+    verdict =
+      Math.abs(gap) < 0.05
+        ? t("stats.calibration.verdict.good")
+        : gap > 0
+          ? t("stats.calibration.verdict.over")
+          : t("stats.calibration.verdict.under");
+  }
+
+  return (
+    <section className="space-y-4 pt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">
+            {t("stats.calibration.title")}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {t("stats.calibration.subtitle")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">
+            {t("stats.calibration.horizonLabel")}
+          </span>
+          <div
+            role="group"
+            aria-label={t("stats.calibration.horizonLabel")}
+            className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 text-xs font-medium"
+          >
+            {horizons.map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => setHorizon(h)}
+                aria-pressed={horizon === h}
+                className={`rounded px-2.5 py-1 font-mono transition-colors ${
+                  horizon === h
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                D+{h}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+          {t("stats.calibration.loading")}
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
+          <p className="font-semibold">{t("stats.calibration.failTitle")}</p>
+        </div>
+      ) : !report || report.n_predictions === 0 ? (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+          {t("stats.calibration.empty")}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4">
+            <p className="text-sm text-gray-700">
+              {t("stats.calibration.summary", {
+                n: report.n_predictions,
+                conf: formatPct(report.mean_confidence),
+                hit: formatPct(report.hit_rate),
+              })}
+            </p>
+            <div className="ml-auto flex gap-5 font-mono text-sm">
+              <span className="text-gray-600">
+                <span className="mr-1 text-[10px] font-sans uppercase tracking-wide text-gray-400">
+                  {t("stats.calibration.ece")}
+                </span>
+                {formatPct(report.expected_calibration_error)}
+              </span>
+              <span className="text-gray-600">
+                <span className="mr-1 text-[10px] font-sans uppercase tracking-wide text-gray-400">
+                  {t("stats.calibration.brier")}
+                </span>
+                {formatIc(report.brier_score)}
+              </span>
+            </div>
+          </div>
+          {verdict && (
+            <p className="text-xs font-medium text-indigo-700">{verdict}</p>
+          )}
+
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">
+                    {t("stats.calibration.th.band")}
+                  </th>
+                  <th className="px-4 py-3 text-right">
+                    {t("stats.calibration.th.n")}
+                  </th>
+                  <th className="px-4 py-3 text-right">
+                    {t("stats.calibration.th.meanConf")}
+                  </th>
+                  <th className="px-4 py-3 text-right">
+                    {t("stats.calibration.th.hitRate")}
+                  </th>
+                  <th className="px-4 py-3 text-right">
+                    {t("stats.calibration.th.gap")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filledBins.map((b) => {
+                  const overconfident = (b.gap ?? 0) > 0;
+                  return (
+                    <tr
+                      key={b.lower}
+                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-2.5 font-mono text-gray-600">
+                        {(b.lower * 100).toFixed(0)}–{(b.upper * 100).toFixed(0)}%
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-600">
+                        {b.count}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono text-gray-600">
+                        {formatPct(b.mean_confidence)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono text-gray-600">
+                        {formatPct(b.hit_rate)}
+                      </td>
+                      <td
+                        className={`px-4 py-2.5 text-right font-mono font-medium ${
+                          overconfident ? "text-amber-600" : "text-emerald-600"
+                        }`}
+                      >
+                        {formatPct(b.gap)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs leading-relaxed text-gray-500">
+            {t("stats.calibration.readHint")}
+          </p>
+        </>
       )}
     </section>
   );

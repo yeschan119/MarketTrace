@@ -18,6 +18,7 @@ import type {
   PassbookStatementSummary,
   MacroObservation,
   MacroSeriesBacktest,
+  CalibrationReport,
   HealthResponse,
 } from "@/types/api";
 
@@ -154,6 +155,10 @@ export const api = {
 
   getMacroDecomposition(): Promise<MacroSeriesBacktest[]> {
     return apiFetch<MacroSeriesBacktest[]>("/stats/macro-decomposition");
+  },
+
+  getCalibration(): Promise<CalibrationReport[]> {
+    return apiFetch<CalibrationReport[]>("/stats/calibration");
   },
 
   getMacroObservations(): Promise<MacroObservation[]> {

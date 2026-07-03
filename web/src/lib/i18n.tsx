@@ -158,6 +158,33 @@ const en: Dict = {
       readHint:
         "Each cell is the out-of-sample information coefficient (predicted vs realised correlation) of conditioning on that series' surprise sign; hover for net-of-cost return and sample size. Green = positive predictive correlation.",
     },
+    calibration: {
+      title: "Confidence Calibration",
+      subtitle:
+        "Does a confidence of 0.7 actually hit ~70%? Directional calls binned by their stated confidence, per horizon, with the observed hit rate against the model's confidence.",
+      horizonLabel: "Horizon",
+      loading: "Loading calibration...",
+      failTitle: "Failed to load calibration",
+      empty: "Not enough directional predictions to calibrate yet.",
+      summary:
+        "{n} directional predictions · mean confidence {conf} vs actual hit rate {hit}",
+      ece: "Calibration error (ECE)",
+      brier: "Brier score",
+      verdict: {
+        over: "Overconfident — stated confidence runs ahead of actual accuracy.",
+        under: "Underconfident — actual accuracy beats stated confidence.",
+        good: "Well calibrated — stated confidence tracks actual accuracy.",
+      },
+      th: {
+        band: "Confidence band",
+        n: "n",
+        meanConf: "Mean confidence",
+        hitRate: "Actual hit rate",
+        gap: "Gap",
+      },
+      readHint:
+        "Gap = mean confidence − actual hit rate. Positive (amber) = overconfident in that band; negative (green) = underconfident. Neutral calls and events with no realised return are excluded. ECE is the sample-weighted average gap; Brier is the mean squared error of confidence vs outcome (lower is better).",
+    },
   },
   eventDetail: {
     loading: "Loading event...",
@@ -467,6 +494,33 @@ const ko: Dict = {
       },
       readHint:
         "각 칸은 해당 시리즈의 surprise 부호로 조건화했을 때의 표본외 정보계수(IC=예측과 실제의 상관)입니다. 마우스를 올리면 거래비용 반영 순수익·표본수가 보입니다. 초록 = 양(+)의 예측상관.",
+    },
+    calibration: {
+      title: "신뢰도 캘리브레이션",
+      subtitle:
+        "신뢰도 0.7 예측이 실제로 ~70% 맞을까? 방향 예측을 신뢰도 구간별로 묶어, 지평별로 실제 적중률과 모델이 말한 신뢰도를 비교합니다.",
+      horizonLabel: "지평",
+      loading: "캘리브레이션 불러오는 중...",
+      failTitle: "캘리브레이션을 불러오지 못했습니다",
+      empty: "캘리브레이션할 방향 예측이 아직 충분하지 않습니다.",
+      summary:
+        "방향 예측 {n}건 · 평균 신뢰도 {conf} vs 실제 적중률 {hit}",
+      ece: "캘리브레이션 오차(ECE)",
+      brier: "Brier 점수",
+      verdict: {
+        over: "과신 — 말한 신뢰도가 실제 정확도보다 높습니다.",
+        under: "과소신뢰 — 실제 정확도가 말한 신뢰도보다 높습니다.",
+        good: "잘 보정됨 — 말한 신뢰도가 실제 정확도를 잘 따라갑니다.",
+      },
+      th: {
+        band: "신뢰도 구간",
+        n: "n",
+        meanConf: "평균 신뢰도",
+        hitRate: "실제 적중률",
+        gap: "격차",
+      },
+      readHint:
+        "격차 = 평균 신뢰도 − 실제 적중률. 양수(주황) = 그 구간에서 과신, 음수(초록) = 과소신뢰. 중립(neutral) 예측과 실현수익이 없는 이벤트는 제외됩니다. ECE는 표본가중 평균 격차, Brier는 신뢰도와 결과의 평균제곱오차(낮을수록 좋음)입니다.",
     },
   },
   eventDetail: {
