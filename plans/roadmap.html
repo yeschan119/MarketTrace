@@ -103,7 +103,7 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 396 tests · ruff clean</span>
+      <span class="pill">✅ 413 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
       <span class="pill">🧭 방향 A: 측정·검증 우선</span>
       <span class="pill">✅ 코퍼스 461건 (KR 253 · US 208)</span>
@@ -126,8 +126,8 @@
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">65%</div><div class="bar"><i style="width:65%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">60%</div><div class="bar"><i style="width:60%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">45%</div><div class="bar"><i style="width:45%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">72%</div><div class="bar"><i style="width:72%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">52%</div><div class="bar"><i style="width:52%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -141,7 +141,7 @@
     <div class="node n-done">사건 추출<small>LLM tool-use</small></div>
     <div class="node n-todo">Feature Store<small>미구현</small></div>
     <div class="node n-done">영향 분석<small>이상수익률 1/5/20/60·섹터·통계·거시 surprise</small></div>
-    <div class="node n-partial">신호·검증<small>유의 9버킷·백테스트 5d 순+2.1%(가동)</small></div>
+    <div class="node n-partial">신호·검증<small>5모델 백테스트·유의게이트 5d +4.4%·거시=프록시 판명</small></div>
     <div class="node n-done">API·대시보드<small>FastAPI + Next.js</small></div>
     <div class="node n-todo">사후 성과 측정<small>미구현</small></div>
   </div>
@@ -253,37 +253,38 @@
   <!-- PHASE 4 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~60%</span></div>
-      <div class="pbar a"><i style="width:60%"></i></div><div class="pct-lbl" style="color:var(--amber)">60%</div>
+      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~72%</span></div>
+      <div class="pbar a"><i style="width:72%"></i></div><div class="pct-lbl" style="color:var(--amber)">72%</div>
     </div>
-    <p class="sub" style="margin:10px 0 0"><b>방향 A(2026-06-17 채택) — 검증 통과(2026-07-03).</b> 코퍼스 461건으로 검정력 확보 → "데이터 부족" 블로커 해소. 검증 엔진이 <b>유의 사건유형과 양(+)의 표본외 백테스트</b>를 실제로 산출.</p>
+    <p class="sub" style="margin:10px 0 0"><b>방향 A — 검증 통과(2026-07-03).</b> 코퍼스 461건으로 검정력 확보 → "데이터 부족" 블로커 해소. <b>5개 신호모델을 look-ahead 차단 워크포워드로 비교</b>, 무엇이 실제로 통하고 무엇이 프록시인지까지 판별.</p>
     <div class="cols">
-      <div><div class="coltitle">완료 (검증 통과)</div>
+      <div><div class="coltitle">완료 (검증·모델 패밀리)</div>
         <ul class="items">
-          <li class="ok"><b>코퍼스 완주 461건</b> — KR 253 · US 208 (Tiingo 쿼터 리셋 후 markettrace-ingest 재실행으로 완료)</li>
-          <li class="ok"><b>유의 사건유형 9버킷</b> — insider_trading 5d <b>−6.6%</b>(t=−5.8), regulatory 5d −3.8%, earnings 5d −1.8%, debt_offering 20d −4.3% 등 <b>전부 음(−) 드리프트</b>. <span class="commit">GET /stats/significance</span></li>
-          <li class="ok"><b>워크포워드 백테스트 양(+)</b> — event_type_history 5d 적중 <b>64.5%</b>·순수익 <b>+2.1%</b>·IC 0.12(거래비용 반영). <span class="commit">GET /stats/backtest</span></li>
-          <li class="ok"><b>모델 비교</b> — llm_direction(LLM 방향 신호)은 적중&lt;50%·순손실 → <b>사건유형 과거통계가 LLM 방향보다 우월</b>함을 데이터로 입증</li>
-          <li class="ok"><b>거래 현실 반영</b> — commission·slippage(0.05%씩) net 수익 + 상폐/무결측 커버리지 보고(n_dropped_no_outcome)</li>
+          <li class="ok"><b>코퍼스 완주 461건</b> — KR 253 · US 208 (markettrace-ingest)</li>
+          <li class="ok"><b>유의 사건유형 9버킷</b> — insider_trading 5d <b>−6.6%</b>(t=−5.8), regulatory 5d −3.8%, earnings 5d −1.8% 등 전부 음(−). <span class="commit">GET /stats/significance</span> + 웹 'Validated Signals' 패널</li>
+          <li class="ok"><b>유의 게이트 신호</b> — significant_event_type: 유의 유형만 매매 → 5d 표본외 <b>순 +4.4%·적중 68%</b>(전체 대비 매매 200→56건, 정밀도↑)</li>
+          <li class="ok"><b>경험 기준선</b> — event_type_history 5d 순 <b>+2.1%</b>·적중 64.5%·IC 0.12</li>
+          <li class="ok"><b>거시·결합 모델 + 분해</b> — macro_surprise·combined 추가. <b>거시 분해로 IC 0.21이 특정 시리즈가 아닌 <span style="color:var(--amber)">캘린더/국면 프록시</span>임을 규명</b>(4시리즈 IC 동일). <span class="commit">GET /stats/macro-decomposition</span></li>
+          <li class="ok"><b>거래 현실 반영</b> — commission·slippage(0.05%) net + 상폐/결측 커버리지(n_dropped_no_outcome)</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no"><b>검증된 신호 UI 노출</b> — significance·backtest를 매수판단 대시보드에</li>
-          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel 인터페이스로 추가 + 결합(combiner)</li>
-          <li class="no">거시(macro surprise)를 신호로 편입</li>
-          <li class="no">calibration(confidence 0.7 ≈ 실제 70%)·실패사례 기록 + 상폐 <b>모델링</b>(현재는 커버리지 보고만)</li>
+          <li class="no"><b>calibration</b> — confidence 0.7 ≈ 실제 70% 검증(신호 신뢰도 정량화). 신호 품질이 제각각이라 결합 전 필수</li>
+          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel로 추가</li>
+          <li class="no">상폐 <b>모델링</b>(현재는 커버리지 보고만)·실패사례 기록</li>
+          <li class="no">(거시) 릴리즈-이벤트 상대시점 설계로 프록시 아닌 순수 거시신호 분리 — 후순위</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>현재 판정 🟢</b> — 검증 통과. 461건 표본에서 <b>유의 9버킷</b> 확인, 경험적 event_type_history 모델이 5d 표본외 <b>순 +2.1%</b>. 완료 기준(벤치마크 대비 표본외 개선) 5d에서 <b>충족</b> → 초점이 "검증"에서 "신호 결합·UI 노출"로 이동.</div>
+    <div class="crit"><b>현재 판정 🟢</b> — 검증 통과. 신뢰 신호는 <b>사건 기반</b>(significant_event_type 5d 순 +4.4%, event_type_history +2.1%). <b>거시=프록시·llm_direction=손실</b>로 배제. 완료 기준(표본외 개선) 5d에서 충족 → 초점이 "모델 확장"에서 <b>"calibration·매수판단 노출"</b>로 이동.</div>
   </div>
 
   <!-- PHASE 5 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~45%</span></div>
-      <div class="pbar a"><i style="width:45%"></i></div><div class="pct-lbl" style="color:var(--amber)">45%</div>
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~52%</span></div>
+      <div class="pbar a"><i style="width:52%"></i></div><div class="pct-lbl" style="color:var(--amber)">52%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -292,14 +293,14 @@
           <li class="ok">변동 원인 후보·근거 (evidence·channels·direction)</li>
           <li class="ok">이상수익률 차트 (1/5/20/60일·<b>섹터조정 라인</b>) + 점수 구성요소</li>
           <li class="ok"><b>로그인 게이트 수동 인제스트</b> (모달 + Ingest 버튼)</li>
-          <li class="ok"><b>데이터 상태 대시보드 (부분)</b> — /stats 사건유형 반응 통계 페이지</li>
+          <li class="ok"><b>검증 대시보드 확장</b> — /stats: 반응 매트릭스 + <b>Validated Signals 패널</b>(유의 신호 ★) + <b>5모델 백테스트 토글</b> + <b>거시 국면 분해 표</b></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
           <li class="no">관심종목 알림</li>
           <li class="no">시나리오별 상승·하락 요인</li>
-          <li class="no">event_impacts UI 노출 + 모델 상태 대시보드 확장</li>
+          <li class="no"><b>종목별 매수판단 화면</b> — 검증 신호를 종목 뷰에 결합(현재는 통계 페이지에만)</li>
         </ul>
       </div>
     </div>
@@ -367,36 +368,37 @@
       </ul>
     </div>
     <div class="mini">
-      <h3>✅ Macro — 4종 정상</h3>
+      <h3>✅ 신호 백테스트 — 5모델 (표본외)</h3>
       <ul class="items">
-        <li class="ok">CPIAUCSL · UNRATE · FEDFUNDS · DGS10 (surprise 포함)</li>
-        <li class="ok">백테스트 가동: event_type_history 5d 순 <b>+2.1%</b>·적중 64.5%(표본외)</li>
+        <li class="ok"><b>significant_event_type 5d 순 +4.4%</b>(적중 68%) · event_type_history +2.1%</li>
+        <li class="ok">Macro 4종(CPI·실업·금리·10Y) 정상. 단 <b>거시 신호 IC는 캘린더/국면 프록시</b>로 판명</li>
+        <li class="ok">llm_direction 손실 → 배제. <b>상태 확인은 항상 라이브 API 먼저</b></li>
       </ul>
     </div>
   </div>
 
   <!-- THIS SESSION -->
-  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-03 · 코퍼스 완주 + 검증 통과)</span></h2>
+  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-03 · 검증 통과 → 5모델 비교 → 거시 프록시 규명)</span></h2>
   <div class="mini">
     <ul class="items">
-      <li class="ok"><b>코퍼스 완주 45 → 461건</b> — Tiingo 쿼터 리셋 후 markettrace-ingest 재실행으로 KR 253 · US 208 적재 완료</li>
-      <li class="ok"><b>검정력 확보 → 유의 9버킷</b> — insider_trading 5d −6.6%(t=−5.8, p&lt;1e-6), regulatory 5d −3.8%, earnings 5d −1.8%, debt_offering 20d −4.3% 등. <b>모두 음(−) 드리프트</b></li>
-      <li class="ok"><b>백테스트 표본외 양(+)</b> — event_type_history 5d 적중 64.5% · 순수익 +2.1% · IC 0.12(거래비용 반영). 20d/1d도 net &gt; 0</li>
-      <li class="ok"><b>LLM 방향 신호 열위 입증</b> — llm_direction 적중&lt;50%·순손실 → 경험적 사건유형 통계가 더 나음</li>
+      <li class="ok"><b>코퍼스 완주 45 → 461건</b> + <b>유의 9버킷</b> — insider_trading 5d −6.6%(t=−5.8), regulatory 5d −3.8% 등 전부 음(−). '데이터 부족' 블로커 해소</li>
+      <li class="ok"><b>유의 게이트 신호</b> — significant_event_type: 유의 유형만 매매 → 5d 표본외 <b>순 +4.4%·적중 68%</b>(매매 200→56건, 정밀도↑). 방향 A를 매매 신호로 구현</li>
+      <li class="ok"><b>거시·결합 모델 + 분해</b> — macro_surprise·combined 추가 후, <b>거시 분해로 IC 0.21이 특정 시리즈가 아닌 캘린더/국면 프록시</b>임을 규명(CPI·금리·실업·10Y 모두 IC 동일, D+60 음전환)</li>
+      <li class="ok"><b>UI·운영</b> — /stats 'Validated Signals' 패널·매트릭스 ★·5모델 백테스트 토글·거시 분해 표 + 운영 도구 <span class="commit">/render-test</span>·<span class="commit">/mock-test</span></li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 <b style="color:var(--ink)">396</b> · ruff 클린. <b style="color:var(--ink)">방향 A 검증 통과</b>: 461건 표본에서 "어떤 사건이 유의미한가"가 실제로 판별됨(6/17 45건 표본의 <s>0/36</s> 판정은 데이터 부족 탓이었고, 완주 후 해소).
-      Phase 4 30 → <b style="color:var(--ink)">60%</b>(검증 통과, 신호 결합·UI 노출 단계로 이동).</p>
+      테스트 396 → <b style="color:var(--ink)">413</b> · ruff 클린. 신뢰 신호는 <b style="color:var(--ink)">사건 기반</b>(significant_event_type·event_type_history). <b style="color:var(--ink)">거시=프록시·llm_direction=손실</b>로 배제 — "무엇이 통하고 무엇이 안 통하는지"를 데이터로 판별.
+      Phase 4 60 → <b style="color:var(--ink)">72%</b>.</p>
   </div>
 
   <!-- NEXT -->
   <h2><span class="num">»</span> 다음 추천 단계</h2>
   <div class="mini">
     <ul class="items next">
-      <li><b>① 검증된 신호 UI 노출</b> — <code>/stats/significance</code>·<code>/stats/backtest</code>를 매수판단 대시보드에. 유의 사건유형·표본외 성과를 사용자에게 보이기(Phase 5)</li>
-      <li><b>② 신호 결합·잔여 모델</b> — event_type_history를 기준선으로 거시(surprise)·가격·수급을 동일 <code>SignalModel</code> 인터페이스로 추가 + combiner + calibration</li>
-      <li><b>③ 상폐 모델링</b> — 현재는 커버리지 보고(n_dropped_no_outcome)만. 거래정지·상장폐지를 수익률 계산에 반영</li>
-      <li><b>④ 사건 중요도 필터</b> — governance 잡무 노이즈 제거(매수판단 화면용) + Phase 2 사람 검토·수정 UI</li>
+      <li><b>① calibration</b> — confidence 구간별 실제 적중률(0.7 ≈ 실제 70%). 신호 품질이 제각각(사건=양호·거시=프록시·llm=손실)이라 <b>결합·신뢰 전 정량화가 필수 수순</b></li>
+      <li><b>② 매수판단 노출(Phase 5)</b> — 검증된 사건유형(significant)을 종목별 매수판단 화면으로. 실사용자 기능</li>
+      <li><b>③ 잔여 모델·상폐 모델링</b> — 펀더멘털·가격·수급을 동일 <code>SignalModel</code>로 + 거래정지·상장폐지를 수익률에 반영</li>
+      <li><b>④ 사건 중요도 필터</b> — governance 노이즈 제거 UI + Phase 2 사람 검토·수정</li>
     </ul>
   </div>
 
