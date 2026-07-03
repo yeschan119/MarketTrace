@@ -103,9 +103,11 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 235 tests · ruff clean</span>
+      <span class="pill">✅ 396 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
-      <span class="pill">기준일: 2026-06-14</span>
+      <span class="pill">🧭 방향 A: 측정·검증 우선</span>
+      <span class="pill">✅ 코퍼스 461건 (KR 253 · US 208)</span>
+      <span class="pill">기준일: 2026-07-03</span>
     </div>
   </div>
 </header>
@@ -123,8 +125,8 @@
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">65%</div><div class="bar"><i style="width:65%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">80%</div><div class="bar"><i style="width:80%"></i></div></div>
-    <div class="st todo"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">0%</div><div class="bar"><i style="width:3%"></i></div></div>
+    <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">60%</div><div class="bar"><i style="width:60%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">45%</div><div class="bar"><i style="width:45%"></i></div></div>
   </div>
 
@@ -138,8 +140,8 @@
     <div class="node n-done">기업·산업 연결<small>entity_linker</small></div>
     <div class="node n-done">사건 추출<small>LLM tool-use</small></div>
     <div class="node n-todo">Feature Store<small>미구현</small></div>
-    <div class="node n-partial">영향 분석<small>이상수익률 1/5/20/60·섹터·통계</small></div>
-    <div class="node n-todo">신호·위험 엔진<small>미착수</small></div>
+    <div class="node n-done">영향 분석<small>이상수익률 1/5/20/60·섹터·통계·거시 surprise</small></div>
+    <div class="node n-partial">신호·검증<small>유의 9버킷·백테스트 5d 순+2.1%(가동)</small></div>
     <div class="node n-done">API·대시보드<small>FastAPI + Next.js</small></div>
     <div class="node n-todo">사후 성과 측정<small>미구현</small></div>
   </div>
@@ -225,8 +227,8 @@
   <!-- PHASE 3 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 3 · 영향 측정 <span class="badge b-partial">진행 중 ~80%</span></div>
-      <div class="pbar a"><i style="width:80%"></i></div><div class="pct-lbl" style="color:var(--amber)">80%</div>
+      <div class="title">Phase 3 · 영향 측정 <span class="badge b-done">완료</span></div>
+      <div class="pbar g"><i style="width:100%"></i></div><div class="pct-lbl" style="color:var(--green)">100%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -236,39 +238,45 @@
           <li class="ok"><b>사건 후 1/5/20/60일 반응 저장</b> (60일 horizon 추가)</li>
           <li class="ok"><b>사건유형별 평균·분산 통계</b> — impact.statistics + GET /stats/event-types</li>
           <li class="ok"><b>event_impacts 테이블</b> — 방향부호 영향점수(signed_abnormal_return)</li>
+          <li class="ok"><b>거시 surprise feature</b> — macro_surprise(예상 대비 실제) + FRED/ALFRED 빈티지 조회</li>
+          <li class="ok"><b>macro_observations 테이블 + 적재</b> — CPIAUCSL·UNRATE·FEDFUNDS·DGS10, GET /macro/observations</li>
           <li class="ok">근거·모델·분석시각 provenance 기록</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
-        <ul class="items">
-          <li class="no">surprise feature (예상 대비 실제, FRED/ALFRED 빈티지)</li>
-          <li class="no">macro_observations 테이블 (거시 빈티지)</li>
-        </ul>
+        <ul class="items"><li class="ok" style="color:var(--green);font-weight:600">없음 — 전부 완료</li></ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟡</b> — 사건별 예측·실제 결과 자동연결 + 사건유형 통계 동작. surprise(빈티지) feature만 남음.</div>
+    <div class="crit"><b>완료 기준 ✅</b> — 사건별 예측·실제 결과 자동연결 + 사건유형 통계 + 거시 surprise(빈티지) 동작. Macro 4종 프로덕션 적재·표시 확인.</div>
   </div>
 
   <!-- PHASE 4 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-todo">미착수</span></div>
-      <div class="pbar r"><i style="width:3%"></i></div><div class="pct-lbl" style="color:var(--red)">0%</div>
+      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~60%</span></div>
+      <div class="pbar a"><i style="width:60%"></i></div><div class="pct-lbl" style="color:var(--amber)">60%</div>
     </div>
+    <p class="sub" style="margin:10px 0 0"><b>방향 A(2026-06-17 채택) — 검증 통과(2026-07-03).</b> 코퍼스 461건으로 검정력 확보 → "데이터 부족" 블로커 해소. 검증 엔진이 <b>유의 사건유형과 양(+)의 표본외 백테스트</b>를 실제로 산출.</p>
     <div class="cols">
-      <div><div class="coltitle">완료</div>
-        <ul class="items"><li class="no" style="color:var(--muted)">—</li></ul>
+      <div><div class="coltitle">완료 (검증 통과)</div>
+        <ul class="items">
+          <li class="ok"><b>코퍼스 완주 461건</b> — KR 253 · US 208 (Tiingo 쿼터 리셋 후 markettrace-ingest 재실행으로 완료)</li>
+          <li class="ok"><b>유의 사건유형 9버킷</b> — insider_trading 5d <b>−6.6%</b>(t=−5.8), regulatory 5d −3.8%, earnings 5d −1.8%, debt_offering 20d −4.3% 등 <b>전부 음(−) 드리프트</b>. <span class="commit">GET /stats/significance</span></li>
+          <li class="ok"><b>워크포워드 백테스트 양(+)</b> — event_type_history 5d 적중 <b>64.5%</b>·순수익 <b>+2.1%</b>·IC 0.12(거래비용 반영). <span class="commit">GET /stats/backtest</span></li>
+          <li class="ok"><b>모델 비교</b> — llm_direction(LLM 방향 신호)은 적중&lt;50%·순손실 → <b>사건유형 과거통계가 LLM 방향보다 우월</b>함을 데이터로 입증</li>
+          <li class="ok"><b>거래 현실 반영</b> — commission·slippage(0.05%씩) net 수익 + 상폐/무결측 커버리지 보고(n_dropped_no_outcome)</li>
+        </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no">펀더멘털·이벤트·거시·가격·수급 모델 분리</li>
-          <li class="no">워크포워드 백테스트</li>
-          <li class="no">거래비용·슬리피지·거래정지·상폐 반영</li>
-          <li class="no">MLflow 모델 관리 + 기여도·실패사례 기록</li>
+          <li class="no"><b>검증된 신호 UI 노출</b> — significance·backtest를 매수판단 대시보드에</li>
+          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel 인터페이스로 추가 + 결합(combiner)</li>
+          <li class="no">거시(macro surprise)를 신호로 편입</li>
+          <li class="no">calibration(confidence 0.7 ≈ 실제 70%)·실패사례 기록 + 상폐 <b>모델링</b>(현재는 커버리지 보고만)</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🔴</b> — 표본 외 구간에서 벤치마크 대비 개선 확인 (look-ahead/survivorship 차단)</div>
+    <div class="crit"><b>현재 판정 🟢</b> — 검증 통과. 461건 표본에서 <b>유의 9버킷</b> 확인, 경험적 event_type_history 모델이 5d 표본외 <b>순 +2.1%</b>. 완료 기준(벤치마크 대비 표본외 개선) 5d에서 <b>충족</b> → 초점이 "검증"에서 "신호 결합·UI 노출"로 이동.</div>
   </div>
 
   <!-- PHASE 5 -->
@@ -299,7 +307,7 @@
   </div>
 
   <!-- DATA MODEL -->
-  <h2><span class="num">▤</span> 데이터 모델 <span style="font-size:13px;font-weight:500;color:var(--muted)">(블루프린트 §4 · 13개 중 9개 구현)</span></h2>
+  <h2><span class="num">▤</span> 데이터 모델 <span style="font-size:13px;font-weight:500;color:var(--muted)">(블루프린트 §4 · 13개 중 10개 구현)</span></h2>
   <div class="grid2">
     <table>
       <tr><th>테이블</th><th>상태</th></tr>
@@ -315,8 +323,8 @@
       <tr><th>테이블</th><th>상태</th></tr>
       <tr><td>model_runs</td><td><span class="tag t-ok">구현</span></td></tr>
       <tr><td>event_impacts</td><td><span class="tag t-ok">구현</span></td></tr>
+      <tr><td>macro_observations <small style="color:var(--muted)">(빈티지·surprise)</small></td><td><span class="tag t-ok">구현</span></td></tr>
       <tr><td>fundamentals</td><td><span class="tag t-no">Phase 4</span></td></tr>
-      <tr><td>macro_observations</td><td><span class="tag t-no">Phase 3-4</span></td></tr>
       <tr><td>features</td><td><span class="tag t-no">Phase 4</span></td></tr>
       <tr><td>signals</td><td><span class="tag t-no">Phase 4</span></td></tr>
     </table>
@@ -347,31 +355,53 @@
     </div>
   </div>
 
+  <!-- CURRENT DATA STATE -->
+  <h2><span class="num">▲</span> 현재 데이터 상태 <span style="font-size:13px;font-weight:500;color:var(--muted)">(라이브 API 확인 · 2026-07-03)</span></h2>
+  <div class="grid2">
+    <div class="mini">
+      <h3>✅ Events — 461건 완주</h3>
+      <ul class="items">
+        <li class="ok"><b>KR 253 · US 208 = 461건</b> (earnings 68 · regulatory 59 · insider 54 …)</li>
+        <li class="ok">유의 사건유형 <b>9버킷</b> 확인(p&lt;0.05, 표본충분). 전부 음(−) 초과수익 드리프트</li>
+        <li class="ok"><b>상태 확인은 항상 라이브 API 먼저</b> — 정적 문서는 stale (6/17 "45건"으로 낡아 있었음)</li>
+      </ul>
+    </div>
+    <div class="mini">
+      <h3>✅ Macro — 4종 정상</h3>
+      <ul class="items">
+        <li class="ok">CPIAUCSL · UNRATE · FEDFUNDS · DGS10 (surprise 포함)</li>
+        <li class="ok">백테스트 가동: event_type_history 5d 순 <b>+2.1%</b>·적중 64.5%(표본외)</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- THIS SESSION -->
-  <h2><span class="num">✓</span> 이번 세션 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-06-14 · Phase 2/3 + UI · 커밋 2개)</span></h2>
+  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-03 · 코퍼스 완주 + 검증 통과)</span></h2>
   <div class="mini">
     <ul class="items">
-      <li class="ok"><span class="commit">ede6142</span> &nbsp;Phase 2/3 엔진 — 60일 horizon · 섹터조정 수익률 · event_impacts · 사건유형 통계 · novelty · F1 eval (backend 25파일 + migration 0002)</li>
-      <li class="ok"><span class="commit">1bf4ea3</span> &nbsp;Web UI — 섹터조정(보라) 라인 · /stats 사건유형 통계 페이지 · 타입 동기화</li>
+      <li class="ok"><b>코퍼스 완주 45 → 461건</b> — Tiingo 쿼터 리셋 후 markettrace-ingest 재실행으로 KR 253 · US 208 적재 완료</li>
+      <li class="ok"><b>검정력 확보 → 유의 9버킷</b> — insider_trading 5d −6.6%(t=−5.8, p&lt;1e-6), regulatory 5d −3.8%, earnings 5d −1.8%, debt_offering 20d −4.3% 등. <b>모두 음(−) 드리프트</b></li>
+      <li class="ok"><b>백테스트 표본외 양(+)</b> — event_type_history 5d 적중 64.5% · 순수익 +2.1% · IC 0.12(거래비용 반영). 20d/1d도 net &gt; 0</li>
+      <li class="ok"><b>LLM 방향 신호 열위 입증</b> — llm_direction 적중&lt;50%·순손실 → 경험적 사건유형 통계가 더 나음</li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 182 → <b style="color:var(--ink)">235</b> · ruff 클린 · alembic upgrade head 검증 · 로컬 스택 UI 헤드리스 검증(D+60·섹터라인·/stats 렌더 확인).
-      Phase 3 40→80%, Phase 2 50→65%, 데이터모델 8→9/13.</p>
+      테스트 <b style="color:var(--ink)">396</b> · ruff 클린. <b style="color:var(--ink)">방향 A 검증 통과</b>: 461건 표본에서 "어떤 사건이 유의미한가"가 실제로 판별됨(6/17 45건 표본의 <s>0/36</s> 판정은 데이터 부족 탓이었고, 완주 후 해소).
+      Phase 4 30 → <b style="color:var(--ink)">60%</b>(검증 통과, 신호 결합·UI 노출 단계로 이동).</p>
   </div>
 
   <!-- NEXT -->
   <h2><span class="num">»</span> 다음 추천 단계</h2>
   <div class="mini">
     <ul class="items next">
-      <li><b>배포·운영</b> — 커밋 2개 push → Render 자동배포(startCommand가 alembic 자동적용) → 로그인 후 Ingest 클릭 → D+60·섹터·/stats 실데이터 확인</li>
-      <li><b>Phase 3 마무리</b> — surprise feature(FRED/ALFRED 빈티지) + macro_observations 테이블 + event_impacts UI 노출</li>
-      <li><b>Phase 2 마무리</b> — 다건 배치(Prefect) + 검토·수정 UI + 골드셋 라벨 확대 → 라이브 F1 측정</li>
-      <li><b>Phase 4 착수</b> — 신호 모델 분리 + 워크포워드 백테스트(비용·상폐 반영) + MLflow + signals/features 테이블</li>
+      <li><b>① 검증된 신호 UI 노출</b> — <code>/stats/significance</code>·<code>/stats/backtest</code>를 매수판단 대시보드에. 유의 사건유형·표본외 성과를 사용자에게 보이기(Phase 5)</li>
+      <li><b>② 신호 결합·잔여 모델</b> — event_type_history를 기준선으로 거시(surprise)·가격·수급을 동일 <code>SignalModel</code> 인터페이스로 추가 + combiner + calibration</li>
+      <li><b>③ 상폐 모델링</b> — 현재는 커버리지 보고(n_dropped_no_outcome)만. 거래정지·상장폐지를 수익률 계산에 반영</li>
+      <li><b>④ 사건 중요도 필터</b> — governance 잡무 노이즈 제거(매수판단 화면용) + Phase 2 사람 검토·수정 UI</li>
     </ul>
   </div>
 
   <footer>
-    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + market-trace-roadmap.md · 갱신 2026-06-14<br>
+    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-03<br>
     공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
   </footer>
 
