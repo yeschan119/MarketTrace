@@ -44,6 +44,18 @@ Do NOT output buy or sell recommendations.
 """
 
 
+def _is_reasoning_model(model: str) -> bool:
+    """True for OpenAI model families that reject the classic Chat Completions knobs.
+
+    The GPT-5 line and the ``o`` reasoning series (o1/o3/o4) only accept the default
+    temperature and require ``max_completion_tokens`` instead of ``max_tokens``;
+    sending the old parameters returns a 400. Matched by name prefix so new point
+    releases (e.g. ``gpt-5.4-mini``) are covered without a hardcoded allowlist.
+    """
+    m = model.lower()
+    return m.startswith(("gpt-5", "o1", "o3", "o4"))
+
+
 class EventExtractor:
     """Extract structured market events from text using an LLM tool call.
 
@@ -173,14 +185,22 @@ class EventExtractor:
 
     @staticmethod
     def _call_openai(client, model: str, prompt: str) -> tuple[dict, str]:
-        response = client.chat.completions.create(
-            model=model,
-            max_tokens=1024,
-            temperature=0,
-            tools=[event_function_definition()],
-            tool_choice={"type": "function", "function": {"name": EVENT_TOOL_NAME}},
-            messages=[{"role": "user", "content": prompt}],
-        )
+        request: dict = {
+            "model": model,
+            "tools": [event_function_definition()],
+            "tool_choice": {"type": "function", "function": {"name": EVENT_TOOL_NAME}},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if _is_reasoning_model(model):
+            # GPT-5 / o-series reasoning models reject the classic knobs: ``max_tokens``
+            # is not accepted (use ``max_completion_tokens``) and only the default
+            # temperature is allowed, so temperature is omitted entirely. The budget is
+            # raised because hidden reasoning tokens draw from the same completion pool.
+            request["max_completion_tokens"] = 4096
+        else:
+            request["max_tokens"] = 1024
+            request["temperature"] = 0
+        response = client.chat.completions.create(**request)
 
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None)

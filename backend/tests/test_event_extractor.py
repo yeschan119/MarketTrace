@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from markettrace.nlp.event_extractor import EventExtractor
+from markettrace.nlp.event_extractor import EventExtractor, _is_reasoning_model
 from markettrace.nlp.schemas import (
     EVENT_TOOL_SCHEMA,
     EventExtraction,
@@ -80,6 +80,23 @@ class FakeCompletions:
 class FakeOpenAIClient:
     def __init__(self, response):
         self.chat = types.SimpleNamespace(completions=FakeCompletions(response))
+
+
+class _RecordingCompletions:
+    """Like FakeCompletions but records the kwargs of the last create() call."""
+
+    def __init__(self, response):
+        self._response = response
+        self.kwargs: dict | None = None
+
+    def create(self, **kwargs):
+        self.kwargs = kwargs
+        return self._response
+
+
+class _RecordingOpenAIClient:
+    def __init__(self, response):
+        self.chat = types.SimpleNamespace(completions=_RecordingCompletions(response))
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +252,43 @@ class TestEventExtractorOpenAI:
         extractor = EventExtractor(client=client, model="gpt-4o", provider="openai")
         with pytest.raises(ValueError, match="No tool_calls"):
             extractor.extract("doc")
+
+    def test_classic_model_sends_max_tokens_and_temperature(self):
+        client = _RecordingOpenAIClient(_make_openai_response(SAMPLE_EVENT_DICT, model="gpt-4o"))
+        EventExtractor(client=client, model="gpt-4o", provider="openai").extract("doc")
+        kwargs = client.chat.completions.kwargs
+        assert kwargs["max_tokens"] == 1024
+        assert kwargs["temperature"] == 0
+        assert "max_completion_tokens" not in kwargs
+
+    def test_reasoning_model_uses_max_completion_tokens_and_omits_temperature(self):
+        # GPT-5 family rejects max_tokens + non-default temperature; we must adapt.
+        client = _RecordingOpenAIClient(
+            _make_openai_response(SAMPLE_EVENT_DICT, model="gpt-5.4-mini")
+        )
+        EventExtractor(client=client, model="gpt-5.4-mini", provider="openai").extract("doc")
+        kwargs = client.chat.completions.kwargs
+        assert kwargs["max_completion_tokens"] == 4096
+        assert "temperature" not in kwargs
+        assert "max_tokens" not in kwargs
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        ("gpt-5.4-mini", True),
+        ("gpt-5", True),
+        ("GPT-5-mini", True),  # case-insensitive
+        ("o1-mini", True),
+        ("o3", True),
+        ("o4-mini", True),
+        ("gpt-4o", False),
+        ("gpt-4o-mini", False),
+        ("gpt-4.1", False),
+    ],
+)
+def test_is_reasoning_model(model: str, expected: bool) -> None:
+    assert _is_reasoning_model(model) is expected
 
 
 # ---------------------------------------------------------------------------
