@@ -98,6 +98,25 @@ const en: Dict = {
     relatedSummary: "Mean of these {n} = {mean}",
     relatedReturn: "Abnormal Return",
     relatedEmpty: "No matching events.",
+    signals: {
+      title: "Validated Signals",
+      subtitle:
+        "Event types whose average abnormal return is both backed by enough samples (n≥5) and statistically distinguishable from zero (p<0.05). These are the reactions the data actually supports — everything else is noise.",
+      count: "{n} significant",
+      empty:
+        "No statistically significant signals yet — the samples aren't conclusive. Ingest more events to build power.",
+      negativeNote:
+        "Every validated signal so far is negative: these filings precede a market-relative decline, so they read as caution / avoid rather than buy signals.",
+      badge: "significant",
+      th: {
+        eventType: "Event Type",
+        horizon: "Horizon",
+        mean: "Mean Abnormal",
+        t: "t-stat",
+        p: "p-value",
+        n: "n",
+      },
+    },
     backtest: {
       title: "Walk-Forward Backtest",
       subtitle:
@@ -371,6 +390,25 @@ const ko: Dict = {
     relatedSummary: "이 {n}건의 평균 = {mean}",
     relatedReturn: "초과수익률",
     relatedEmpty: "일치하는 이벤트가 없습니다.",
+    signals: {
+      title: "검증된 신호",
+      subtitle:
+        "평균 초과수익률이 표본도 충분하고(n≥5) 0과 통계적으로 구분되는(p<0.05) 사건유형만 — 데이터가 실제로 뒷받침하는 반응입니다. 나머지는 노이즈.",
+      count: "유의 {n}개",
+      empty:
+        "아직 통계적으로 유의한 신호가 없습니다 — 표본이 결론을 낼 만큼 충분치 않습니다. 이벤트를 더 수집하세요.",
+      negativeNote:
+        "지금까지 검증된 신호는 전부 음(−)입니다: 해당 공시 뒤 시장 대비 하락 경향이라, 매수보다는 주의·회피 신호로 읽힙니다.",
+      badge: "유의",
+      th: {
+        eventType: "사건유형",
+        horizon: "기간",
+        mean: "평균 초과수익",
+        t: "t값",
+        p: "p값",
+        n: "n",
+      },
+    },
     backtest: {
       title: "워크포워드 백테스트",
       subtitle:

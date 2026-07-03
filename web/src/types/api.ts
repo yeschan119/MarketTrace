@@ -41,6 +41,18 @@ export interface EventContribution {
   market: string | null;
 }
 
+export interface EventTypeSignificance {
+  event_type: string;
+  horizon_days: number;
+  count: number;
+  mean_abnormal_return: number | null;
+  std_abnormal_return: number | null;
+  t_stat: number | null;
+  p_value: number | null;
+  significant_5pct: boolean;
+  sufficient_sample: boolean;
+}
+
 export type BacktestModel = "event_type_history" | "llm_direction";
 
 export interface BacktestResult {

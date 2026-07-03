@@ -5,6 +5,7 @@ import type {
   EventSummary,
   EventDetail,
   EventTypeStat,
+  EventTypeSignificance,
   InstrumentTimeline,
   LedgerCategory,
   LedgerEntry,
@@ -139,6 +140,10 @@ export const api = {
 
   getEventTypeContributions(): Promise<EventContribution[]> {
     return apiFetch<EventContribution[]>("/stats/event-types/contributions");
+  },
+
+  getEventTypeSignificance(): Promise<EventTypeSignificance[]> {
+    return apiFetch<EventTypeSignificance[]>("/stats/significance");
   },
 
   getBacktest(model: BacktestModel = "event_type_history"): Promise<BacktestResult[]> {

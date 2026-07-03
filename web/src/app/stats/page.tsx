@@ -9,6 +9,7 @@ import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import type {
   EventTypeStat,
+  EventTypeSignificance,
   EventContribution,
   BacktestResult,
   BacktestModel,
@@ -20,6 +21,17 @@ function formatPct(v: number | null): string {
 }
 
 function formatIc(v: number | null): string {
+  if (v == null) return "—";
+  return v.toFixed(2);
+}
+
+function formatP(v: number | null): string {
+  if (v == null) return "—";
+  if (v < 0.001) return "<0.001";
+  return v.toFixed(3);
+}
+
+function formatT(v: number | null): string {
   if (v == null) return "—";
   return v.toFixed(2);
 }
@@ -74,6 +86,14 @@ export default function StatsPage() {
     queryFn: () => api.getEventTypeContributions(),
   });
 
+  // Which (event_type, horizon) buckets are statistically validated signals —
+  // enough sample AND distinguishable from zero. This is the "what does the data
+  // actually support" layer that turns the mean matrix into buy/avoid evidence.
+  const { data: sigData } = useQuery({
+    queryKey: ["event-type-significance"],
+    queryFn: () => api.getEventTypeSignificance(),
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
@@ -114,6 +134,15 @@ export default function StatsPage() {
     ? relatedValues.reduce((sum, v) => sum + v, 0) / relatedValues.length
     : null;
 
+  // Validated signals: sufficient sample AND significant at 5%, strongest
+  // evidence (smallest p) first. `sigSet` lets the matrix flag the same cells.
+  const sigRows: EventTypeSignificance[] = (sigData ?? [])
+    .filter((s) => s.significant_5pct && s.sufficient_sample)
+    .sort((a, b) => (a.p_value ?? 1) - (b.p_value ?? 1));
+  const sigSet = new Set(
+    sigRows.map((s) => `${s.event_type}|${s.horizon_days}`)
+  );
+
   const groups = groupByType(stats);
   const selectedInfo = selected ? describeEventType(selected.type, lang) : null;
   const toggleCell = (type: string, horizon: number) =>
@@ -132,6 +161,8 @@ export default function StatsPage() {
         </span>
       </div>
       <p className="text-sm text-gray-500">{t("stats.subtitle")}</p>
+
+      <SignalsSection rows={sigRows} />
 
       {stats.length === 0 ? (
         <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
@@ -216,6 +247,7 @@ export default function StatsPage() {
                         );
                       }
                       const positive = value >= 0;
+                      const isSig = sigSet.has(`${g.event_type}|${h}`);
                       return (
                         <td key={h} className="p-1 text-right">
                           <button
@@ -224,7 +256,7 @@ export default function StatsPage() {
                             aria-pressed={active}
                             title={`${t("stats.th.std")}: ${formatPct(
                               cell.std_abnormal_return
-                            )}`}
+                            )}${isSig ? ` · ${t("stats.signals.badge")}` : ""}`}
                             className={`w-full rounded px-2 py-1.5 text-right font-mono transition-colors ${
                               active
                                 ? "bg-indigo-600 text-white shadow-sm"
@@ -240,6 +272,14 @@ export default function StatsPage() {
                                     : "text-red-600"
                               }`}
                             >
+                              {isSig && (
+                                <span
+                                  aria-hidden
+                                  className={active ? "text-white" : "text-indigo-500"}
+                                >
+                                  ★{" "}
+                                </span>
+                              )}
                               {formatPct(value)}
                             </span>
                             <span
@@ -332,6 +372,113 @@ export default function StatsPage() {
 
       <BacktestSection model={model} setModel={setModel} />
     </div>
+  );
+}
+
+// The validated-signals panel: the buckets the data actually supports. This is
+// the "which events matter for a buy/avoid call" surface — the whole point of
+// the measure-and-validate direction. It leads the page above the raw matrix.
+function SignalsSection({ rows }: { rows: EventTypeSignificance[] }) {
+  const { t, lang } = useI18n();
+  const allNegative =
+    rows.length > 0 && rows.every((r) => (r.mean_abnormal_return ?? 0) < 0);
+
+  return (
+    <section className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-bold text-gray-900">
+          {t("stats.signals.title")}
+        </h2>
+        {rows.length > 0 && (
+          <span className="text-xs text-gray-500">
+            {t("stats.signals.count", { n: rows.length })}
+          </span>
+        )}
+      </div>
+      <p className="text-sm leading-relaxed text-gray-600">
+        {t("stats.signals.subtitle")}
+      </p>
+
+      {rows.length === 0 ? (
+        <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-indigo-200 text-sm text-gray-500">
+          {t("stats.signals.empty")}
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-md border border-indigo-100 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2.5">
+                    {t("stats.signals.th.eventType")}
+                  </th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t("stats.signals.th.horizon")}
+                  </th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t("stats.signals.th.mean")}
+                  </th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t("stats.signals.th.t")}
+                  </th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t("stats.signals.th.p")}
+                  </th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t("stats.signals.th.n")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const info = describeEventType(r.event_type, lang);
+                  const positive = (r.mean_abnormal_return ?? 0) >= 0;
+                  return (
+                    <tr
+                      key={`${r.event_type}-${r.horizon_days}`}
+                      className="border-b border-gray-100 last:border-0 hover:bg-indigo-50/40"
+                    >
+                      <td className="px-4 py-2.5">
+                        <span className="block font-medium text-gray-900">
+                          {info.label}
+                        </span>
+                        <span className="block font-mono text-[10px] text-gray-400">
+                          {r.event_type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-600">
+                        D+{r.horizon_days}
+                      </td>
+                      <td
+                        className={`px-3 py-2.5 text-right font-mono font-medium ${
+                          positive ? "text-emerald-600" : "text-red-600"
+                        }`}
+                      >
+                        {formatPct(r.mean_abnormal_return)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                        {formatT(r.t_stat)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                        {formatP(r.p_value)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                        {r.count}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {allNegative && (
+            <p className="text-xs leading-relaxed text-amber-700">
+              {t("stats.signals.negativeNote")}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
