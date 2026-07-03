@@ -13,7 +13,16 @@ import type {
   EventContribution,
   BacktestResult,
   BacktestModel,
+  MacroSeriesBacktest,
 } from "@/types/api";
+
+// Friendly labels for the deployed FRED macro series (raw id shown alongside).
+const MACRO_SERIES_LABELS: Record<string, string> = {
+  CPIAUCSL: "CPI",
+  UNRATE: "Unemployment",
+  FEDFUNDS: "Fed Funds",
+  DGS10: "10Y Treasury",
+};
 
 function formatPct(v: number | null): string {
   if (v == null) return "—";
@@ -371,6 +380,7 @@ export default function StatsPage() {
       )}
 
       <BacktestSection model={model} setModel={setModel} />
+      <MacroDecompositionSection />
     </div>
   );
 }
@@ -641,6 +651,137 @@ function BacktestSection({
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+// Macro decomposition: backtest the macro-regime signal on each series alone, to
+// see whether the composite's IC concentrates in one economically meaningful
+// series (real macro content) or spreads evenly (a slow calendar/regime proxy).
+function MacroDecompositionSection() {
+  const { t } = useI18n();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["macro-decomposition"],
+    queryFn: () => api.getMacroDecomposition(),
+  });
+
+  const rows: MacroSeriesBacktest[] = data ?? [];
+  const bySeries = new Map<string, Map<number, MacroSeriesBacktest>>();
+  for (const r of rows) {
+    let m = bySeries.get(r.series_id);
+    if (!m) {
+      m = new Map();
+      bySeries.set(r.series_id, m);
+    }
+    m.set(r.horizon_days, r);
+  }
+  const series = [...bySeries.keys()].sort();
+
+  return (
+    <section className="space-y-4 pt-4">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">
+          {t("stats.macro.title")}
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">{t("stats.macro.subtitle")}</p>
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+          {t("stats.macro.loading")}
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
+          <p className="font-semibold">{t("stats.macro.failTitle")}</p>
+        </div>
+      ) : series.length === 0 ? (
+        <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
+          {t("stats.macro.empty")}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
+                  {t("stats.macro.th.series")}
+                </th>
+                <th
+                  colSpan={HORIZONS.length}
+                  className="border-b border-gray-100 px-4 py-2 text-center font-medium normal-case tracking-normal text-gray-400"
+                >
+                  {t("stats.macro.th.icGroup")}
+                </th>
+              </tr>
+              <tr className="border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {HORIZONS.map((h) => (
+                  <th key={h} className="px-3 py-2 text-right font-mono">
+                    D+{h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {series.map((sid) => {
+                const cells = bySeries.get(sid)!;
+                return (
+                  <tr
+                    key={sid}
+                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
+                  >
+                    <td className="px-4 py-2">
+                      <span className="block font-medium text-gray-900">
+                        {MACRO_SERIES_LABELS[sid] ?? sid}
+                      </span>
+                      <span className="block font-mono text-[10px] text-gray-400">
+                        {sid}
+                      </span>
+                    </td>
+                    {HORIZONS.map((h) => {
+                      const cell = cells.get(h);
+                      const ic = cell?.information_coefficient ?? null;
+                      if (cell == null || ic == null) {
+                        return (
+                          <td
+                            key={h}
+                            className="px-3 py-2 text-right font-mono text-gray-300"
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      const positive = ic >= 0;
+                      return (
+                        <td
+                          key={h}
+                          className="px-3 py-2 text-right font-mono"
+                          title={`${t("stats.macro.th.net")}: ${formatPct(
+                            cell.mean_strategy_return_net
+                          )} · n=${cell.n_predictions}`}
+                        >
+                          <span
+                            className={`block font-medium ${
+                              positive ? "text-emerald-600" : "text-red-600"
+                            }`}
+                          >
+                            {formatIc(ic)}
+                          </span>
+                          <span className="block text-[10px] text-gray-400">
+                            n={cell.n_predictions}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="text-xs leading-relaxed text-gray-500">
+        {t("stats.macro.readHint")}
+      </p>
     </section>
   );
 }

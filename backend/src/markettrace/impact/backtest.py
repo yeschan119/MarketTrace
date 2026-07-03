@@ -45,11 +45,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from markettrace.db.models import Document, Event, EventImpact, MacroObservation
-from markettrace.impact.signal import EventTypeSignal, SignalModel
+from markettrace.impact.signal import EventTypeSignal, MacroSurpriseSignal, SignalModel
 
 __all__ = [
     "BacktestEvent",
     "BacktestResult",
+    "MacroSeriesBacktest",
+    "distinct_macro_series",
+    "run_macro_decomposition",
     "run_walk_forward_backtest",
     "walk_forward_backtest",
 ]
@@ -199,13 +202,19 @@ def walk_forward_backtest(
     )
 
 
-def _load_backtest_events(session: Session, *, horizon_days: int) -> list[BacktestEvent]:
+def _load_backtest_events(
+    session: Session, *, horizon_days: int, macro_series: str | None = None
+) -> list[BacktestEvent]:
     """Load scored events for one horizon, each tagged with its macro regime.
 
     Each event's ``macro_surprise`` is the latest ``surprise_score`` published
     *strictly before* the event's filing time — a cutoff that keeps the macro
     feature look-ahead-safe (an event never sees a surprise the market had not yet
     seen). Events are returned in query order; the backtest sorts them by date.
+
+    ``macro_series`` restricts that regime to a single series (e.g. ``"CPIAUCSL"``)
+    instead of the freshest surprise across all series — this is what lets the macro
+    signal be *decomposed* per series to see which one, if any, carries the edge.
     """
     rows = session.execute(
         select(
@@ -219,11 +228,12 @@ def _load_backtest_events(session: Session, *, horizon_days: int) -> list[Backte
         .where(EventImpact.horizon_days == horizon_days)
     ).all()
 
-    macro_rows = session.execute(
-        select(MacroObservation.published_at, MacroObservation.surprise_score)
-        .where(MacroObservation.surprise_score.is_not(None))
-        .order_by(MacroObservation.published_at)
-    ).all()
+    macro_stmt = select(
+        MacroObservation.published_at, MacroObservation.surprise_score
+    ).where(MacroObservation.surprise_score.is_not(None))
+    if macro_series is not None:
+        macro_stmt = macro_stmt.where(MacroObservation.series_id == macro_series)
+    macro_rows = session.execute(macro_stmt.order_by(MacroObservation.published_at)).all()
     macro_dates = [r[0] for r in macro_rows]
     macro_values = [r[1] for r in macro_rows]
 
@@ -251,9 +261,16 @@ def run_walk_forward_backtest(
     commission_per_trade: float = 0.0,
     slippage_per_trade: float = 0.0,
     model: SignalModel | None = None,
+    macro_series: str | None = None,
 ) -> BacktestResult:
-    """Backtest one horizon from ``event_impacts`` ordered by each event's filing date."""
-    events = _load_backtest_events(session, horizon_days=horizon_days)
+    """Backtest one horizon from ``event_impacts`` ordered by each event's filing date.
+
+    ``macro_series`` scopes the macro regime feature to a single series (used by the
+    macro decomposition); leave it ``None`` for the all-series composite regime.
+    """
+    events = _load_backtest_events(
+        session, horizon_days=horizon_days, macro_series=macro_series
+    )
     return walk_forward_backtest(
         events,
         horizon_days=horizon_days,
@@ -262,3 +279,74 @@ def run_walk_forward_backtest(
         slippage_per_trade=slippage_per_trade,
         model=model,
     )
+
+
+@dataclass(frozen=True)
+class MacroSeriesBacktest:
+    """One macro series' standalone out-of-sample result at one horizon.
+
+    The composite ``macro_surprise`` model conditions on the *freshest surprise
+    across all series*, so a strong IC there could be one series doing the work — or
+    just a slow-moving proxy for the calendar. Backtesting each series on its own
+    (this row) decomposes that: if the edge concentrates in one economically
+    meaningful series it argues for real macro content; if every series looks alike
+    it argues for a time/regime proxy.
+    """
+
+    series_id: str
+    horizon_days: int
+    n_predictions: int
+    hit_rate: float | None
+    mean_strategy_return_net: float | None
+    information_coefficient: float | None
+
+
+def distinct_macro_series(session: Session) -> list[str]:
+    """Series ids that have at least one usable surprise, sorted for stable output."""
+    rows = session.execute(
+        select(MacroObservation.series_id)
+        .where(MacroObservation.surprise_score.is_not(None))
+        .distinct()
+        .order_by(MacroObservation.series_id)
+    ).all()
+    return [r[0] for r in rows]
+
+
+def run_macro_decomposition(
+    session: Session,
+    *,
+    horizons: Iterable[int],
+    min_train_per_type: int = DEFAULT_MIN_TRAIN_PER_TYPE,
+    commission_per_trade: float = 0.0,
+    slippage_per_trade: float = 0.0,
+) -> list[MacroSeriesBacktest]:
+    """Backtest the macro-regime signal on each series independently, per horizon.
+
+    Reuses the same look-ahead-safe walk-forward as the composite macro model, but
+    scopes the regime to one series at a time (``macro_series=``) so the composite's
+    information coefficient can be attributed series by series.
+    """
+    horizons = list(horizons)
+    results: list[MacroSeriesBacktest] = []
+    for series_id in distinct_macro_series(session):
+        for horizon in horizons:
+            result = run_walk_forward_backtest(
+                session,
+                horizon_days=horizon,
+                min_train_per_type=min_train_per_type,
+                commission_per_trade=commission_per_trade,
+                slippage_per_trade=slippage_per_trade,
+                model=MacroSurpriseSignal(min_train=min_train_per_type),
+                macro_series=series_id,
+            )
+            results.append(
+                MacroSeriesBacktest(
+                    series_id=series_id,
+                    horizon_days=horizon,
+                    n_predictions=result.n_predictions,
+                    hit_rate=result.hit_rate,
+                    mean_strategy_return_net=result.mean_strategy_return_net,
+                    information_coefficient=result.information_coefficient,
+                )
+            )
+    return results

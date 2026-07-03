@@ -354,3 +354,20 @@ def test_backtest_route_selects_direction_model(client: TestClient) -> None:
 def test_backtest_route_rejects_unknown_model(client: TestClient) -> None:
     resp = client.get("/stats/backtest", params={"model": "bogus"})
     assert resp.status_code == 400
+
+
+def test_macro_decomposition_route(client, ts_session):
+    ts_session.add(_macro_row("CPIAUCSL", datetime(2024, 3, 1, tzinfo=UTC), 303.0, 2.0))
+    ts_session.add(_macro_row("UNRATE", datetime(2024, 3, 1, tzinfo=UTC), 3.9, -0.5))
+    ts_session.flush()
+
+    resp = client.get("/stats/macro-decomposition")
+    assert resp.status_code == 200
+    data = resp.json()
+    # One backtest per (series, standard horizon).
+    assert {r["series_id"] for r in data} == {"CPIAUCSL", "UNRATE"}
+    cpi_horizons = sorted(r["horizon_days"] for r in data if r["series_id"] == "CPIAUCSL")
+    assert cpi_horizons == [1, 5, 20, 60]
+    for row in data:
+        assert "information_coefficient" in row
+        assert "mean_strategy_return_net" in row

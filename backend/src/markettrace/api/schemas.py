@@ -132,6 +132,17 @@ class BacktestResultOut(BaseModel):
     slippage_per_trade: float
 
 
+class MacroSeriesBacktestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    series_id: str
+    horizon_days: int
+    n_predictions: int
+    hit_rate: float | None
+    mean_strategy_return_net: float | None
+    information_coefficient: float | None
+
+
 class MacroObservationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

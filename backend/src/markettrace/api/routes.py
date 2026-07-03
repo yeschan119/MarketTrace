@@ -18,6 +18,7 @@ from markettrace.api.schemas import (
     InstrumentOut,
     InstrumentTimeline,
     MacroObservationOut,
+    MacroSeriesBacktestOut,
     OutcomeOut,
 )
 from markettrace.config import get_settings
@@ -30,6 +31,7 @@ from markettrace.db.models import (
 )
 from markettrace.impact.backtest import (
     DEFAULT_MIN_TRAIN_PER_TYPE,
+    run_macro_decomposition,
     run_walk_forward_backtest,
 )
 from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
@@ -190,6 +192,27 @@ def get_backtest(
         for h in _BACKTEST_HORIZONS
     ]
     return [BacktestResultOut.model_validate(r) for r in results]
+
+
+@router.get("/stats/macro-decomposition", response_model=list[MacroSeriesBacktestOut])
+def get_macro_decomposition(
+    db: Session = Depends(get_db),
+) -> list[MacroSeriesBacktestOut]:
+    """Per-macro-series walk-forward backtest: which series (if any) carries the edge.
+
+    Decomposes the composite ``macro_surprise`` model — which conditions on the
+    freshest surprise across all series — into one standalone backtest per series
+    and horizon, so a strong composite IC can be attributed rather than taken on
+    faith (it may be one series, or merely a slow calendar proxy)."""
+    settings = get_settings()
+    results = run_macro_decomposition(
+        db,
+        horizons=_BACKTEST_HORIZONS,
+        min_train_per_type=DEFAULT_MIN_TRAIN_PER_TYPE,
+        commission_per_trade=settings.backtest_commission_per_trade,
+        slippage_per_trade=settings.backtest_slippage_per_trade,
+    )
+    return [MacroSeriesBacktestOut.model_validate(r) for r in results]
 
 
 @router.get("/macro/observations", response_model=list[MacroObservationOut])

@@ -17,6 +17,7 @@ import type {
   PassbookStatement,
   PassbookStatementSummary,
   MacroObservation,
+  MacroSeriesBacktest,
   HealthResponse,
 } from "@/types/api";
 
@@ -149,6 +150,10 @@ export const api = {
   getBacktest(model: BacktestModel = "event_type_history"): Promise<BacktestResult[]> {
     const query = new URLSearchParams({ model });
     return apiFetch<BacktestResult[]>(`/stats/backtest?${query}`);
+  },
+
+  getMacroDecomposition(): Promise<MacroSeriesBacktest[]> {
+    return apiFetch<MacroSeriesBacktest[]>("/stats/macro-decomposition");
   },
 
   getMacroObservations(): Promise<MacroObservation[]> {

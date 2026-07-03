@@ -76,6 +76,15 @@ export interface BacktestResult {
   slippage_per_trade: number;
 }
 
+export interface MacroSeriesBacktest {
+  series_id: string;
+  horizon_days: number;
+  n_predictions: number;
+  hit_rate: number | null;
+  mean_strategy_return_net: number | null;
+  information_coefficient: number | null;
+}
+
 export interface MacroObservation {
   series_id: string;
   reference_date: string;

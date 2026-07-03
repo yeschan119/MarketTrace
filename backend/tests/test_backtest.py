@@ -20,6 +20,8 @@ from markettrace.db.models import (
 from markettrace.impact.backtest import (
     BacktestEvent,
     _load_backtest_events,
+    distinct_macro_series,
+    run_macro_decomposition,
     run_walk_forward_backtest,
     walk_forward_backtest,
 )
@@ -402,3 +404,85 @@ def test_macro_enrichment_is_look_ahead_safe(mem_session) -> None:
     assert by_day[2] is None  # STRICTLY before -> the Jan-2 release itself is excluded
     assert by_day[3] == pytest.approx(0.7)  # sees the Jan-2 surprise
     assert by_day[4] == pytest.approx(0.7)
+
+
+def _seed_two_series(session) -> None:
+    """One instrument, 4 earnings events (Jan 3..6, h=5), and two macro series
+    with OPPOSITE-sign surprises both released Jan 2 (so events 3..6 see both)."""
+    inst = Instrument(market="US", ticker="AAPL", name="Apple")
+    session.add(inst)
+    session.flush()
+    for series_id, surprise in (("CPIAUCSL", 0.9), ("UNRATE", -0.4)):
+        session.add(
+            MacroObservation(
+                series_id=series_id,
+                source="fred",
+                reference_date=datetime(2025, 12, 1, tzinfo=UTC),
+                released_value=1.0,
+                surprise_score=surprise,
+                occurred_at=datetime(2025, 12, 1, tzinfo=UTC),
+                first_seen_at=datetime(2026, 1, 2, tzinfo=UTC),
+                published_at=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+        )
+    for day in range(3, 7):
+        doc = Document(
+            source="sec_edgar",
+            external_id=f"acc-{day}",
+            url="https://example.com",
+            title="8-K",
+            content_hash=f"h{day}",
+            market="US",
+            published_at=datetime(2026, 1, day, tzinfo=UTC),
+            first_seen_at=datetime(2026, 1, day, tzinfo=UTC),
+        )
+        session.add(doc)
+        session.flush()
+        event = Event(
+            document_id=doc.id,
+            primary_instrument_id=inst.id,
+            event_type="earnings",
+            direction="positive",
+            horizon_days=5,
+            confidence=0.7,
+            model="t",
+            model_version="v1",
+            analyzed_at=datetime(2026, 1, day, tzinfo=UTC),
+        )
+        session.add(event)
+        session.flush()
+        session.add(
+            EventImpact(
+                event_id=event.id,
+                instrument_id=inst.id,
+                event_type="earnings",
+                direction="positive",
+                horizon_days=5,
+                abnormal_return=0.01,
+                computed_at=datetime(2026, 1, day, tzinfo=UTC),
+            )
+        )
+    session.commit()
+
+
+def test_load_backtest_events_scopes_regime_to_one_series(mem_session) -> None:
+    _seed_two_series(mem_session)
+    cpi = {e.occurred_at.day: e.macro_surprise for e in
+           _load_backtest_events(mem_session, horizon_days=5, macro_series="CPIAUCSL")}
+    unrate = {e.occurred_at.day: e.macro_surprise for e in
+              _load_backtest_events(mem_session, horizon_days=5, macro_series="UNRATE")}
+    # Each event sees only the requested series' (opposite-sign) surprise.
+    assert cpi[3] == pytest.approx(0.9)
+    assert unrate[3] == pytest.approx(-0.4)
+
+
+def test_distinct_macro_series_lists_series_with_surprise(mem_session) -> None:
+    _seed_two_series(mem_session)
+    assert distinct_macro_series(mem_session) == ["CPIAUCSL", "UNRATE"]
+
+
+def test_macro_decomposition_returns_row_per_series_and_horizon(mem_session) -> None:
+    _seed_two_series(mem_session)
+    rows = run_macro_decomposition(mem_session, horizons=[5])
+    assert {r.series_id for r in rows} == {"CPIAUCSL", "UNRATE"}
+    assert all(r.horizon_days == 5 for r in rows)

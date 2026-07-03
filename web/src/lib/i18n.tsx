@@ -143,6 +143,21 @@ const en: Dict = {
       },
       coverageHint: "used / dropped (no outcome)",
     },
+    macro: {
+      title: "Macro Regime Decomposition",
+      subtitle:
+        "The macro-regime signal backtested on each series alone. If the edge concentrates in one economically meaningful series it argues for real macro content; if every series looks alike it's likely a slow calendar/regime proxy.",
+      loading: "Loading macro decomposition...",
+      failTitle: "Failed to load macro decomposition",
+      empty: "No macro series with surprises yet.",
+      th: {
+        series: "Macro Series",
+        icGroup: "Information coefficient by horizon",
+        net: "Net return",
+      },
+      readHint:
+        "Each cell is the out-of-sample information coefficient (predicted vs realised correlation) of conditioning on that series' surprise sign; hover for net-of-cost return and sample size. Green = positive predictive correlation.",
+    },
   },
   eventDetail: {
     loading: "Loading event...",
@@ -437,6 +452,21 @@ const ko: Dict = {
         coverage: "커버리지",
       },
       coverageHint: "사용 / 제외(결측)",
+    },
+    macro: {
+      title: "거시 국면 분해",
+      subtitle:
+        "거시 국면 신호를 시리즈별로 따로 백테스트한 결과. 특정 경제 시리즈에 엣지가 몰리면 진짜 거시효과를, 모든 시리즈가 비슷하면 느린 캘린더/국면 프록시를 시사합니다.",
+      loading: "거시 분해 불러오는 중...",
+      failTitle: "거시 분해를 불러오지 못했습니다",
+      empty: "surprise가 있는 거시 시리즈가 아직 없습니다.",
+      th: {
+        series: "거시 시리즈",
+        icGroup: "지평별 정보계수(IC)",
+        net: "순수익",
+      },
+      readHint:
+        "각 칸은 해당 시리즈의 surprise 부호로 조건화했을 때의 표본외 정보계수(IC=예측과 실제의 상관)입니다. 마우스를 올리면 거래비용 반영 순수익·표본수가 보입니다. 초록 = 양(+)의 예측상관.",
     },
   },
   eventDetail: {
