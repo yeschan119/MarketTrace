@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketTrace — 설계 블루프린트</title>
+<style>
+  :root{
+    --indigo:#818cf8; --indigo-light:#1e1b4b; --ink:#e2e8f0; --muted:#94a3b8;
+    --green:#4ade80; --green-bg:#10301d; --amber:#fbbf24; --amber-bg:#3a2c0a;
+    --red:#f87171; --red-bg:#3a1414; --gray:#94a3b8; --gray-bg:#1e293b;
+    --line:#2a3344; --card:#161e2e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",Roboto,sans-serif;
+    background:#0b1120;color:var(--ink);line-height:1.6;padding:0 0 80px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:var(--indigo)}
+  header{background:linear-gradient(135deg,#1e1b4b,#312e6b 55%,#3b0d5e);color:#fff;padding:44px 0 38px;margin-bottom:34px;border-bottom:1px solid #2a2550}
+  header .wrap{display:block}
+  .logo{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .logo span{opacity:.8;font-weight:500;font-size:16px;margin-left:10px}
+  .tagline{margin-top:10px;font-size:15px;opacity:.92;max-width:780px}
+  .pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);
+    padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+
+  h2{font-size:20px;margin:40px 0 14px;display:flex;align-items:center;gap:9px;scroll-margin-top:16px}
+  h2 .num{background:var(--indigo);color:#fff;min-width:26px;height:26px;padding:0 6px;border-radius:7px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  h3{font-size:15.5px;margin:20px 0 8px;color:#f1f5f9}
+  p{margin:10px 0;color:#cbd5e1;font-size:14px}
+  .sub{color:var(--muted);font-size:13.5px;margin:-4px 0 14px}
+  ul.bul{list-style:none;font-size:13.8px;margin:8px 0}
+  ul.bul li{padding:4px 0 4px 20px;position:relative;color:#cbd5e1}
+  ul.bul li:before{content:"–";position:absolute;left:4px;color:var(--indigo);font-weight:700}
+  ol.num{margin:8px 0 8px 22px;font-size:13.8px;color:#cbd5e1}
+  ol.num li{padding:3px 0}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#0b1120;color:#a5b4fc;
+    border:1px solid #2a3344;padding:1px 6px;border-radius:5px}
+  pre{background:#0b1120;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.3px;color:#cbd5e1;line-height:1.55;margin:14px 0}
+  pre b{color:#a5b4fc;font-weight:600}
+
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px}
+  .card .title{font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px}
+  .b-done{background:var(--green-bg);color:var(--green)}
+  .b-partial{background:var(--amber-bg);color:var(--amber)}
+  .b-todo{background:var(--red-bg);color:var(--red)}
+
+  /* pipeline flow (roadmap §3 style) */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:14px 0}
+  .flow .node{flex:1;min-width:96px;border-radius:10px;padding:11px 9px;text-align:center;font-size:12px;font-weight:600;border:1px solid var(--line)}
+  .flow .node small{display:block;font-size:10px;font-weight:500;opacity:.7;margin-top:2px}
+  .n-done{background:var(--green-bg);border-color:#1f5135;color:#86efac}
+  .n-partial{background:var(--amber-bg);border-color:#5c4510;color:#fcd34d}
+  .n-todo{background:var(--gray-bg);color:#94a3b8}
+
+  /* phase strip */
+  .strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0}
+  .strip .st{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 12px;text-align:center}
+  .strip .st .ph{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.4px}
+  .strip .st .nm{font-size:12.5px;font-weight:700;margin:4px 0 8px}
+  .strip .st .pct{font-size:21px;font-weight:800}
+  .done .pct{color:var(--green)} .partial .pct{color:var(--amber)} .todo .pct{color:var(--red)}
+  .bar{height:6px;border-radius:99px;background:var(--gray-bg);overflow:hidden;margin-top:7px}
+  .bar > i{display:block;height:100%;border-radius:99px}
+  .done .bar>i{background:var(--green)} .partial .bar>i{background:var(--amber)} .todo .bar>i{background:var(--red)}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#1e293b;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .t-ok{background:var(--green-bg);color:var(--green)} .t-no{background:var(--gray-bg);color:#64748b}
+  .t-part{background:var(--amber-bg);color:var(--amber)}
+
+  /* roadmap cross-reference callout */
+  .rm{margin:14px 0;font-size:12.8px;color:#c7d2fe;background:var(--indigo-light);border:1px solid #2e2a5e;border-radius:9px;padding:11px 14px;line-height:1.55}
+  .rm b{color:#a5b4fc}
+  .rm .h{display:inline-flex;align-items:center;gap:6px;font-weight:800;color:#a5b4fc;margin-right:6px}
+  .warn{background:var(--red-bg);border-color:#5c2020;color:#fca5a5}
+  .warn .h,.warn b{color:#fca5a5}
+
+  /* TOC */
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:8px}
+  .toc .coltitle{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+  .toc ul{list-style:none;columns:2;column-gap:28px;font-size:13.3px}
+  @media(max-width:640px){.toc ul{columns:1}.strip{grid-template-columns:repeat(2,1fr)}}
+  .toc li{padding:3px 0;break-inside:avoid}
+  .toc a{text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 4px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  footer{margin-top:40px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+  .quote{border-left:3px solid var(--indigo);background:#12172a;padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0;color:#e2e8f0;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="logo">MarketTrace <span>설계 블루프린트</span></div>
+    <div class="tagline">종목을 바로 추천하지 않는다. "지금 무슨 사건이 났고 → 누구에게 노출되며 → 무엇을(매출·비용·할인율·위험) 바꾸고 → 방향·크기·기간·신뢰도는 얼마이며 → 시장은 실제로 어떻게 반응했는가"에 반복적으로 답하는 시스템.</div>
+    <div class="pills">
+      <span class="pill">📄 원본: stock-analysis-system-blueprint.md</span>
+      <span class="pill">🧭 구현 현황은 <b>로드맵</b> 대조 주석</span>
+      <span class="pill">🟢 배포: miffy178.com</span>
+      <span class="pill">✅ 코퍼스 461건 (KR 253 · US 208)</span>
+      <span class="pill">기준일: 2026-07-03</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- TOC -->
+  <div class="toc">
+    <div class="coltitle">목차 · 파란 박스는 <a href="roadmap.html">roadmap.html</a> 대조</div>
+    <ul>
+      <li><a href="#s1">1. 제품 정의</a></li>
+      <li><a href="#s2">2. 핵심 설계 원칙</a></li>
+      <li><a href="#s3">3. 전체 구조 (파이프라인)</a></li>
+      <li><a href="#s4">4. 데이터 모델</a></li>
+      <li><a href="#s5">5. 권장 기술 스택</a></li>
+      <li><a href="#s6">6. MVP 범위</a></li>
+      <li><a href="#s7">7. 개발 순서</a></li>
+      <li><a href="#s8">8. 평가 지표</a></li>
+      <li><a href="#s9">9. 반드시 피해야 할 오류</a></li>
+      <li><a href="#s10">10. 공식 데이터 출발점</a></li>
+      <li><a href="#s11">11. 첫 번째 구현 목표</a></li>
+    </ul>
+  </div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--green)"></i> 구현·검증 완료</span>
+    <span><i class="dot" style="background:var(--amber)"></i> 진행 중 / 부분</span>
+    <span><i class="dot" style="background:var(--red)"></i> 미착수</span>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="s1"><span class="num">1</span> 제품 정의</h2>
+  <p>이 시스템의 1차 목적은 종목을 바로 추천하는 것이 아니라 다음 질문에 반복적으로 답하는 것이다.</p>
+  <ol class="num">
+    <li>지금 어떤 사건이 발생했는가?</li>
+    <li>어떤 기업과 산업에 노출되는가?</li>
+    <li>매출, 비용, 할인율, 재무 위험 중 무엇을 바꾸는가?</li>
+    <li>영향의 방향, 크기, 지속 기간, 신뢰도는 어느 정도인가?</li>
+    <li>시장은 발표 직후와 이후에 실제로 어떻게 반응했는가?</li>
+    <li>과거 유사 사건과 비교했을 때 현재 가격에 얼마나 반영되었는가?</li>
+  </ol>
+  <p>첫 버전의 출력은 <code>매수/매도</code>보다 아래 형태가 적합하다.</p>
+  <pre>삼성전자 / 부정적 관찰
+- 사건: 메모리 수출 규제 강화
+- 영향 경로: 출하량 감소 -&gt; 매출 감소 가능성
+- 예상 기간: 1~2개 분기
+- 신뢰도: 0.71
+- 이미 반영된 정도: 중간
+- 확인할 후속 지표: 수출액, DRAM 가격, 회사 가이던스</pre>
+  <div class="rm"><span class="h">🧭 로드맵</span> 사건 상세 화면이 이 출력 형태(사건·영향경로·방향·신뢰도·근거)를 이미 렌더한다. <b>남은 것은 "종목별 매수판단 화면"</b>(검증 신호를 종목 뷰에 결합) — Phase 5 잔여 항목.</div>
+
+  <!-- 2 -->
+  <h2 id="s2"><span class="num">2</span> 핵심 설계 원칙</h2>
+
+  <h3>LLM과 수치 모델의 역할을 분리한다</h3>
+  <ul class="bul">
+    <li><b>LLM</b>: 문서 요약, 종목 연결, 사건 분류, 영향 경로와 근거 추출</li>
+    <li><b>수치 모델</b>: 예상 수익률, 변동성, 이상 수익률, 신뢰구간 계산</li>
+    <li><b>규칙 엔진</b>: 출처 신뢰도, 중복 뉴스, 데이터 누락, 위험 제한 처리</li>
+  </ul>
+  <p>LLM이 뉴스 원문을 보고 곧바로 매수 또는 매도를 결정하게 만들면 설명 가능성과 재현성이 크게 떨어진다.</p>
+
+  <h3>시점 정보를 절대 잃지 않는다</h3>
+  <p>모든 데이터에 최소 세 시각을 저장한다.</p>
+  <ul class="bul">
+    <li><code>occurred_at</code>: 사건이 실제 발생한 시각</li>
+    <li><code>published_at</code>: 출처가 공개한 시각</li>
+    <li><code>first_seen_at</code>: 시스템이 처음 수집한 시각</li>
+  </ul>
+  <p>백테스트에서는 당시 알 수 있었던 데이터만 사용해야 한다. 수정된 경제지표, 뒤늦게 수정된 기사, 상장폐지 종목을 현재 기준으로 사용하면 결과가 과대평가된다.</p>
+
+  <h3>모든 결론에 근거를 남긴다</h3>
+  <ul class="bul">
+    <li>원문 URL과 출처</li>
+    <li>근거 문장 또는 공시 항목</li>
+    <li>사용한 모델과 버전</li>
+    <li>분석 시각 / 입력 데이터 버전</li>
+    <li>예측값과 실제 결과</li>
+  </ul>
+  <div class="rm"><span class="h">🧭 로드맵</span> 세 원칙 모두 <b>준수 확인</b> — LLM↔수치모델 분리(LLM 호출은 <code>event_extractor</code>에만, AC3), 3시각 <code>documents</code> NOT NULL(AC2), 근거 provenance(URL·근거문장·모델·버전·분석시각) 기록. novelty·통계·F1은 결정론적 순수함수라 재현성 확보.</div>
+
+  <!-- 3 -->
+  <h2 id="s3"><span class="num">3</span> 전체 구조 — 파이프라인</h2>
+  <p class="sub">원문(공시·뉴스·거시·시세) → 수집 → 저장 → 정규화 → 연결 → 사건추출 → Feature Store → 영향분석 → 신호·위험 → API/대시보드 → 사후성과(→ Feature Store로 피드백)</p>
+  <div class="flow">
+    <div class="node n-done">수집기<small>SEC·OpenDART·Tiingo·Naver</small></div>
+    <div class="node n-done">원문 저장소<small>ObjectStore + 해시</small></div>
+    <div class="node n-done">정규화·중복제거<small>content_hash·novelty</small></div>
+    <div class="node n-done">기업·산업 연결<small>entity_linker</small></div>
+    <div class="node n-done">사건 추출<small>LLM tool-use</small></div>
+    <div class="node n-todo">Feature Store<small>미구현</small></div>
+    <div class="node n-done">영향 분석<small>이상수익률 1/5/20/60·섹터·거시</small></div>
+    <div class="node n-partial">신호·위험<small>5모델 백테스트·유의게이트</small></div>
+    <div class="node n-done">API·대시보드<small>FastAPI + Next.js</small></div>
+    <div class="node n-todo">사후 성과 측정<small>미구현</small></div>
+  </div>
+
+  <h3>수집 계층</h3>
+  <ul class="bul">
+    <li>가격: 일봉, 거래량, 시가총액, 수정주가, 기업행동</li>
+    <li>기업: 공시, 재무제표, 실적 발표, 가이던스, 지분 변동</li>
+    <li>거시경제: 금리, CPI, 고용, 환율, 원자재, 경제 일정</li>
+    <li>텍스트: 기업 보도자료, 정부 발표, 신뢰 가능한 뉴스</li>
+    <li>시장 수급: 외국인·기관 매매, 공매도, 옵션 및 변동성 지표</li>
+  </ul>
+  <p>원문은 수정하지 않고 객체 저장소에 보존하고, 파싱 결과만 별도 테이블에 저장한다.</p>
+
+  <h3>사건 추출 계층</h3>
+  <p>사건 분류 예시:</p>
+  <ul class="bul">
+    <li><code>earnings</code>, <code>guidance</code>, <code>product_launch</code>, <code>contract</code></li>
+    <li><code>regulation</code>, <code>tariff</code>, <code>tax</code>, <code>sanction</code>, <code>election</code></li>
+    <li><code>war</code>, <code>geopolitical_risk</code>, <code>supply_disruption</code></li>
+    <li><code>merger</code>, <code>buyback</code>, <code>dividend</code>, <code>capital_raise</code></li>
+    <li><code>clinical_trial</code>, <code>approval</code>, <code>recall</code>, <code>accident</code>, <code>lawsuit</code></li>
+    <li><code>rate_decision</code>, <code>inflation</code>, <code>employment</code>, <code>fx_shock</code></li>
+  </ul>
+  <p>사건은 단순 감성 점수가 아니라 다음 구조로 저장한다.</p>
+  <pre>{
+  "event_type": "product_launch",
+  "entities": ["AAPL"],
+  "industries": ["smartphone", "semiconductor"],
+  "channels": ["revenue", "margin", "competition"],
+  "direction": "positive",
+  "horizon_days": 90,
+  "surprise_score": 0.76,
+  "novelty_score": 0.83,
+  "source_reliability": 0.95,
+  "confidence": 0.78,
+  "evidence": ["source-document-reference"]
+}</pre>
+
+  <h3>영향 분석 계층</h3>
+  <p>개별 사건 점수는 다음 개념으로 계산한다.</p>
+  <pre>event_score =
+    direction
+  * surprise
+  * source_reliability
+  * company_exposure
+  * expected_persistence
+  * model_confidence
+  - priced_in_penalty</pre>
+  <p>최종 종목 점수는 서로 다른 신호를 분리해서 보여준다.</p>
+  <pre>total_score =
+    fundamental_score
+  + event_score
+  + macro_score
+  + price_momentum_score
+  + flow_score
+  - risk_penalty</pre>
+  <p>점수 하나만 노출하지 말고 구성 요소, 예상 기간, 신뢰구간을 함께 제공해야 한다.</p>
+  <div class="rm"><span class="h">🧭 로드맵</span> 10개 노드 중 <b>8개 동작</b>. 초록 = 수집·저장·정규화·연결·추출·영향분석·API. 회색 미구현 = <b>Feature Store · 사후 성과 측정</b>(피드백 루프). 노랑 = 신호·검증(5모델 백테스트까지 구현, calibration·결합 잔여). <code>total_score</code>의 event 항은 검증됨(사건 기반), macro 항은 <b>프록시로 판명</b>돼 배제.</div>
+
+  <!-- 4 -->
+  <h2 id="s4"><span class="num">4</span> 데이터 모델 <span style="font-size:13px;font-weight:500;color:var(--muted)">(13개 중 10개 구현)</span></h2>
+  <table>
+    <tr><th>테이블</th><th>용도</th><th>상태</th></tr>
+    <tr><td><code>instruments</code></td><td>종목, 거래소, 산업, 상장 및 상장폐지 이력</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>entity_aliases</code></td><td>회사명, 브랜드명, 티커, 자회사 별칭</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>prices</code></td><td>수정 전·후 OHLCV와 기업행동</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>documents</code></td><td>수집한 원문과 출처, 세 시각, 해시</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>document_entities</code></td><td>문서와 기업 간 연결 및 확률</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>events</code></td><td>구조화한 사건과 영향 속성</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>event_impacts</code></td><td>사건별 종목·산업 영향 점수</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>fundamentals</code></td><td>재무 수치와 공시 당시 이용 가능 시각</td><td><span class="tag t-no">Phase 4</span></td></tr>
+    <tr><td><code>macro_observations</code></td><td>발표값, 예상값, 이전값, 수정 이력</td><td><span class="tag t-ok">구현</span></td></tr>
+    <tr><td><code>features</code></td><td>모델 입력값과 계산 시점</td><td><span class="tag t-no">Phase 4</span></td></tr>
+    <tr><td><code>signals</code></td><td>모델별 예측, 기간, 신뢰도, 버전</td><td><span class="tag t-no">Phase 4</span></td></tr>
+    <tr><td><code>outcomes</code></td><td>1일·5일·20일·60일 실제 성과</td><td><span class="tag t-ok">구현 (+섹터)</span></td></tr>
+    <tr><td><code>model_runs</code></td><td>학습 기간, 파라미터, 데이터 버전</td><td><span class="tag t-ok">구현</span></td></tr>
+  </table>
+  <div class="rm"><span class="h">🧭 로드맵</span> <b>10/13 구현.</b> 미구현 3종(<code>fundamentals</code>·<code>features</code>·<code>signals</code>)은 모두 Phase 4의 "펀더멘털·가격·수급 모델을 동일 <code>SignalModel</code>로 추가"와 묶여 있음. <code>macro_observations</code>는 빈티지·surprise까지 적재 완료.</div>
+
+  <!-- 5 -->
+  <h2 id="s5"><span class="num">5</span> 권장 기술 스택</h2>
+  <table>
+    <tr><th>영역</th><th>선택</th><th>현황</th></tr>
+    <tr><td>언어</td><td>Python 3.12</td><td><span class="tag t-ok">채택</span></td></tr>
+    <tr><td>API</td><td>FastAPI</td><td><span class="tag t-ok">채택</span></td></tr>
+    <tr><td>배치·워크플로</td><td>Prefect</td><td><span class="tag t-no">CLI로 대체</span></td></tr>
+    <tr><td>데이터 처리</td><td>Polars, DuckDB</td><td><span class="tag t-part">Polars</span></td></tr>
+    <tr><td>운영 DB</td><td>PostgreSQL <small style="color:var(--muted)">(필요시 TimescaleDB)</small></td><td><span class="tag t-ok">채택</span></td></tr>
+    <tr><td>원문 저장</td><td>S3 호환 객체 저장소</td><td><span class="tag t-part">로컬 ObjectStore</span></td></tr>
+    <tr><td>모델 관리</td><td>MLflow</td><td><span class="tag t-no">미도입</span></td></tr>
+    <tr><td>대시보드</td><td>Next.js <small style="color:var(--muted)">(초기 Streamlit)</small></td><td><span class="tag t-ok">Next.js 15</span></td></tr>
+    <tr><td>배포</td><td>Docker Compose → (확장 시) K8s</td><td><span class="tag t-ok">Render 배포</span></td></tr>
+  </table>
+  <p>초기에는 Kafka, Kubernetes, 복잡한 마이크로서비스를 사용하지 않는다. 수집기와 분석 작업을 독립 모듈로 만들되 하나의 저장소와 배포 단위로 운영하는 편이 빠르다.</p>
+  <div class="rm"><span class="h">🧭 로드맵</span> 핵심 스택(Python·FastAPI·PostgreSQL·Next.js) 채택. Prefect·MLflow·DuckDB·S3는 <b>의도적으로 미도입</b> — "규모 커진 뒤 검토" 원칙대로 CLI·로컬 ObjectStore로 단순 유지.</div>
+
+  <!-- 6 -->
+  <h2 id="s6"><span class="num">6</span> MVP 범위</h2>
+  <ul class="bul">
+    <li>시장: 한국 또는 미국 한 곳 → <b>KR·US 양쪽 라이브</b></li>
+    <li>대상: 유동성 높은 50~100개 종목</li>
+    <li>빈도: 장 마감 후 일 1회, 공시는 5~15분 주기</li>
+    <li>데이터: 가격, 기업행동, 공시, 재무제표, 주요 거시지표</li>
+    <li>사건: 실적, 가이던스, 계약, 증자, 자사주, 규제, 제품 발표</li>
+    <li>출력: 사건 타임라인, 영향 점수, 유사 과거 사건, 사후 수익률</li>
+    <li>제외: 초단타, 자동 주문, SNS 전체 크롤링, 틱 데이터</li>
+  </ul>
+  <p>뉴스 전체를 먼저 모으기보다 공식 공시와 경제지표로 데이터 파이프라인을 검증한 뒤 뉴스 범위를 넓히는 것이 좋다.</p>
+  <div class="rm"><span class="h">🧭 로드맵</span> MVP 범위 <b>초과 달성</b> — 원안은 "한 시장"이었으나 SEC(US)·OpenDART(KR) 동일 Protocol로 <b>양쪽 라이브</b>. 공식 공시 기반 검증을 먼저 완료(코퍼스 461건), 뉴스는 후속 확장.</div>
+
+  <!-- 7 -->
+  <h2 id="s7"><span class="num">7</span> 개발 순서</h2>
+  <div class="strip">
+    <div class="st partial"><div class="ph">1단계</div><div class="nm">데이터 기반</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
+    <div class="st partial"><div class="ph">2단계</div><div class="nm">사건 엔진</div><div class="pct">65%</div><div class="bar"><i style="width:65%"></i></div></div>
+    <div class="st done"><div class="ph">3단계</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
+    <div class="st partial"><div class="ph">4단계</div><div class="nm">신호·검증</div><div class="pct">72%</div><div class="bar"><i style="width:72%"></i></div></div>
+    <div class="st partial"><div class="ph">5단계</div><div class="nm">사용자 기능</div><div class="pct">52%</div><div class="bar"><i style="width:52%"></i></div></div>
+  </div>
+
+  <div class="card">
+    <div class="title">1단계 · 데이터 기반 <span class="badge b-done">완료</span></div>
+    <ul class="bul">
+      <li>종목 마스터와 상장 이력 구축</li>
+      <li>가격과 기업행동 수집</li>
+      <li>원문 저장, 중복 제거, 재시도, 수집 상태 모니터링</li>
+      <li>데이터 품질 검사</li>
+    </ul>
+    <p class="sub"><b>완료 기준:</b> 임의 날짜의 종목과 당시 이용 가능 데이터가 재현된다.</p>
+  </div>
+
+  <div class="card">
+    <div class="title">2단계 · 사건 엔진 <span class="badge b-partial">진행 중 ~65%</span></div>
+    <ul class="bul">
+      <li>공시와 문서에서 기업 연결 <span class="tag t-ok">완료</span></li>
+      <li>사건 유형, 방향, 영향 경로, 기간 추출 <span class="tag t-ok">완료</span></li>
+      <li>동일 사건을 보도한 여러 문서 묶기 (Jaccard 군집·novelty) <span class="tag t-ok">완료</span></li>
+      <li>사람이 검토하고 수정할 수 있는 화면 <span class="tag t-no">잔여</span></li>
+    </ul>
+    <p class="sub"><b>완료 기준 🟡:</b> 기업연결 P/R/F1·분류 macro F1 <b>측정 가능</b>(메트릭·하베스트 구현). 실수치는 골드셋 확장 후 라이브 실행 필요.</p>
+  </div>
+
+  <div class="card">
+    <div class="title">3단계 · 영향 측정 <span class="badge b-done">완료</span></div>
+    <ul class="bul">
+      <li>시장·산업 수익률을 제거한 이상 수익률 계산 (섹터 조정 포함)</li>
+      <li>사건 후 1일, 5일, 20일, 60일 반응 저장</li>
+      <li>사건 유형별 평균 반응과 분산 계산</li>
+      <li>예상 대비 실제 발표치의 surprise feature 추가 (FRED/ALFRED 빈티지)</li>
+    </ul>
+    <p class="sub"><b>완료 기준 ✅:</b> 사건별 예측과 실제 결과가 자동으로 연결된다.</p>
+  </div>
+
+  <div class="card">
+    <div class="title">4단계 · 신호와 검증 <span class="badge b-partial">진행 중 ~72%</span></div>
+    <ul class="bul">
+      <li>펀더멘털·이벤트·거시·가격·수급 모델 분리 <span class="tag t-part">이벤트·거시·결합 구현</span></li>
+      <li>워크포워드 백테스트 (look-ahead 차단) <span class="tag t-ok">완료</span></li>
+      <li>거래비용·슬리피지·거래정지·상장폐지 반영 <span class="tag t-part">비용·커버리지 반영</span></li>
+      <li>모델별 기여도와 실패 사례 기록 <span class="tag t-ok">5모델 비교·거시 분해</span></li>
+    </ul>
+    <p class="sub"><b>완료 기준 🟢:</b> 표본 외 개선을 5d에서 확인 — significant_event_type 순 <b>+4.4%</b>·적중 68%, event_type_history <b>+2.1%</b>. <b>거시=프록시·llm_direction=손실</b>로 배제.</p>
+  </div>
+
+  <div class="card">
+    <div class="title">5단계 · 사용자 기능 <span class="badge b-partial">진행 중 ~52%</span></div>
+    <ul class="bul">
+      <li>종목별 사건 타임라인 <span class="tag t-ok">완료</span></li>
+      <li>변동 원인 후보와 근거 <span class="tag t-ok">완료</span></li>
+      <li>관심 종목 알림 <span class="tag t-no">잔여</span></li>
+      <li>시나리오별 상승·하락 요인 <span class="tag t-no">잔여</span></li>
+      <li>데이터와 모델 상태 대시보드 <span class="tag t-ok">/stats 검증 대시보드</span></li>
+    </ul>
+  </div>
+  <div class="rm"><span class="h">🧭 로드맵</span> 1·3단계 완료, 2·4·5단계 진행 중. <b>초점이 "모델 확장"에서 "calibration·매수판단 노출"로 이동.</b> 상세 단계별 카드는 <a href="roadmap.html">roadmap.html</a> 참조.</div>
+
+  <!-- 8 -->
+  <h2 id="s8"><span class="num">8</span> 평가 지표</h2>
+  <p>분류 정확도와 투자 성과를 따로 측정한다.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="g2">
+    <div class="card">
+      <h3 style="margin-top:0">데이터·NLP 품질</h3>
+      <ul class="bul">
+        <li>수집 성공률과 지연 시간</li>
+        <li>중복 제거 정확도</li>
+        <li>기업 연결 precision/recall</li>
+        <li>사건 분류 macro F1</li>
+        <li>방향과 영향 기간의 calibration</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">금융 성과</h3>
+      <ul class="bul">
+        <li>Information Coefficient</li>
+        <li>방향 적중률</li>
+        <li>시장·산업 조정 이상 수익률</li>
+        <li>Sharpe ratio와 최대 낙폭</li>
+        <li>turnover와 거래비용 차감 후 수익</li>
+        <li>신뢰도 구간별 실제 적중률</li>
+      </ul>
+    </div>
+  </div>
+  <div class="quote">정확도보다 중요한 것은 <code>confidence=0.7</code>인 예측이 장기적으로 약 <b>70% 수준의 신뢰성</b>을 갖는지 여부다.</div>
+  <div class="rm warn"><span class="h">🧭 로드맵 · 잔여</span> IC·적중률·이상수익률·거래비용 차감 수익은 백테스트로 측정 중. 다만 위 인용의 <b>calibration(신뢰도 구간별 실제 적중률)은 미구현</b> — 신호 품질이 제각각(사건=양호·거시=프록시·llm=손실)이라 <b>결합 전 필수 다음 단계</b>로 지정됨.</div>
+
+  <!-- 9 -->
+  <h2 id="s9"><span class="num">9</span> 반드시 피해야 할 오류</h2>
+  <table>
+    <tr><th>안티패턴</th><th>대응</th></tr>
+    <tr><td>미래 데이터가 과거 학습에 섞이는 look-ahead bias</td><td><span class="tag t-ok">워크포워드·3시각·빈티지</span></td></tr>
+    <tr><td>현재 살아남은 기업만 사용하는 survivorship bias</td><td><span class="tag t-part">상장폐지 이력·커버리지 보고</span></td></tr>
+    <tr><td>경제지표 최신 수정값을 과거 발표값처럼 사용</td><td><span class="tag t-ok">ALFRED 빈티지 조회</span></td></tr>
+    <tr><td>액면분할·배당·증자 등 기업행동 미반영</td><td><span class="tag t-ok">수정주가·기업행동</span></td></tr>
+    <tr><td>동일 기사를 여러 독립 신호로 계산하는 중복</td><td><span class="tag t-ok">content_hash·Jaccard 군집</span></td></tr>
+    <tr><td>뉴스 감성을 가격 방향으로 바로 변환</td><td><span class="tag t-ok">LLM은 추출만·수치는 별도</span></td></tr>
+    <tr><td>백테스트 반복하며 테스트 구간까지 과적합</td><td><span class="tag t-part">표본 외 평가·주의 지속</span></td></tr>
+    <tr><td>무료 웹페이지 데이터 무단 재배포</td><td><span class="tag t-part">공식 API·라이선스 확인 필요</span></td></tr>
+  </table>
+  <div class="rm"><span class="h">🧭 로드맵</span> 대부분 구조적으로 차단됨(3시각·빈티지·dedup·역할 분리). <b>부분 대응:</b> survivorship는 이력·커버리지 보고까지, 상장폐지 <b>모델링은 Phase 4 잔여</b>. 과적합은 지속적 경계 필요.</div>
+
+  <!-- 10 -->
+  <h2 id="s10"><span class="num">10</span> 공식 데이터 출발점</h2>
+  <table>
+    <tr><th>영역</th><th>출처</th><th>사용</th></tr>
+    <tr><td>한국 공시</td><td><a href="https://opendart.fss.or.kr/guide/main.do?apiGrpCd=DS001">OpenDART</a></td><td><span class="tag t-ok">연동</span></td></tr>
+    <tr><td>한국 시장정보</td><td><a href="https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd">KRX Data Marketplace</a></td><td><span class="tag t-part">라이선스 확인</span></td></tr>
+    <tr><td>미국 공시·XBRL</td><td><a href="https://www.sec.gov/search-filings/edgar-application-programming-interfaces">SEC EDGAR APIs</a></td><td><span class="tag t-ok">연동</span></td></tr>
+    <tr><td>미국 거시경제</td><td><a href="https://fred.stlouisfed.org/docs/api/fred/">FRED API</a></td><td><span class="tag t-ok">연동</span></td></tr>
+  </table>
+  <p>OpenDART는 공시 검색·기업 개황·원문 파일·재무정보 API를 제공한다. SEC의 <code>data.sec.gov</code>는 인증키 없이 submissions·XBRL JSON을 제공하며, 대량 수집에는 nightly bulk 파일을 권장한다. FRED/ALFRED는 경제지표와 과거 발표 당시의 빈티지 데이터를 구분하는 데 유용하다.</p>
+  <p>KRX 데이터와 뉴스 콘텐츠는 조회 가능 여부와 별개로 복제·재배포 권한을 확인해야 한다. 외부 사용자에게 서비스할 계획이라면 시장 데이터 라이선스와 투자자문 관련 규제를 개발 초기에 검토해야 한다.</p>
+
+  <!-- 11 -->
+  <h2 id="s11"><span class="num">11</span> 첫 번째 구현 목표</h2>
+  <p>가장 좋은 첫 번째 vertical slice는 아래 한 줄이다.</p>
+  <div class="quote">공시 한 건을 수집해 기업과 사건을 식별하고, 영향 가설을 저장한 뒤, 발표 후 1일·5일·20일 시장 조정 수익률을 자동 계산한다.</div>
+  <p>이 흐름이 제대로 작동하면 뉴스, 거시지표, 정치·전쟁 사건을 같은 사건 모델에 추가할 수 있다. 반대로 이 흐름이 검증되지 않은 상태에서 추천 모델부터 만들면 결과를 설명하거나 개선하기 어렵다.</p>
+  <div class="rm"><span class="h">🧭 로드맵 · Phase 1</span> <b>✅ 달성.</b> AAPL(US)·삼성(KR) 실데이터로 "공시 1건 → events 1행 + outcomes 3행(근거·모델버전) → Next.js 렌더" 검증·배포 완료. 이 슬라이스가 검증됐기에 이후 거시·결합 모델을 같은 사건 모델에 확장할 수 있었다.</div>
+
+  <footer>
+    MarketTrace 설계 블루프린트 · 원본 stock-analysis-system-blueprint.md · 구현 현황 대조 <a href="roadmap.html">roadmap.html</a> (기준 2026-07-03)<br>
+    공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
+  </footer>
+
+</div>
+</body>
+</html>
