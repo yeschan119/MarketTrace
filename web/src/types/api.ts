@@ -56,6 +56,8 @@ export interface EventTypeSignificance {
 export type BacktestModel =
   | "event_type_history"
   | "significant_event_type"
+  | "macro_surprise"
+  | "combined"
   | "llm_direction";
 
 export interface BacktestResult {

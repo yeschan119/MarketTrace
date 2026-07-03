@@ -11,7 +11,7 @@ any model the same way: :meth:`~SignalModel.predict` an event, then
 :meth:`~SignalModel.observe` its realised outcome — strictly in that order, so a
 prediction never sees its own or any future return.
 
-Three concrete models ship here:
+The models that ship here:
 
 * :class:`EventTypeSignal` — learns each event type's mean abnormal return from
   history (an expanding window). Needs training; look-ahead-safe by construction.
@@ -19,6 +19,11 @@ Three concrete models ship here:
   takes a position on types whose training-window edge is statistically
   distinguishable from zero (one-sample t-test, p<α). Operationalises Direction A:
   trade only the validated signals, stay flat on noise.
+* :class:`MacroSurpriseSignal` — learns the mean abnormal return conditioned on the
+  *macro regime* (the sign of the freshest macro surprise known at filing time),
+  asking whether the macro backdrop — not the event's type — carries information.
+* :class:`CombinedSignal` — equal-weight combination of several expected-return
+  models, so their signals can be backtested together rather than in isolation.
 * :class:`DirectionSignal` — trades the event's own LLM-assigned ``direction``
   (호재/악재), which is known at the moment the disclosure lands (t=0). Needs no
   training and answers the project's core question directly: does the model's
@@ -34,8 +39,10 @@ from markettrace.impact.tstat import two_sided_t_pvalue
 
 __all__ = [
     "SIGNAL_MODEL_NAMES",
+    "CombinedSignal",
     "DirectionSignal",
     "EventTypeSignal",
+    "MacroSurpriseSignal",
     "SignalInput",
     "SignalModel",
     "SignificantEventTypeSignal",
@@ -53,6 +60,15 @@ _SIGNIFICANCE_MIN_SAMPLE = 5
 _DIRECTION_POSITION: dict[str, int] = {"positive": 1, "negative": -1, "neutral": 0}
 
 
+def _sign_int(x: float) -> int:
+    """Sign of ``x`` as -1 / 0 / +1 (used to bucket the macro-surprise regime)."""
+    if x > 0.0:
+        return 1
+    if x < 0.0:
+        return -1
+    return 0
+
+
 @runtime_checkable
 class SignalInput(Protocol):
     """The event fields a signal model may read. ``BacktestEvent`` satisfies it."""
@@ -60,6 +76,9 @@ class SignalInput(Protocol):
     event_type: str
     direction: str | None
     abnormal_return: float | None
+    # Freshest macro surprise known at the event's filing time (or None). Read by
+    # MacroSurpriseSignal; other models ignore it.
+    macro_surprise: float | None
 
 
 class SignalModel(Protocol):
@@ -162,6 +181,82 @@ class SignificantEventTypeSignal:
         return mean
 
 
+class MacroSurpriseSignal:
+    """Expanding-window mean abnormal return conditioned on the macro regime.
+
+    Keys history on the *sign* of the freshest macro surprise known at the event's
+    filing time (``sign(macro_surprise)`` ∈ {-1, 0, +1}) and predicts that bucket's
+    historical mean. Unlike the event-type model this asks whether the prevailing
+    macro-surprise regime — not the event's own type — carries return information.
+
+    It assumes no economic direction: the regime→return relationship is *learned*
+    from history (measurement-first), so a positive surprise is not presumed good or
+    bad. ``macro_surprise`` is a single scalar (the latest ``surprise_score`` across
+    all macro series published before the event); collapsing several series with
+    different sign conventions into one number is a known v1 limitation — a
+    per-series or multivariate regime model is future work. Look-ahead-safe: only
+    prior-observed (regime, return) pairs enter the estimate.
+    """
+
+    name = "macro_surprise"
+
+    def __init__(self, *, min_train: int) -> None:
+        self.min_train = min_train
+        self._history: dict[int, list[float]] = {}
+
+    def observe(self, event: SignalInput) -> None:
+        """Record one realised return, keyed by the sign of the macro surprise."""
+        if event.abnormal_return is None or event.macro_surprise is None:
+            return
+        self._history.setdefault(_sign_int(event.macro_surprise), []).append(
+            event.abnormal_return
+        )
+
+    def predict(self, event: SignalInput) -> float | None:
+        """Mean return for the event's macro regime, or ``None`` if unknown/undertrained."""
+        if event.macro_surprise is None:
+            return None
+        prior = self._history.get(_sign_int(event.macro_surprise))
+        if prior is None or len(prior) < self.min_train:
+            return None
+        return sum(prior) / len(prior)
+
+
+class CombinedSignal:
+    """Equal-weight combination of several expected-return signal models.
+
+    Forwards :meth:`observe` to every constituent so they each learn, and predicts
+    the mean of the constituents' non-``None`` estimates — all in abnormal-return
+    units, so the average is meaningful. Returns ``None`` only when *every*
+    constituent abstains; the backtest trades the sign of the combined estimate.
+
+    Constituents must output expected *returns* (e.g. :class:`EventTypeSignal`,
+    :class:`MacroSurpriseSignal`), not position signs — averaging a return with a
+    ±1 direction would mix units.
+    """
+
+    name = "combined"
+
+    def __init__(self, models: list[SignalModel]) -> None:
+        self._models = models
+
+    def observe(self, event: SignalInput) -> None:
+        """Forward the outcome to every constituent model."""
+        for model in self._models:
+            model.observe(event)
+
+    def predict(self, event: SignalInput) -> float | None:
+        """Mean of the constituents' non-``None`` estimates, or ``None`` if all abstain."""
+        estimates = [
+            estimate
+            for model in self._models
+            if (estimate := model.predict(event)) is not None
+        ]
+        if not estimates:
+            return None
+        return sum(estimates) / len(estimates)
+
+
 class DirectionSignal:
     """Trade the event's own LLM-assigned direction, known at t=0 (no training).
 
@@ -188,6 +283,14 @@ def make_signal_model(name: str, *, min_train: int) -> SignalModel:
         return EventTypeSignal(min_train=min_train)
     if name == SignificantEventTypeSignal.name:
         return SignificantEventTypeSignal(min_train=min_train)
+    if name == MacroSurpriseSignal.name:
+        return MacroSurpriseSignal(min_train=min_train)
+    if name == CombinedSignal.name:
+        # Combine the two expected-return models (matching units); the LLM-direction
+        # and significance-gated models are kept separate/standalone by design.
+        return CombinedSignal(
+            [EventTypeSignal(min_train=min_train), MacroSurpriseSignal(min_train=min_train)]
+        )
     if name == DirectionSignal.name:
         return DirectionSignal()
     raise ValueError(f"unknown signal model: {name!r}")
@@ -197,5 +300,7 @@ def make_signal_model(name: str, *, min_train: int) -> SignalModel:
 SIGNAL_MODEL_NAMES: tuple[str, ...] = (
     EventTypeSignal.name,
     SignificantEventTypeSignal.name,
+    MacroSurpriseSignal.name,
+    CombinedSignal.name,
     DirectionSignal.name,
 )

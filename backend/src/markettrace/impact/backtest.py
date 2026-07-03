@@ -35,6 +35,7 @@ records from ``event_impacts`` joined to each event's filing date.
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -43,7 +44,7 @@ from math import sqrt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from markettrace.db.models import Document, Event, EventImpact
+from markettrace.db.models import Document, Event, EventImpact, MacroObservation
 from markettrace.impact.signal import EventTypeSignal, SignalModel
 
 __all__ = [
@@ -65,6 +66,9 @@ class BacktestEvent:
     event_type: str
     abnormal_return: float | None
     direction: str | None = None
+    # Freshest macro surprise published strictly before this event (or None). Read
+    # only by MacroSurpriseSignal; look-ahead-safe by construction of that cutoff.
+    macro_surprise: float | None = None
 
 
 @dataclass(frozen=True)
@@ -195,16 +199,14 @@ def walk_forward_backtest(
     )
 
 
-def run_walk_forward_backtest(
-    session: Session,
-    *,
-    horizon_days: int,
-    min_train_per_type: int = DEFAULT_MIN_TRAIN_PER_TYPE,
-    commission_per_trade: float = 0.0,
-    slippage_per_trade: float = 0.0,
-    model: SignalModel | None = None,
-) -> BacktestResult:
-    """Backtest one horizon from ``event_impacts`` ordered by each event's filing date."""
+def _load_backtest_events(session: Session, *, horizon_days: int) -> list[BacktestEvent]:
+    """Load scored events for one horizon, each tagged with its macro regime.
+
+    Each event's ``macro_surprise`` is the latest ``surprise_score`` published
+    *strictly before* the event's filing time — a cutoff that keeps the macro
+    feature look-ahead-safe (an event never sees a surprise the market had not yet
+    seen). Events are returned in query order; the backtest sorts them by date.
+    """
     rows = session.execute(
         select(
             Document.published_at,
@@ -216,10 +218,42 @@ def run_walk_forward_backtest(
         .join(Document, Document.id == Event.document_id)
         .where(EventImpact.horizon_days == horizon_days)
     ).all()
-    events = [
-        BacktestEvent(occurred_at=r[0], event_type=r[1], abnormal_return=r[2], direction=r[3])
+
+    macro_rows = session.execute(
+        select(MacroObservation.published_at, MacroObservation.surprise_score)
+        .where(MacroObservation.surprise_score.is_not(None))
+        .order_by(MacroObservation.published_at)
+    ).all()
+    macro_dates = [r[0] for r in macro_rows]
+    macro_values = [r[1] for r in macro_rows]
+
+    def _latest_macro_surprise(before: datetime) -> float | None:
+        idx = bisect.bisect_left(macro_dates, before) - 1
+        return macro_values[idx] if idx >= 0 else None
+
+    return [
+        BacktestEvent(
+            occurred_at=r[0],
+            event_type=r[1],
+            abnormal_return=r[2],
+            direction=r[3],
+            macro_surprise=_latest_macro_surprise(r[0]),
+        )
         for r in rows
     ]
+
+
+def run_walk_forward_backtest(
+    session: Session,
+    *,
+    horizon_days: int,
+    min_train_per_type: int = DEFAULT_MIN_TRAIN_PER_TYPE,
+    commission_per_trade: float = 0.0,
+    slippage_per_trade: float = 0.0,
+    model: SignalModel | None = None,
+) -> BacktestResult:
+    """Backtest one horizon from ``event_impacts`` ordered by each event's filing date."""
+    events = _load_backtest_events(session, horizon_days=horizon_days)
     return walk_forward_backtest(
         events,
         horizon_days=horizon_days,

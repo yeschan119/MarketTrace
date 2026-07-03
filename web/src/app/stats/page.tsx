@@ -508,6 +508,11 @@ function BacktestSection({
       value: "significant_event_type",
       label: t("stats.backtest.model.significant_event_type"),
     },
+    {
+      value: "macro_surprise",
+      label: t("stats.backtest.model.macro_surprise"),
+    },
+    { value: "combined", label: t("stats.backtest.model.combined") },
     { value: "llm_direction", label: t("stats.backtest.model.llm_direction") },
   ];
 
@@ -529,7 +534,7 @@ function BacktestSection({
           <div
             role="group"
             aria-label={t("stats.backtest.modelLabel")}
-            className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 text-xs font-medium"
+            className="inline-flex flex-wrap rounded-md border border-gray-200 bg-gray-50 p-0.5 text-xs font-medium"
           >
             {modelOptions.map((opt) => (
               <button

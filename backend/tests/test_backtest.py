@@ -9,9 +9,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from markettrace.db.models import Base, Document, Event, EventImpact, Instrument
+from markettrace.db.models import (
+    Base,
+    Document,
+    Event,
+    EventImpact,
+    Instrument,
+    MacroObservation,
+)
 from markettrace.impact.backtest import (
     BacktestEvent,
+    _load_backtest_events,
     run_walk_forward_backtest,
     walk_forward_backtest,
 )
@@ -328,3 +336,69 @@ def test_run_backtest_joins_and_orders_by_filing_date(mem_session) -> None:
     assert result.n_predictions == 2  # events 3 and 4 have >= 2 priors
     assert result.hit_rate == 1.0
     assert result.mean_strategy_return == pytest.approx(0.01)
+
+
+def test_macro_enrichment_is_look_ahead_safe(mem_session) -> None:
+    """Each event's macro_surprise is the latest surprise published STRICTLY before it."""
+    inst = Instrument(market="US", ticker="AAPL", name="Apple")
+    mem_session.add(inst)
+    mem_session.flush()
+
+    # One macro surprise released on Jan 2. Events on Jan 1..4 share the fixture shape.
+    mem_session.add(
+        MacroObservation(
+            series_id="CPIAUCSL",
+            source="fred",
+            reference_date=datetime(2025, 12, 1, tzinfo=UTC),
+            released_value=1.0,
+            surprise_score=0.7,
+            occurred_at=datetime(2025, 12, 1, tzinfo=UTC),
+            first_seen_at=datetime(2026, 1, 2, tzinfo=UTC),
+            published_at=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+    )
+    for day in range(1, 5):
+        doc = Document(
+            source="sec_edgar",
+            external_id=f"acc-{day}",
+            url="https://example.com",
+            title="8-K",
+            content_hash=f"h{day}",
+            market="US",
+            published_at=datetime(2026, 1, day, tzinfo=UTC),
+            first_seen_at=datetime(2026, 1, day, tzinfo=UTC),
+        )
+        mem_session.add(doc)
+        mem_session.flush()
+        event = Event(
+            document_id=doc.id,
+            primary_instrument_id=inst.id,
+            event_type="earnings",
+            direction="positive",
+            horizon_days=5,
+            confidence=0.7,
+            model="t",
+            model_version="v1",
+            analyzed_at=datetime(2026, 1, day, tzinfo=UTC),
+        )
+        mem_session.add(event)
+        mem_session.flush()
+        mem_session.add(
+            EventImpact(
+                event_id=event.id,
+                instrument_id=inst.id,
+                event_type="earnings",
+                direction="positive",
+                horizon_days=5,
+                abnormal_return=0.01,
+                computed_at=datetime(2026, 1, day, tzinfo=UTC),
+            )
+        )
+    mem_session.commit()
+
+    events = _load_backtest_events(mem_session, horizon_days=5)
+    by_day = {e.occurred_at.day: e.macro_surprise for e in events}
+    assert by_day[1] is None  # nothing published before Jan 1
+    assert by_day[2] is None  # STRICTLY before -> the Jan-2 release itself is excluded
+    assert by_day[3] == pytest.approx(0.7)  # sees the Jan-2 surprise
+    assert by_day[4] == pytest.approx(0.7)

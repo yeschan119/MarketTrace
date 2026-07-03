@@ -8,8 +8,10 @@ import pytest
 
 from markettrace.impact.signal import (
     SIGNAL_MODEL_NAMES,
+    CombinedSignal,
     DirectionSignal,
     EventTypeSignal,
+    MacroSurpriseSignal,
     SignificantEventTypeSignal,
     make_signal_model,
 )
@@ -22,6 +24,7 @@ class _Ev:
     event_type: str = "x"
     abnormal_return: float | None = None
     direction: str | None = None
+    macro_surprise: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +130,69 @@ def test_significant_is_look_ahead_safe() -> None:
 
 
 # ---------------------------------------------------------------------------
+# MacroSurpriseSignal — expanding mean conditioned on the macro regime (sign)
+# ---------------------------------------------------------------------------
+
+
+def test_macro_none_surprise_makes_no_call() -> None:
+    sig = MacroSurpriseSignal(min_train=1)
+    sig.observe(_Ev(abnormal_return=0.02, macro_surprise=0.5))
+    assert sig.predict(_Ev(macro_surprise=None)) is None
+
+
+def test_macro_learns_per_regime_sign() -> None:
+    sig = MacroSurpriseSignal(min_train=2)
+    # Positive-surprise regime tends up; negative-surprise regime tends down.
+    sig.observe(_Ev(abnormal_return=0.03, macro_surprise=0.8))
+    sig.observe(_Ev(abnormal_return=0.05, macro_surprise=0.2))
+    sig.observe(_Ev(abnormal_return=-0.04, macro_surprise=-0.6))
+    sig.observe(_Ev(abnormal_return=-0.02, macro_surprise=-0.1))
+    assert sig.predict(_Ev(macro_surprise=1.5)) == pytest.approx(0.04)
+    assert sig.predict(_Ev(macro_surprise=-0.9)) == pytest.approx(-0.03)
+
+
+def test_macro_undertrained_regime_predicts_none() -> None:
+    sig = MacroSurpriseSignal(min_train=3)
+    sig.observe(_Ev(abnormal_return=0.03, macro_surprise=0.8))
+    sig.observe(_Ev(abnormal_return=0.05, macro_surprise=0.2))
+    assert sig.predict(_Ev(macro_surprise=0.4)) is None  # only 2 in the + bucket
+
+
+def test_macro_ignores_missing_outcome() -> None:
+    sig = MacroSurpriseSignal(min_train=1)
+    sig.observe(_Ev(abnormal_return=None, macro_surprise=0.5))  # delisted -> not learned
+    assert sig.predict(_Ev(macro_surprise=0.5)) is None
+
+
+# ---------------------------------------------------------------------------
+# CombinedSignal — equal-weight mean of constituent expected-return models
+# ---------------------------------------------------------------------------
+
+
+def test_combined_averages_constituent_estimates() -> None:
+    a = EventTypeSignal(min_train=1)
+    b = MacroSurpriseSignal(min_train=1)
+    combined = CombinedSignal([a, b])
+    combined.observe(_Ev("earnings", 0.02, macro_surprise=0.5))  # both learn
+    # a("earnings") -> 0.02 ; b(+regime) -> 0.02 ; mean -> 0.02
+    assert combined.predict(_Ev("earnings", macro_surprise=0.5)) == pytest.approx(0.02)
+
+
+def test_combined_uses_available_when_one_abstains() -> None:
+    a = EventTypeSignal(min_train=1)
+    b = MacroSurpriseSignal(min_train=1)
+    combined = CombinedSignal([a, b])
+    combined.observe(_Ev("earnings", 0.04, macro_surprise=None))  # only a learns
+    # b has no macro history -> abstains; combined falls back to a's 0.04.
+    assert combined.predict(_Ev("earnings", macro_surprise=None)) == pytest.approx(0.04)
+
+
+def test_combined_none_when_all_abstain() -> None:
+    combined = CombinedSignal([EventTypeSignal(min_train=1), MacroSurpriseSignal(min_train=1)])
+    assert combined.predict(_Ev("never_seen", macro_surprise=None)) is None
+
+
+# ---------------------------------------------------------------------------
 # DirectionSignal — trade the event's own LLM direction, no training
 # ---------------------------------------------------------------------------
 
@@ -164,6 +230,8 @@ def test_factory_builds_named_models() -> None:
     assert isinstance(
         make_signal_model("significant_event_type", min_train=3), SignificantEventTypeSignal
     )
+    assert isinstance(make_signal_model("macro_surprise", min_train=3), MacroSurpriseSignal)
+    assert isinstance(make_signal_model("combined", min_train=3), CombinedSignal)
     assert isinstance(make_signal_model("llm_direction", min_train=3), DirectionSignal)
 
 
@@ -176,5 +244,7 @@ def test_registered_model_names() -> None:
     assert SIGNAL_MODEL_NAMES == (
         "event_type_history",
         "significant_event_type",
+        "macro_surprise",
+        "combined",
         "llm_direction",
     )
