@@ -187,9 +187,9 @@ export default function StatsPage() {
               {t("stats.howToReadBody")}
             </p>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
                     {t("stats.th.eventType")}
@@ -340,7 +340,7 @@ export default function StatsPage() {
                       mean: formatPct(relatedMean),
                     })}
                   </p>
-                  <ul className="mt-3 divide-y divide-indigo-100">
+                  <ul className="mt-3 max-h-80 divide-y divide-indigo-100 overflow-y-auto">
                     {related.map((c) => {
                       const positive = (c.abnormal_return ?? 0) >= 0;
                       return (
@@ -415,10 +415,10 @@ function SignalsSection({ rows }: { rows: EventTypeSignificance[] }) {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-md border border-indigo-100 bg-white">
+          <div className="max-h-96 overflow-auto rounded-md border border-indigo-100 bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <tr className="sticky top-0 z-10 border-b border-gray-200 bg-white text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-2.5">
                     {t("stats.signals.th.eventType")}
                   </th>
@@ -578,10 +578,10 @@ function BacktestSection({
           {t("stats.backtest.empty")}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <tr className="sticky top-0 z-10 border-b border-gray-200 bg-white text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">{t("stats.backtest.th.horizon")}</th>
                 <th className="px-4 py-3 text-right">
                   {t("stats.backtest.th.predictions")}
@@ -699,9 +699,9 @@ function MacroDecompositionSection() {
           {t("stats.macro.empty")}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
                   {t("stats.macro.th.series")}
