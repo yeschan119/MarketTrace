@@ -17,7 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # left unset so the right model is picked for whichever provider is active.
 _DEFAULT_EXTRACTION_MODEL: dict[str, str] = {
     "anthropic": "claude-sonnet-4-6",
-    "openai": "gpt-4o",
+    "openai": "gpt-5.4-mini",
 }
 
 
