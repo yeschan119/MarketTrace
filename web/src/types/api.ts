@@ -53,7 +53,10 @@ export interface EventTypeSignificance {
   sufficient_sample: boolean;
 }
 
-export type BacktestModel = "event_type_history" | "llm_direction";
+export type BacktestModel =
+  | "event_type_history"
+  | "significant_event_type"
+  | "llm_direction";
 
 export interface BacktestResult {
   model: BacktestModel | string;

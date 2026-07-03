@@ -7,9 +7,9 @@ distinguishable from zero, or is it just noise?**
 
 This module runs a one-sample, two-sided t-test (H0: mean abnormal return = 0)
 over each bucket and flags whether the sample is even large enough to draw a
-conclusion. It is deliberately self-contained — no SciPy/NumPy dependency — so
-the two-sided t p-value is computed from the regularised incomplete beta
-function (Numerical Recipes ``betai``/``betacf``).
+conclusion. The two-sided t p-value comes from the SciPy-free
+:func:`~markettrace.impact.tstat.two_sided_t_pvalue` (regularised incomplete
+beta), shared with the significance-gated signal model.
 
 Caveat — multiple comparisons: many ``(event_type, horizon)`` buckets are tested
 at once, so an individual ``significant_5pct`` flag is *exploratory*, not a
@@ -21,18 +21,19 @@ look extreme purely by chance).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import exp, lgamma, log, sqrt
+from math import sqrt
 
 from sqlalchemy.orm import Session
 
 from markettrace.impact.statistics import EventTypeStat, compute_event_type_statistics
+from markettrace.impact.tstat import two_sided_t_pvalue
 
 __all__ = [
     "MIN_SAMPLE",
     "EventTypeSignificance",
     "assess_significance",
     "compute_event_type_significance",
-    "two_sided_t_pvalue",
+    "two_sided_t_pvalue",  # re-exported from tstat for callers/tests
 ]
 
 # Below this many observations a bucket is treated as inconclusive regardless of
@@ -57,72 +58,6 @@ class EventTypeSignificance:
     significant_5pct: bool
     # True when ``count >= MIN_SAMPLE``; below that, any verdict is inconclusive.
     sufficient_sample: bool
-
-
-def _betacf(a: float, b: float, x: float) -> float:
-    """Continued-fraction expansion for the incomplete beta function."""
-    maxit = 200
-    eps = 3.0e-12
-    fpmin = 1.0e-300
-
-    qab = a + b
-    qap = a + 1.0
-    qam = a - 1.0
-    c = 1.0
-    d = 1.0 - qab * x / qap
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, maxit + 1):
-        m2 = 2 * m
-        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
-        d = 1.0 + aa * d
-        if abs(d) < fpmin:
-            d = fpmin
-        c = 1.0 + aa / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
-        d = 1.0 + aa * d
-        if abs(d) < fpmin:
-            d = fpmin
-        c = 1.0 + aa / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < eps:
-            break
-    return h
-
-
-def _betai(a: float, b: float, x: float) -> float:
-    """Regularised incomplete beta function I_x(a, b)."""
-    if x <= 0.0:
-        return 0.0
-    if x >= 1.0:
-        return 1.0
-    ln_beta = lgamma(a + b) - lgamma(a) - lgamma(b)
-    bt = exp(ln_beta + a * log(x) + b * log(1.0 - x))
-    if x < (a + 1.0) / (a + b + 2.0):
-        return bt * _betacf(a, b, x) / a
-    return 1.0 - bt * _betacf(b, a, 1.0 - x) / b
-
-
-def two_sided_t_pvalue(t_stat: float, df: int) -> float | None:
-    """Two-sided p-value for a Student-t statistic with ``df`` degrees of freedom.
-
-    Uses the identity ``p = I_{df/(df+t^2)}(df/2, 1/2)``. Returns ``None`` when
-    ``df <= 0`` (fewer than two observations).
-    """
-    if df <= 0:
-        return None
-    x = df / (df + t_stat * t_stat)
-    return _betai(df / 2.0, 0.5, x)
 
 
 def assess_significance(stat: EventTypeStat) -> EventTypeSignificance:

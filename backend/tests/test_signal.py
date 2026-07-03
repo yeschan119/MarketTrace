@@ -10,6 +10,7 @@ from markettrace.impact.signal import (
     SIGNAL_MODEL_NAMES,
     DirectionSignal,
     EventTypeSignal,
+    SignificantEventTypeSignal,
     make_signal_model,
 )
 
@@ -73,6 +74,59 @@ def test_observe_ignores_missing_outcome() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SignificantEventTypeSignal — expanding mean, gated on a significant t-test
+# ---------------------------------------------------------------------------
+
+
+def _train(sig: SignificantEventTypeSignal, event_type: str, returns: list[float]) -> None:
+    for r in returns:
+        sig.observe(_Ev(event_type, r))
+
+
+def test_significant_enforces_min_sample_floor() -> None:
+    # Even with min_train=2, the significance floor (5) governs: 4 obs -> no call.
+    sig = SignificantEventTypeSignal(min_train=2)
+    assert sig.min_train == 5
+    _train(sig, "x", [-0.05, -0.05, -0.05, -0.05])
+    assert sig.predict(_Ev(event_type="x")) is None
+
+
+def test_significant_trades_a_consistent_edge() -> None:
+    # A tight, clearly-nonzero negative edge over an adequate sample -> significant,
+    # so the model takes the position (returns the mean, which is negative).
+    sig = SignificantEventTypeSignal(min_train=5)
+    _train(sig, "insider", [-0.06, -0.05, -0.07, -0.06, -0.065, -0.055])
+    est = sig.predict(_Ev(event_type="insider"))
+    assert est is not None
+    assert est < 0.0
+
+
+def test_significant_stays_flat_on_noise() -> None:
+    # A mean near zero with wide spread is indistinguishable from zero -> no call,
+    # even though the sample is adequate. This is the governance-noise filter.
+    sig = SignificantEventTypeSignal(min_train=5)
+    _train(sig, "governance", [0.10, -0.11, 0.09, -0.10, 0.08, -0.06])
+    assert sig.predict(_Ev(event_type="governance")) is None
+
+
+def test_significant_zero_variance_makes_no_call() -> None:
+    # Degenerate: identical returns -> zero spread -> t-test undefined -> no call.
+    sig = SignificantEventTypeSignal(min_train=5)
+    _train(sig, "x", [0.02, 0.02, 0.02, 0.02, 0.02])
+    assert sig.predict(_Ev(event_type="x")) is None
+
+
+def test_significant_is_look_ahead_safe() -> None:
+    # predict() sees only what has been observed so far; the current event's own
+    # (as-yet-unobserved) return never enters the estimate.
+    sig = SignificantEventTypeSignal(min_train=5)
+    _train(sig, "x", [-0.06, -0.05, -0.07, -0.06])  # only 4 so far
+    assert sig.predict(_Ev(event_type="x")) is None  # under the floor of 5
+    sig.observe(_Ev("x", -0.065))  # now 5
+    assert sig.predict(_Ev(event_type="x")) is not None
+
+
+# ---------------------------------------------------------------------------
 # DirectionSignal — trade the event's own LLM direction, no training
 # ---------------------------------------------------------------------------
 
@@ -107,6 +161,9 @@ def test_direction_needs_no_training() -> None:
 
 def test_factory_builds_named_models() -> None:
     assert isinstance(make_signal_model("event_type_history", min_train=3), EventTypeSignal)
+    assert isinstance(
+        make_signal_model("significant_event_type", min_train=3), SignificantEventTypeSignal
+    )
     assert isinstance(make_signal_model("llm_direction", min_train=3), DirectionSignal)
 
 
@@ -116,4 +173,8 @@ def test_factory_rejects_unknown_model() -> None:
 
 
 def test_registered_model_names() -> None:
-    assert SIGNAL_MODEL_NAMES == ("event_type_history", "llm_direction")
+    assert SIGNAL_MODEL_NAMES == (
+        "event_type_history",
+        "significant_event_type",
+        "llm_direction",
+    )

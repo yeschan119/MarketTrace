@@ -504,6 +504,10 @@ function BacktestSection({
       value: "event_type_history",
       label: t("stats.backtest.model.event_type_history"),
     },
+    {
+      value: "significant_event_type",
+      label: t("stats.backtest.model.significant_event_type"),
+    },
     { value: "llm_direction", label: t("stats.backtest.model.llm_direction") },
   ];
 

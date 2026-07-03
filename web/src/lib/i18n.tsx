@@ -124,6 +124,7 @@ const en: Dict = {
       modelLabel: "Signal model",
       model: {
         event_type_history: "Event-type history",
+        significant_event_type: "Significant only",
         llm_direction: "LLM direction",
       },
       loading: "Loading backtest...",
@@ -416,6 +417,7 @@ const ko: Dict = {
       modelLabel: "신호 모델",
       model: {
         event_type_history: "이벤트유형 히스토리",
+        significant_event_type: "유의 유형만",
         llm_direction: "LLM 방향",
       },
       loading: "백테스트 불러오는 중...",
