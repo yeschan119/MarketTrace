@@ -245,7 +245,7 @@ export default function EventsPage() {
                 </button>
 
                 {isOpen && (
-                  <div className="divide-y divide-gray-100 border-t border-gray-200">
+                  <div className="max-h-96 divide-y divide-gray-100 overflow-y-auto border-t border-gray-200">
                     {group.events.map((event) => {
                       const info = describeEventType(event.event_type, lang);
                       return (

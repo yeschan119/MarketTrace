@@ -126,8 +126,8 @@
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">80%</div><div class="bar"><i style="width:80%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">88%</div><div class="bar"><i style="width:88%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">64%</div><div class="bar"><i style="width:64%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">76%</div><div class="bar"><i style="width:76%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -254,8 +254,8 @@
   <!-- PHASE 4 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~88%</span></div>
-      <div class="pbar a"><i style="width:88%"></i></div><div class="pct-lbl" style="color:var(--amber)">88%</div>
+      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~90%</span></div>
+      <div class="pbar a"><i style="width:90%"></i></div><div class="pct-lbl" style="color:var(--amber)">90%</div>
     </div>
     <p class="sub" style="margin:10px 0 0"><b>방향 A — 검증 통과(2026-07-03).</b> 코퍼스 461건으로 검정력 확보 → "데이터 부족" 블로커 해소. <b>5개 신호모델을 look-ahead 차단 워크포워드로 비교</b>, 무엇이 실제로 통하고 무엇이 프록시인지까지 판별.</p>
     <div class="cols">
@@ -269,11 +269,12 @@
           <li class="ok"><b>거래 현실 반영</b> — commission·slippage(0.05%) net + 상폐/결측 커버리지(n_dropped_no_outcome)</li>
           <li class="ok"><b>calibration</b> — confidence 구간별 실제 적중률(ECE·Brier), <span class="commit">GET /stats/calibration</span> + 웹 보정 패널</li>
           <li class="ok"><b>검증신호 개별 이벤트 노출 + 결합 판정</b> — 이벤트별로 그 유형의 검증 실측 vs LLM 방향을 대비해 <b>일치/충돌</b> 판정(예: insider 긍정 판단 vs 실측 5d −6.6% → 충돌). 목록 배지 + "충돌만"/"미검토 충돌" 필터. <span class="commit">/events · /events/{id}</span></li>
+          <li class="ok"><b>가격 모멘텀 모델(6번째)</b> — 사건 전 20일 모멘텀 부호별 조건부 학습(look-ahead 안전). 실측 판정: D+5 net +0.99%·IC 0.15로 <span style="color:var(--amber)">한계적</span>(사건기반의 절반↓·타 지평 노이즈) → 1차 신호 채택 안 함, 비교 베이스라인 유지. <span class="commit">?model=price_momentum</span></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel로 추가 <span style="color:var(--muted)">(수급 데이터 수집 선행 필요)</span></li>
+          <li class="no">펀더멘털·수급 모델을 동일 SignalModel로 추가 <span style="color:var(--muted)">(재무·수급 데이터 수집 선행 필요; 가격 모델은 완료)</span></li>
           <li class="no">상폐 <b>모델링</b> — <span style="color:var(--amber)">데이터 부재로 보류</span>: delisted_at 미채움·provider 상폐 미수집, drop 3원인 구분 불가. KRX/OpenDART 상폐목록 수집 선행 필요</li>
           <li class="no">(거시) 릴리즈-이벤트 상대시점 설계로 프록시 아닌 순수 거시신호 분리 — 후순위</li>
         </ul>
@@ -285,8 +286,8 @@
   <!-- PHASE 5 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~64%</span></div>
-      <div class="pbar a"><i style="width:64%"></i></div><div class="pct-lbl" style="color:var(--amber)">64%</div>
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~76%</span></div>
+      <div class="pbar a"><i style="width:76%"></i></div><div class="pct-lbl" style="color:var(--amber)">76%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -297,13 +298,13 @@
           <li class="ok"><b>로그인 게이트 수동 인제스트</b> (모달 + Ingest 버튼)</li>
           <li class="ok"><b>검증 대시보드 확장</b> — /stats: 반응 매트릭스 + <b>Validated Signals 패널</b>(유의 신호 ★) + <b>5모델 백테스트 토글</b> + <b>거시 국면 분해 표</b> + 보정 패널</li>
           <li class="ok"><b>사건 단위 검증신호 결합</b> — 이벤트 상세·목록에 검증신호 vs LLM 방향 일치/충돌 노출 + "미검토 충돌" 검토 큐(사람 검토 루프와 연결)</li>
+          <li class="ok"><b>종목별 매수판단 화면</b> — 종목 뷰에 검증신호 집계 <b>종합 판정</b>(주의/우호/혼조 + 평균 드리프트·검증사건수·충돌수) + <b>상승·하락 요인 분해</b>(유형별 검증 드리프트로 종목이 왜 오르내리나). 판정+근거 완성. <span class="commit">/instruments/{id}</span></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no"><b>종목별 매수판단 화면</b> — 검증 신호를 <b>종목(instrument) 뷰</b>에 집계(현재는 사건·통계 단위까지. 종목 타임라인에 종합 판정 결합) ← <b>다음 단계 후보</b></li>
-          <li class="no">관심종목 알림</li>
-          <li class="no">시나리오별 상승·하락 요인</li>
+          <li class="no">관심종목 알림 <span style="color:var(--muted)">(알림 인프라 필요)</span></li>
+          <li class="no">종목 매수판단에 확신도·최근성 가중 정교화</li>
         </ul>
       </div>
     </div>
