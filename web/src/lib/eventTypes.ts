@@ -432,7 +432,97 @@ const LABELS: Record<string, Entry> = {
     en: { label: "Employment Agreement Amendment", desc: "Amendment to an employment agreement." },
     ko: { label: "고용계약 변경", desc: "임원 고용계약 개정." },
   },
+
+  // --- Canonical families (the fixed taxonomy the extractor now enforces) ---
+  // Stored event_type values are one of these ~18 families. The legacy raw
+  // codes above remain for display of any pre-migration cached strings.
+  earnings: {
+    en: { label: "Earnings", desc: "Quarterly or annual results — revenue and profit." },
+    ko: { label: "실적", desc: "분기·연간 실적(매출·이익) 공시." },
+  },
+  guidance: {
+    en: { label: "Guidance", desc: "Company forecast or revision for upcoming results." },
+    ko: { label: "가이던스", desc: "회사가 제시·수정한 향후 실적 전망." },
+  },
+  insider_trading: {
+    en: { label: "Insider Trading", desc: "Insiders reporting their own buys/sells of the stock." },
+    ko: { label: "내부자 거래", desc: "내부자 본인의 자사주 매매 신고." },
+  },
+  buyback: {
+    en: { label: "Buyback", desc: "Repurchase or treasury-stock acquisition of own shares." },
+    ko: { label: "자사주 취득", desc: "자기주식 취득·소각 등 자사주 매입." },
+  },
+  dividend: {
+    en: { label: "Dividend", desc: "Dividend declaration or distribution to shareholders." },
+    ko: { label: "배당", desc: "주주 배당 결정·지급." },
+  },
+  capital_raise: {
+    en: { label: "Capital Raise", desc: "Debt, equity, or other financing to raise capital." },
+    ko: { label: "자본 조달", desc: "채권·증자 등 자금 조달." },
+  },
+  merger_acquisition: {
+    en: { label: "M&A / Asset Deal", desc: "Merger, acquisition, or major asset transfer." },
+    ko: { label: "인수·합병/자산거래", desc: "합병·인수·주요 자산 양수도." },
+  },
+  // ownership_change / shareholder_meeting defined above (legacy entries reused).
+  governance: {
+    en: { label: "Governance", desc: "Board, executive, or leadership / compensation change." },
+    ko: { label: "지배구조", desc: "이사·경영진·리더십·보상 변경." },
+  },
+  regulatory: {
+    en: { label: "Regulatory", desc: "Regulator action, litigation, or settlement." },
+    ko: { label: "규제·소송", desc: "규제기관 조치·소송·합의." },
+  },
+  contract_partnership: {
+    en: { label: "Contract / Partnership", desc: "A supply, sales, or partnership agreement." },
+    ko: { label: "계약·제휴", desc: "공급·판매·제휴 계약." },
+  },
+  // investment defined above (legacy entry reused).
+  product: {
+    en: { label: "Product", desc: "A product launch, approval, or major update." },
+    ko: { label: "제품", desc: "제품 출시·승인·주요 업데이트." },
+  },
+  ir_event: {
+    en: { label: "IR Event", desc: "Investor conference, day, or presentation." },
+    ko: { label: "IR 행사", desc: "투자자 대상 컨퍼런스·설명회." },
+  },
+  esg_report: {
+    en: { label: "ESG / Report", desc: "Sustainability, ESG, or non-financial report." },
+    ko: { label: "ESG·보고서", desc: "지속가능경영·ESG 등 비재무 보고." },
+  },
+  macro: {
+    en: { label: "Macro", desc: "Macroeconomic indicator release (not a single filer)." },
+    ko: { label: "거시지표", desc: "거시경제 지표 발표(개별 공시 아님)." },
+  },
+  other: {
+    en: { label: "Other", desc: "No canonical family fits this disclosure." },
+    ko: { label: "기타", desc: "정규 유형에 맞지 않는 공시." },
+  },
 };
+
+// The canonical family taxonomy the extractor enforces (mirrors
+// markettrace.nlp.taxonomy.CANONICAL_FAMILIES). Used as the review dropdown so
+// reviewers pick from the same enum the model does. Ordered by rough frequency.
+export const CANONICAL_EVENT_TYPES: string[] = [
+  "earnings",
+  "guidance",
+  "insider_trading",
+  "buyback",
+  "dividend",
+  "capital_raise",
+  "merger_acquisition",
+  "ownership_change",
+  "governance",
+  "shareholder_meeting",
+  "regulatory",
+  "contract_partnership",
+  "investment",
+  "product",
+  "ir_event",
+  "esg_report",
+  "macro",
+  "other",
+];
 
 function humanize(code: string): string {
   return code
@@ -449,7 +539,8 @@ export function describeEventType(code: string, lang: Lang): EventTypeInfo {
   return { label: humanize(code), desc: "" };
 }
 
-// Known event_type codes, for review dropdowns. The list is not exhaustive of
-// what the LLM can emit (codes are free-form), so an event's current code is
-// merged in by callers when it falls outside this set.
-export const EVENT_TYPE_CODES: string[] = Object.keys(LABELS);
+// Known event_type codes, for review dropdowns. Now the fixed canonical family
+// enum the extractor enforces — reviewers pick from the same set the model does.
+// A stored code outside this set (e.g. a legacy pre-migration string) is merged
+// in by callers so it stays selectable.
+export const EVENT_TYPE_CODES: string[] = CANONICAL_EVENT_TYPES;

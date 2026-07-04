@@ -138,7 +138,7 @@ class TestEventExtractor:
         event, model_version = extractor.extract("Some document text.")
 
         assert isinstance(event, EventExtraction)
-        assert event.event_type == "earnings_beat"
+        assert event.event_type == "earnings"  # canonicalized from "earnings_beat"
         assert event.direction == "positive"
         assert event.entities == ["AAPL"]
         assert event.confidence == pytest.approx(0.95)
@@ -234,7 +234,7 @@ class TestEventExtractorOpenAI:
         event, model_version = extractor.extract("Some document text.")
 
         assert isinstance(event, EventExtraction)
-        assert event.event_type == "earnings_beat"
+        assert event.event_type == "earnings"  # canonicalized from "earnings_beat"
         assert event.direction == "positive"
         assert event.entities == ["AAPL"]
         assert model_version == "gpt-4o"
@@ -301,3 +301,43 @@ class TestEventFunctionDefinition:
         assert defn["type"] == "function"
         assert defn["function"]["name"] == "record_event"
         assert defn["function"]["parameters"] is EVENT_TOOL_SCHEMA
+
+
+# ---------------------------------------------------------------------------
+# Tests: event_type is constrained to the canonical family enum
+# ---------------------------------------------------------------------------
+
+class TestEventTypeEnum:
+    def test_tool_schema_constrains_event_type_to_families(self):
+        """The tool schema exposes event_type as an enum of the canonical families."""
+        from markettrace.nlp.taxonomy import CANONICAL_FAMILIES
+
+        enum = EVENT_TOOL_SCHEMA["properties"]["event_type"].get("enum")
+        assert enum is not None
+        assert set(enum) == set(CANONICAL_FAMILIES)
+        # A representative family and the OTHER fallback are present.
+        assert "earnings" in enum
+        assert "insider_trading" in enum
+        assert "other" in enum
+
+    def test_validator_canonicalizes_near_synonyms(self):
+        """A near-synonym label is collapsed to its family on validation."""
+        ex = EventExtraction.model_validate(
+            {
+                **SAMPLE_EVENT_DICT,
+                "event_type": "treasury_stock_acquisition",
+            }
+        )
+        assert ex.event_type == "buyback"
+
+    def test_validator_maps_unknown_to_other(self):
+        ex = EventExtraction.model_validate(
+            {**SAMPLE_EVENT_DICT, "event_type": "corporate_disclosure"}
+        )
+        assert ex.event_type == "other"
+
+    def test_validator_is_idempotent_on_families(self):
+        ex = EventExtraction.model_validate(
+            {**SAMPLE_EVENT_DICT, "event_type": "governance"}
+        )
+        assert ex.event_type == "governance"

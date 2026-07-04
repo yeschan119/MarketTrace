@@ -161,7 +161,7 @@ def test_run_slice_end_to_end(db_session, tmp_object_store) -> None:
     event = events[0]
     assert event.id == result.event_id
     assert event.primary_instrument_id == instrument.id
-    assert event.event_type == "earnings_beat"
+    assert event.event_type == "earnings"  # canonicalized from "earnings_beat"
     assert event.entities == ["AAPL"]
     assert event.evidence == [
         "Apple Inc. reported quarterly results that beat analyst expectations.",
@@ -196,7 +196,7 @@ def test_run_slice_end_to_end(db_session, tmp_object_store) -> None:
     # --- one EventImpact per horizon, directional sign applied ---
     impacts = db_session.query(EventImpact).order_by(EventImpact.horizon_days).all()
     assert [i.horizon_days for i in impacts] == [1, 5, 20]
-    assert all(i.event_id == event.id and i.event_type == "earnings_beat" for i in impacts)
+    assert all(i.event_id == event.id and i.event_type == "earnings" for i in impacts)
     # positive direction + positive abnormal return -> positive signed impact
     by_h_imp = {i.horizon_days: i for i in impacts}
     assert by_h_imp[1].signed_abnormal_return == pytest.approx(0.02)

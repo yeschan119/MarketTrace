@@ -9,7 +9,12 @@ from __future__ import annotations
 import copy
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from markettrace.nlp.taxonomy import CANONICAL_FAMILIES, canonicalize
+
+# Sorted family list for a stable enum in the tool schema and the field docs.
+_FAMILY_ENUM: list[str] = sorted(CANONICAL_FAMILIES)
 
 
 class EventExtraction(BaseModel):
@@ -17,11 +22,24 @@ class EventExtraction(BaseModel):
 
     event_type: str = Field(
         description=(
-            "Canonical snake_case category of the market event (e.g. 'earnings', "
-            "'insider_trading', 'capital_raise', 'governance'); 'macro' only for "
-            "macroeconomic indicator releases, never a single company's filing."
+            "Canonical snake_case category of the market event. MUST be exactly "
+            "one of: " + ", ".join(_FAMILY_ENUM) + ". Use 'macro' only for "
+            "macroeconomic indicator releases (never a single company's filing) "
+            "and 'other' only when no family fits."
         )
     )
+
+    @field_validator("event_type")
+    @classmethod
+    def _canonicalize_event_type(cls, v: str) -> str:
+        """Collapse the value to a canonical family (belt-and-suspenders).
+
+        The tool schema constrains the LLM to :data:`CANONICAL_FAMILIES` via an
+        ``enum``, but that is a soft constraint — a model may still emit a
+        near-synonym. Canonicalizing here guarantees every stored ``event_type``
+        is one of the ~18 families, so the signal statistics never re-fragment.
+        """
+        return canonicalize(v)
     entities: list[str] = Field(description="Ticker symbols or company names involved.")
     industries: list[str] = Field(description="Industry sectors affected.")
     channels: list[str] = Field(
@@ -72,6 +90,13 @@ def _build_tool_schema() -> dict:
     for prop in schema.get("properties", {}).values():
         prop.pop("title", None)
         # anyOf wrapping for Optional fields — leave intact; the API handles it.
+
+    # Constrain event_type to the canonical families at the API layer so the
+    # model picks from the fixed enum instead of inventing near-synonyms. Both
+    # Anthropic (input_schema) and OpenAI (parameters) honour a string ``enum``.
+    event_type_prop = schema.get("properties", {}).get("event_type")
+    if event_type_prop is not None:
+        event_type_prop["enum"] = list(_FAMILY_ENUM)
 
     return schema
 
