@@ -10,6 +10,7 @@ import { DirectionBadge } from "@/components/DirectionBadge";
 import { AbnormalReturnChart } from "@/components/AbnormalReturnChart";
 import { ScoreBars } from "@/components/ScoreBars";
 import { ValidatedSignalCard } from "@/components/ValidatedSignalCard";
+import { EventReviewForm } from "@/components/EventReviewForm";
 
 export default function EventDetailPage() {
   const { t, locale, lang } = useI18n();
@@ -129,6 +130,9 @@ export default function EventDetailPage() {
         direction={event.direction}
         horizonDays={event.horizon_days}
       />
+
+      {/* Human review: correct the model's read (login-gated) */}
+      <EventReviewForm event={event} />
 
       {/* Score Components */}
       <ScoreBars

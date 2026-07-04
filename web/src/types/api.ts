@@ -141,8 +141,18 @@ export interface EventDetail {
   evidence: string[];
   model: string;
   model_version: string;
+  reviewed_at: string | null;
+  original_direction: string | null;
+  original_event_type: string | null;
+  original_confidence: number | null;
   document: Document;
   outcomes: Outcome[];
+}
+
+export interface EventUpdate {
+  direction?: string;
+  event_type?: string;
+  confidence?: number;
 }
 
 export interface Instrument {

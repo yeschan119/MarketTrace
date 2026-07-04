@@ -226,6 +226,20 @@ const en: Dict = {
         infoTitle: "Validated signal exists; model is neutral",
       },
     },
+    review: {
+      title: "Review & correct",
+      subtitle:
+        "Correct the model's read. Direction or type edits update the stats and backtest immediately.",
+      direction: "Direction",
+      eventType: "Event type",
+      confidence: "Confidence",
+      save: "Save",
+      saving: "Saving…",
+      noChanges: "No changes",
+      failed: "Save failed. Try again.",
+      sessionExpired: "Session expired — please log in again.",
+      reviewedAt: "Human-reviewed on {date}",
+    },
   },
   instrument: {
     loading: "Loading instrument timeline...",
@@ -590,6 +604,20 @@ const ko: Dict = {
         info: "신호",
         infoTitle: "검증신호 있음, 모델은 중립",
       },
+    },
+    review: {
+      title: "검토·수정",
+      subtitle:
+        "모델 판단을 교정합니다. 방향·유형을 바꾸면 통계·백테스트에 즉시 반영됩니다.",
+      direction: "방향",
+      eventType: "사건유형",
+      confidence: "신뢰도",
+      save: "저장",
+      saving: "저장 중…",
+      noChanges: "변경 없음",
+      failed: "저장 실패. 다시 시도하세요.",
+      sessionExpired: "세션 만료 — 다시 로그인하세요.",
+      reviewedAt: "{date} 사람이 검토함",
     },
   },
   instrument: {

@@ -448,3 +448,8 @@ export function describeEventType(code: string, lang: Lang): EventTypeInfo {
   // Unknown / long-tail code: at least render it as readable words.
   return { label: humanize(code), desc: "" };
 }
+
+// Known event_type codes, for review dropdowns. The list is not exhaustive of
+// what the LLM can emit (codes are free-form), so an event's current code is
+// merged in by callers when it falls outside this set.
+export const EVENT_TYPE_CODES: string[] = Object.keys(LABELS);

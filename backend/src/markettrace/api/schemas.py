@@ -57,8 +57,24 @@ class EventDetail(BaseModel):
     evidence: list[str]
     model: str
     model_version: str
+    reviewed_at: datetime | None = None
+    original_direction: str | None = None
+    original_event_type: str | None = None
+    original_confidence: float | None = None
     document: DocumentOut
     outcomes: list[OutcomeOut]
+
+
+class EventUpdate(BaseModel):
+    """Human corrections to an LLM-extracted event (Phase 2 review).
+
+    All fields optional — only those provided are changed. ``direction`` and
+    ``event_type`` edits trigger a rebuild of the event's impact rows.
+    """
+
+    direction: str | None = None
+    event_type: str | None = None
+    confidence: float | None = None
 
 
 class InstrumentOut(BaseModel):

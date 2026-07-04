@@ -76,20 +76,16 @@ def list_events(db: Session = Depends(get_db)) -> list[EventSummary]:
     return [_event_summary(event, doc) for event, doc in rows]
 
 
-@router.get("/events/{event_id}", response_model=EventDetail)
-def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
-    """Return full EventDetail for a single event; 404 if not found."""
-    event = db.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-
+def build_event_detail(db: Session, event: Event) -> EventDetail:
+    """Assemble the full EventDetail payload for an event; 404 if its document
+    is missing. Shared by the read route and the review (PATCH) route."""
     document = db.get(Document, event.document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
     outcomes_stmt = (
         select(Outcome)
-        .where(Outcome.event_id == event_id)
+        .where(Outcome.event_id == event.id)
         .order_by(Outcome.horizon_days.asc())
     )
     outcomes = db.scalars(outcomes_stmt).all()
@@ -109,9 +105,22 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
         evidence=list(event.evidence) if event.evidence else [],
         model=event.model,
         model_version=event.model_version,
+        reviewed_at=event.reviewed_at,
+        original_direction=event.original_direction,
+        original_event_type=event.original_event_type,
+        original_confidence=event.original_confidence,
         document=DocumentOut.model_validate(document),
         outcomes=[OutcomeOut.model_validate(o) for o in outcomes],
     )
+
+
+@router.get("/events/{event_id}", response_model=EventDetail)
+def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
+    """Return full EventDetail for a single event; 404 if not found."""
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return build_event_detail(db, event)
 
 
 @router.get("/instruments/{instrument_id}/timeline", response_model=InstrumentTimeline)

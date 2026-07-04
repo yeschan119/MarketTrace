@@ -4,6 +4,7 @@ import type {
   EventContribution,
   EventSummary,
   EventDetail,
+  EventUpdate,
   EventTypeStat,
   EventTypeSignificance,
   InstrumentTimeline,
@@ -100,6 +101,27 @@ async function apiPost<T>(
   return res.json() as Promise<T>;
 }
 
+async function apiPatch<T>(
+  path: string,
+  body: unknown,
+  token?: string
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await buildApiError(res, url);
+  }
+  return res.json() as Promise<T>;
+}
+
 async function apiPostForm<T>(
   path: string,
   body: FormData,
@@ -130,6 +152,14 @@ export const api = {
 
   getEvent(id: string): Promise<EventDetail> {
     return apiFetch<EventDetail>(`/events/${id}`);
+  },
+
+  updateEvent(
+    id: string,
+    patch: EventUpdate,
+    token: string
+  ): Promise<EventDetail> {
+    return apiPatch<EventDetail>(`/events/${id}`, patch, token);
   },
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {

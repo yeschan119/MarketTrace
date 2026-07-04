@@ -110,6 +110,16 @@ class Event(Base):
     model_version: Mapped[str] = mapped_column(String, nullable=False)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    # Phase 2 human review: timestamp of the last manual correction and the
+    # model's original values, snapshotted on the first edit so the LLM read
+    # stays recoverable. All NULL until an event is reviewed.
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    original_direction: Mapped[str | None] = mapped_column(String, nullable=True)
+    original_event_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    original_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     primary_instrument: Mapped[Instrument | None] = relationship()
 
 
