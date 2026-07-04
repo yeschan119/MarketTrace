@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { InstrumentSignalCard } from "@/components/InstrumentSignalCard";
+import { InstrumentFactorsCard } from "@/components/InstrumentFactorsCard";
 
 export default function InstrumentTimelinePage() {
   const { t, locale, lang } = useI18n();
@@ -73,6 +74,9 @@ export default function InstrumentTimelinePage() {
 
       {/* Aggregate buy-decision signal for this instrument */}
       <InstrumentSignalCard events={events} />
+
+      {/* Upside vs. downside factors behind the aggregate verdict */}
+      <InstrumentFactorsCard events={events} />
 
       {/* Timeline */}
       <div>

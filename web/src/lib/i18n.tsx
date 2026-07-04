@@ -267,6 +267,15 @@ const en: Dict = {
         none: "Insufficient validated signal.",
       },
     },
+    factors: {
+      title: "Upside vs. downside factors",
+      subtitle:
+        "The event types in this stock's history that carry a validated drift — what could move it, and which way.",
+      upside: "Upside factors",
+      downside: "Downside factors",
+      none: "None identified.",
+      detail: "D+{horizon} · {count}× · latest {date}",
+    },
   },
   direction: { positive: "positive", negative: "negative", neutral: "neutral" },
   chart: {
@@ -664,6 +673,15 @@ const ko: Dict = {
         neutral: "혼조 — 뚜렷한 검증 방향 없음.",
         none: "검증신호 부족.",
       },
+    },
+    factors: {
+      title: "상승 · 하락 요인",
+      subtitle:
+        "이 종목 이력의 사건 유형 중 검증된 드리프트를 가진 것 — 무엇이 어느 방향으로 움직일 수 있는지.",
+      upside: "상승 요인",
+      downside: "하락 요인",
+      none: "확인된 요인 없음.",
+      detail: "D+{horizon} · {count}건 · 최근 {date}",
     },
   },
   direction: { positive: "긍정", negative: "부정", neutral: "중립" },
