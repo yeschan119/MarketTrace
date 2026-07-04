@@ -103,11 +103,11 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 413 tests · ruff clean</span>
+      <span class="pill">✅ 513 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
       <span class="pill">🧭 방향 A: 측정·검증 우선</span>
-      <span class="pill">✅ 코퍼스 461건 (KR 253 · US 208)</span>
-      <span class="pill">기준일: 2026-07-03</span>
+      <span class="pill">✅ 코퍼스 486건 (KR 275 · US 211)</span>
+      <span class="pill">기준일: 2026-07-04</span>
     </div>
   </div>
 </header>
@@ -124,10 +124,10 @@
   <div class="strip">
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">80%</div><div class="bar"><i style="width:80%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">88%</div><div class="bar"><i style="width:88%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">76%</div><div class="bar"><i style="width:76%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">82%</div><div class="bar"><i style="width:82%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -200,8 +200,8 @@
   <!-- PHASE 2 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~80%</span></div>
-      <div class="pbar a"><i style="width:80%"></i></div><div class="pct-lbl" style="color:var(--amber)">80%</div>
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~88%</span></div>
+      <div class="pbar a"><i style="width:88%"></i></div><div class="pct-lbl" style="color:var(--amber)">88%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -210,19 +210,20 @@
           <li class="ok">사건 유형·방향·영향경로(channels)·기간 추출</li>
           <li class="ok"><b>시장 추상화 (AC1)</b> — OpenDART(KR)를 동일 Protocol로 추가, 계약 테스트로 실증</li>
           <li class="ok"><b>동일 사건 다문서 묶기 (novelty/dedup)</b> — Jaccard 군집(cluster_documents) + 슬라이스가 과거 evidence와 비교해 novelty 자동계산</li>
-          <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 시드 골드셋, markettrace-eval CLI</li>
+          <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 골드셋, markettrace-eval CLI</li>
+          <li class="ok"><b>정규 택소노미 + 라이브 분류 F1 실측</b> — event_type 자유텍스트가 110개로 파편화 → <span class="commit">eval/taxonomy.py</span> 정규화(110→18계열). 골드셋 6→26 + 실이벤트 97건 <b>2인 검수(일치도 97.9%)</b>. 배포 추출기 <b>77.3%</b> → 오류패턴(macro·regulatory 과적용 등) 프롬프트 교정 → 라이브 재추출 <b>91.8% (+14.5%p)</b>. <span class="commit">markettrace-eval-live</span></li>
           <li class="ok"><b>사람 검토·수정 화면</b> — <span class="commit">PATCH /events/{id}</span>(auth) + 이벤트 상세 편집폼: 방향·유형·신뢰도 교정, 원본 LLM값 스냅샷(original_*·reviewed_at, 마이그레이션 0006), 수정시 EventImpact 재빌드로 통계 즉시 반영. 목록에 ✓검토됨·"미검토 충돌" 큐</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
           <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
-          <li class="no">골드셋 라벨 확대 → 라이브 F1 측정(현재는 측정 프레임워크만)</li>
+          <li class="no">기존 486건 <b>재추출</b>로 개선 프롬프트 반영(현재 개선은 향후 추출만) + entity_linking F1 별도 측정(entity_linker 경유)</li>
           <li class="no">엔티티(종목 연결) 교정 — 현재 검토는 방향/유형/신뢰도만</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟡</b> — 기업연결 정확도·분류 F1 <b>측정 가능</b>(메트릭·하베스트 구현) + <b>사람 검토·수정 루프 가동</b>(교정→통계 반영). 실 F1 수치는 골드셋 확장 후 라이브 실행 필요.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 기업연결·분류 F1 <b>실측 완료</b>: 정규계열 분류 라이브 <b>91.8%(89/97)</b>, 검수 일치도 97.9%. 프롬프트 교정으로 systematic 오류 제거(잔여는 대부분 본질 모호 'other'). <b>사람 검토·수정 루프 가동</b>(교정→통계 반영). 남은 건 기존 코퍼스 재추출·entity 교정 UI.</div>
   </div>
 
   <!-- PHASE 3 -->
@@ -361,12 +362,12 @@
   </div>
 
   <!-- CURRENT DATA STATE -->
-  <h2><span class="num">▲</span> 현재 데이터 상태 <span style="font-size:13px;font-weight:500;color:var(--muted)">(라이브 API 확인 · 2026-07-03)</span></h2>
+  <h2><span class="num">▲</span> 현재 데이터 상태 <span style="font-size:13px;font-weight:500;color:var(--muted)">(라이브 API 확인 · 2026-07-04)</span></h2>
   <div class="grid2">
     <div class="mini">
-      <h3>✅ Events — 461건 완주</h3>
+      <h3>✅ Events — 486건</h3>
       <ul class="items">
-        <li class="ok"><b>KR 253 · US 208 = 461건</b> (earnings 68 · regulatory 59 · insider 54 …)</li>
+        <li class="ok"><b>KR 275 · US 211 = 486건</b> (earnings 70 · regulatory 59 · insider 55 …)</li>
         <li class="ok">유의 사건유형 <b>9버킷</b> 확인(p&lt;0.05, 표본충분). 전부 음(−) 초과수익 드리프트</li>
         <li class="ok"><b>상태 확인은 항상 라이브 API 먼저</b> — 정적 문서는 stale (6/17 "45건"으로 낡아 있었음)</li>
       </ul>
@@ -382,32 +383,32 @@
   </div>
 
   <!-- THIS SESSION -->
-  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-03 · 검증 통과 → 5모델 비교 → 거시 프록시 규명)</span></h2>
+  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-04 · 종목 랭킹 → 정합성 감사 → 라이브 분류 F1)</span></h2>
   <div class="mini">
     <ul class="items">
-      <li class="ok"><b>코퍼스 완주 45 → 461건</b> + <b>유의 9버킷</b> — insider_trading 5d −6.6%(t=−5.8), regulatory 5d −3.8% 등 전부 음(−). '데이터 부족' 블로커 해소</li>
-      <li class="ok"><b>유의 게이트 신호</b> — significant_event_type: 유의 유형만 매매 → 5d 표본외 <b>순 +4.4%·적중 68%</b>(매매 200→56건, 정밀도↑). 방향 A를 매매 신호로 구현</li>
-      <li class="ok"><b>거시·결합 모델 + 분해</b> — macro_surprise·combined 추가 후, <b>거시 분해로 IC 0.21이 특정 시리즈가 아닌 캘린더/국면 프록시</b>임을 규명(CPI·금리·실업·10Y 모두 IC 동일, D+60 음전환)</li>
-      <li class="ok"><b>UI·운영</b> — /stats 'Validated Signals' 패널·매트릭스 ★·5모델 백테스트 토글·거시 분해 표 + 운영 도구 <span class="commit">/render-test</span>·<span class="commit">/mock-test</span></li>
+      <li class="ok"><b>종목 간 랭킹 + 매수판단 정교화</b> — 단순평균을 <b>확신도 × 최근성 가중</b>(반감기 180일)으로 정교화해 전 종목 랭킹. <span class="commit">/rankings · GET /stats/instrument-ranking</span>. 실측 38종목(카카오·삼성·네이버 순 insider −6.6% 주의)</li>
+      <li class="ok"><b>roadmap·blueprint 정합성 감사(ralph)</b> — 독립 코드 리뷰 2회. §2 원칙·Phase 주장 모두 코드와 일치, <b>드리프트 없음</b>. AC2/AC3 문구만 실제에 맞게 교정</li>
+      <li class="ok"><b>정규 택소노미 + 라이브 분류 F1</b> — event_type 자유텍스트 110개 파편화 규명 → 정규화(110→18계열). 실이벤트 97건 <b>2인 검수(일치 97.9%)</b>. 배포 추출기 <b>77.3%</b> → 오류패턴(macro·regulatory 과적용·insider 불일치) 프롬프트 교정 → 라이브 재추출 <b>91.8% (+14.5%p)</b></li>
+      <li class="ok"><b>평가 인프라</b> — <span class="commit">eval/taxonomy.py</span> · <span class="commit">markettrace-eval-live</span>(배포 출력 오프라인 F1) + 검수 골드셋 아티팩트</li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 396 → <b style="color:var(--ink)">413</b> · ruff 클린. 신뢰 신호는 <b style="color:var(--ink)">사건 기반</b>(significant_event_type·event_type_history). <b style="color:var(--ink)">거시=프록시·llm_direction=손실</b>로 배제 — "무엇이 통하고 무엇이 안 통하는지"를 데이터로 판별.
-      Phase 4 60 → <b style="color:var(--ink)">72%</b>.</p>
+      테스트 413 → <b style="color:var(--ink)">513</b> · ruff 클린. 추출 품질 <b style="color:var(--ink)">77.3%→91.8%</b> 실측·검증(잔여 오류는 대부분 본질 모호 'other'). ⚠️ 개선 프롬프트는 <b>향후 추출만</b> 적용 — 기존 486건은 재적재 시 반영.
+      Phase 2 80 → <b style="color:var(--ink)">88%</b> · Phase 5 76 → <b style="color:var(--ink)">82%</b>.</p>
   </div>
 
   <!-- NEXT -->
   <h2><span class="num">»</span> 다음 추천 단계</h2>
   <div class="mini">
     <ul class="items next">
-      <li><b>① calibration</b> — confidence 구간별 실제 적중률(0.7 ≈ 실제 70%). 신호 품질이 제각각(사건=양호·거시=프록시·llm=손실)이라 <b>결합·신뢰 전 정량화가 필수 수순</b></li>
-      <li><b>② 매수판단 노출(Phase 5)</b> — 검증된 사건유형(significant)을 종목별 매수판단 화면으로. 실사용자 기능</li>
-      <li><b>③ 잔여 모델·상폐 모델링</b> — 펀더멘털·가격·수급을 동일 <code>SignalModel</code>로 + 거래정지·상장폐지를 수익률에 반영</li>
-      <li><b>④ 사건 중요도 필터</b> — governance 노이즈 제거 UI + Phase 2 사람 검토·수정</li>
+      <li><b>① 기존 코퍼스 재추출</b> — 개선 프롬프트(91.8%)를 기존 486건에 반영(재적재) → 신호 통계도 파편화 감소로 검정력↑. entity_linking F1 별도 측정(entity_linker 경유)</li>
+      <li><b>② 관심종목 알림(Phase 5)</b> — Telegram 등 알림 인프라 + 관심종목 저장·트리거. 실사용자 기능(무료티어 spin-down 고려)</li>
+      <li><b>③ 데이터 수집 트랙</b> — 펀더멘털·수급을 동일 <code>SignalModel</code>로 + 상폐목록(KRX/OpenDART) 수집해 생존편향 차단. 착수비용 큰 별도 트랙</li>
+      <li><b>④ event_type enum화(선택)</b> — 정규 18계열을 추출 스키마 enum으로 강제해 파편화 원천 차단(기존 데이터 마이그레이션 동반)</li>
     </ul>
   </div>
 
   <footer>
-    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-03<br>
+    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-04<br>
     공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
   </footer>
 
