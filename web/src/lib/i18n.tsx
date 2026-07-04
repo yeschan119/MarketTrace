@@ -196,6 +196,22 @@ const en: Dict = {
     evidence: "Supporting Evidence",
     industries: "Industries",
     channels: "Channels",
+    signal: {
+      title: "Validated Signal",
+      subtitle:
+        "How this event type has actually moved the market historically — and whether that agrees with the model's read.",
+      verdictLabel: "Model vs. history",
+      conflict:
+        "Conflict — the model reads {llm}, but validated history for this event type points {hist}.",
+      agree:
+        "Agreement — the model's {llm} read matches validated history ({hist}).",
+      info:
+        "The model reads neutral; validated history for this event type points {hist}.",
+      none:
+        "No statistically significant signal for this event type yet (n≥5, p<0.05). Treat the model's read as unconfirmed.",
+      up: "up",
+      down: "down",
+    },
   },
   instrument: {
     loading: "Loading instrument timeline...",
@@ -533,6 +549,20 @@ const ko: Dict = {
     evidence: "근거",
     industries: "산업",
     channels: "채널",
+    signal: {
+      title: "검증신호",
+      subtitle:
+        "이 사건유형이 과거 실제로 시장을 어떻게 움직였는지 — 그리고 모델 판단과 일치하는지.",
+      verdictLabel: "모델 vs 실측",
+      conflict:
+        "충돌 — 모델은 {llm}으로 봤지만, 이 사건유형의 검증된 실측은 {hist} 신호입니다.",
+      agree: "일치 — 모델의 {llm} 판단이 검증된 실측({hist})과 부합합니다.",
+      info: "모델은 중립으로 봤고, 이 사건유형의 검증된 실측은 {hist} 신호입니다.",
+      none:
+        "이 사건유형은 아직 통계적으로 유의한 검증신호가 없습니다(n≥5, p<0.05). 모델 판단은 미검증으로 보세요.",
+      up: "상승",
+      down: "하락",
+    },
   },
   instrument: {
     loading: "종목 타임라인 불러오는 중...",

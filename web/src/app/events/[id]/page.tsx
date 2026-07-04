@@ -9,6 +9,7 @@ import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { AbnormalReturnChart } from "@/components/AbnormalReturnChart";
 import { ScoreBars } from "@/components/ScoreBars";
+import { ValidatedSignalCard } from "@/components/ValidatedSignalCard";
 
 export default function EventDetailPage() {
   const { t, locale, lang } = useI18n();
@@ -121,6 +122,13 @@ export default function EventDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Validated signal: LLM read vs. historical evidence for this event type */}
+      <ValidatedSignalCard
+        eventType={event.event_type}
+        direction={event.direction}
+        horizonDays={event.horizon_days}
+      />
 
       {/* Score Components */}
       <ScoreBars
