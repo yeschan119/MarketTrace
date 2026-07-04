@@ -66,7 +66,7 @@
 > 순수 코드로 낼 수 있는 가시적 가치는 대체로 소진 → 남은 건 데이터 수집·수동 라벨링·외부 인프라.
 
 1. **잔여 SignalModel (데이터 선행)** — 펀더멘털·수급을 동일 `SignalModel`로. **재무·수급 데이터 수집 선행 필요**(가격 모멘텀은 완료, 실측 한계적). 상폐는 delisted_at 미채움·provider 미수집으로 모델링 불가 → KRX/OpenDART 상폐목록 수집 선행.
-2. **골드셋 확대 → 라이브 F1** 🟡 진행 — 정규 택소노미(110→18계열) + 골드셋 6→25건 + 배포 추출기 오프라인 F1(`markettrace-eval-live`). **첫 실측 베이스라인: 정규 정확도 85.7%(30/35)·macro F1 0.771**. 오류패턴: `macro_data_release` 비-거시 공시 과적용(2/5)·insider↔ownership 불일치·product/regulatory 과라벨. 남음: 라벨 사람검수·표본 확대·라이브 LLM 재추출 F1(키 필요).
+2. **골드셋 확대 → 라이브 F1** 🟡 진행 — 정규 택소노미(110→18계열) + 정적 골드셋 6→25건 + 배포 추출기 오프라인 F1(`markettrace-eval-live`, 실 이벤트 97건 표본·독립 어노테이터 2인 검수 **일치도 97.9%**). **실측 베이스라인: 정규 정확도 77.3%(75/97)·macro F1 0.723**. 오류패턴(22건): `macro_data_release`(5)·`regulatory_action`(5) 과적용, insider↔ownership 불일치(4), 특수관계인 거래 오분류. → 추출 프롬프트/스키마를 정규 어휘+오류패턴 규칙으로 교정(soft steer, event_type 자유텍스트 유지). 남음(키 필요): **라이브 LLM 재추출 F1**(`markettrace-eval`, Render Shell)로 교정 효과 실측·entity linking F1.
 3. **관심종목 알림** — 알림 인프라(Telegram 등) 필요.
 4. ~~종목 매수판단 정교화(확신도·최근성 가중, 종목 간 랭킹)~~ — ✅ 완료(`/rankings` + `GET /stats/instrument-ranking`).
 
