@@ -19,6 +19,12 @@ export function SiteHeader() {
           {t("nav.events")}
         </a>
         <a
+          href="/rankings"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.rankings")}
+        </a>
+        <a
           href="/stats"
           className="text-sm font-medium text-gray-600 hover:text-gray-900"
         >

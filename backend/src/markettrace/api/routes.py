@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +19,7 @@ from markettrace.api.schemas import (
     EventTypeSignificanceOut,
     EventTypeStatOut,
     InstrumentOut,
+    InstrumentRankingOut,
     InstrumentTimeline,
     MacroObservationOut,
     MacroSeriesBacktestOut,
@@ -36,6 +39,11 @@ from markettrace.impact.backtest import (
     run_walk_forward_backtest,
 )
 from markettrace.impact.calibration import compute_confidence_calibration
+from markettrace.impact.instrument_ranking import (
+    DEFAULT_HALF_LIFE_DAYS,
+    RankingEventInput,
+    rank_instruments,
+)
 from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
 from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import (
@@ -175,6 +183,58 @@ def get_event_type_significance(
     distinguishable from zero, and is the sample even large enough to say?"""
     results = compute_event_type_significance(db)
     return [EventTypeSignificanceOut.model_validate(r) for r in results]
+
+
+@router.get("/stats/instrument-ranking", response_model=list[InstrumentRankingOut])
+def get_instrument_ranking(
+    limit: int = 50,
+    half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
+    db: Session = Depends(get_db),
+) -> list[InstrumentRankingOut]:
+    """Rank instruments by confidence x recency weighted validated drift.
+
+    Refines the single-instrument buy-judgment card into a cross-instrument
+    comparison: each instrument's validated events are weighted by their LLM
+    confidence and by recency (exponential decay, ``half_life_days``) before
+    averaging their type's statistically-validated abnormal-return drift.
+    Sorted ascending by score — strongest historical caution first. ``limit``
+    caps the returned rows; ``half_life_days`` tunes how fast old events fade.
+    """
+    if half_life_days <= 0:
+        raise HTTPException(status_code=400, detail="half_life_days must be positive")
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be positive")
+
+    significance = compute_event_type_significance(db)
+
+    stmt = (
+        select(Event, Document)
+        .join(Document, Event.document_id == Document.id)
+        .where(Event.primary_instrument_id.is_not(None))
+    )
+    inputs: list[RankingEventInput] = []
+    for event, document in db.execute(stmt).all():
+        instrument = event.primary_instrument
+        if instrument is None:
+            continue
+        inputs.append(
+            RankingEventInput(
+                instrument_id=instrument.id,
+                ticker=instrument.ticker,
+                name=instrument.name,
+                market=instrument.market,
+                event_type=event.event_type,
+                direction=event.direction,
+                confidence=event.confidence,
+                published_at=document.published_at,
+                reviewed_at=event.reviewed_at,
+            )
+        )
+
+    ranked = rank_instruments(
+        inputs, significance, date.today(), half_life_days=half_life_days
+    )
+    return [InstrumentRankingOut.model_validate(r) for r in ranked[:limit]]
 
 
 @router.get("/stats/backtest", response_model=list[BacktestResultOut])

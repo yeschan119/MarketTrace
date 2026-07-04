@@ -371,3 +371,24 @@ def test_macro_decomposition_route(client, ts_session):
     for row in data:
         assert "information_coefficient" in row
         assert "mean_strategy_return_net" in row
+
+
+# ---------------------------------------------------------------------------
+# GET /stats/instrument-ranking
+# ---------------------------------------------------------------------------
+
+
+def test_instrument_ranking_route_ok_empty(client: TestClient, seeded: dict) -> None:
+    # One seeded event is far below MIN_SAMPLE, so no event type is validated
+    # and nothing ranks — but the route wiring must return 200 with a list.
+    resp = client.get("/stats/instrument-ranking")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_instrument_ranking_route_validates_params(client: TestClient) -> None:
+    assert client.get("/stats/instrument-ranking", params={"limit": 0}).status_code == 400
+    assert (
+        client.get("/stats/instrument-ranking", params={"half_life_days": 0}).status_code
+        == 400
+    )

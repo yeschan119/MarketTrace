@@ -168,6 +168,26 @@ export interface InstrumentTimeline {
   events: EventSummary[];
 }
 
+export interface TopFactor {
+  event_type: string;
+  drift: number;
+  count: number;
+}
+
+export interface InstrumentRanking {
+  instrument_id: number;
+  ticker: string;
+  name: string;
+  market: string | null;
+  weighted_score: number;
+  simple_mean: number;
+  lean: "bearish" | "bullish" | "neutral";
+  validated_count: number;
+  conflict_count: number;
+  unreviewed_conflict_count: number;
+  top_factor: TopFactor | null;
+}
+
 export interface HealthResponse {
   status: string;
 }

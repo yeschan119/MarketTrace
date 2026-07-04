@@ -7,6 +7,7 @@ import type {
   EventUpdate,
   EventTypeStat,
   EventTypeSignificance,
+  InstrumentRanking,
   InstrumentTimeline,
   LedgerCategory,
   LedgerEntry,
@@ -164,6 +165,17 @@ export const api = {
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {
     return apiFetch<InstrumentTimeline>(`/instruments/${id}/timeline`);
+  },
+
+  getInstrumentRanking(
+    limit = 50,
+    halfLifeDays?: number
+  ): Promise<InstrumentRanking[]> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (halfLifeDays != null) query.set("half_life_days", String(halfLifeDays));
+    return apiFetch<InstrumentRanking[]>(
+      `/stats/instrument-ranking?${query.toString()}`
+    );
   },
 
   getEventTypeStats(): Promise<EventTypeStat[]> {

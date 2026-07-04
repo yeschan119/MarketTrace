@@ -17,6 +17,7 @@ type Dict = { [key: string]: string | Dict };
 const en: Dict = {
   nav: {
     events: "Events",
+    rankings: "Rankings",
     stats: "Stats",
     macro: "Macro",
     ledger: "Ledger",
@@ -277,6 +278,30 @@ const en: Dict = {
       detail: "D+{horizon} · {count}× · latest {date}",
     },
   },
+  rankings: {
+    title: "Instrument Rankings",
+    subtitle:
+      "Every instrument ranked by its confidence- and recency-weighted validated drift — a cross-stock buy-judgment view. Recent, high-confidence events count more than stale, low-confidence ones. Not a price prediction; strongest historical caution first.",
+    loading: "Loading rankings...",
+    failTitle: "Failed to load rankings",
+    empty:
+      "No instruments have enough validated events to rank yet. Ingest more events to build power.",
+    weightingNote:
+      "Weighting: each validated event × its LLM confidence × recency (half-life {halfLife} days).",
+    col: {
+      rank: "#",
+      instrument: "Instrument",
+      lean: "Lean",
+      score: "Weighted drift",
+      simpleMean: "Simple mean",
+      validated: "Validated",
+      conflicts: "Conflicts",
+      topFactor: "Top factor",
+    },
+    lean: { bearish: "Caution", bullish: "Favorable", neutral: "Mixed" },
+    factor: "{label} {drift} ({count}×)",
+    conflictsCell: "{total} ({unreviewed} unreviewed)",
+  },
   direction: { positive: "positive", negative: "negative", neutral: "neutral" },
   chart: {
     title: "Abnormal Returns (%)",
@@ -426,6 +451,7 @@ const en: Dict = {
 const ko: Dict = {
   nav: {
     events: "이벤트",
+    rankings: "랭킹",
     stats: "통계",
     macro: "거시",
     ledger: "가계부",
@@ -683,6 +709,30 @@ const ko: Dict = {
       none: "확인된 요인 없음.",
       detail: "D+{horizon} · {count}건 · 최근 {date}",
     },
+  },
+  rankings: {
+    title: "종목 랭킹",
+    subtitle:
+      "모든 종목을 확신도·최근성 가중 검증 드리프트로 랭킹 — 종목 간 매수판단 뷰. 최근·고확신 사건이 낡거나 저확신 사건보다 크게 반영됩니다. 가격 예측이 아니며, 과거 실측상 가장 주의할 종목이 위로.",
+    loading: "랭킹 불러오는 중...",
+    failTitle: "랭킹을 불러오지 못했습니다",
+    empty:
+      "아직 랭킹에 필요한 검증 사건이 충분한 종목이 없습니다. 이벤트를 더 적재해 검정력을 확보하세요.",
+    weightingNote:
+      "가중: 각 검증 사건 × LLM 확신도 × 최근성(반감기 {halfLife}일).",
+    col: {
+      rank: "#",
+      instrument: "종목",
+      lean: "판정",
+      score: "가중 드리프트",
+      simpleMean: "단순 평균",
+      validated: "검증",
+      conflicts: "충돌",
+      topFactor: "주요 요인",
+    },
+    lean: { bearish: "주의", bullish: "우호", neutral: "혼조" },
+    factor: "{label} {drift} ({count}건)",
+    conflictsCell: "{total} (미검토 {unreviewed})",
   },
   direction: { positive: "긍정", negative: "부정", neutral: "중립" },
   chart: {

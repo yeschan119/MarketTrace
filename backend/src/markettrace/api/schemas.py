@@ -131,6 +131,30 @@ class EventTypeSignificanceOut(BaseModel):
     sufficient_sample: bool
 
 
+class TopFactorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type: str
+    drift: float
+    count: int
+
+
+class InstrumentRankingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    instrument_id: int
+    ticker: str
+    name: str
+    market: str | None
+    weighted_score: float
+    simple_mean: float
+    lean: str
+    validated_count: int
+    conflict_count: int
+    unreviewed_conflict_count: int
+    top_factor: TopFactorOut | None
+
+
 class BacktestResultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
