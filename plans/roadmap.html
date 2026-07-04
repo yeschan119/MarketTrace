@@ -124,10 +124,10 @@
   <div class="strip">
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">65%</div><div class="bar"><i style="width:65%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">80%</div><div class="bar"><i style="width:80%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">72%</div><div class="bar"><i style="width:72%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">52%</div><div class="bar"><i style="width:52%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">88%</div><div class="bar"><i style="width:88%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">64%</div><div class="bar"><i style="width:64%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -200,8 +200,8 @@
   <!-- PHASE 2 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~65%</span></div>
-      <div class="pbar a"><i style="width:65%"></i></div><div class="pct-lbl" style="color:var(--amber)">65%</div>
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~80%</span></div>
+      <div class="pbar a"><i style="width:80%"></i></div><div class="pct-lbl" style="color:var(--amber)">80%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -211,17 +211,18 @@
           <li class="ok"><b>시장 추상화 (AC1)</b> — OpenDART(KR)를 동일 Protocol로 추가, 계약 테스트로 실증</li>
           <li class="ok"><b>동일 사건 다문서 묶기 (novelty/dedup)</b> — Jaccard 군집(cluster_documents) + 슬라이스가 과거 evidence와 비교해 novelty 자동계산</li>
           <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 시드 골드셋, markettrace-eval CLI</li>
+          <li class="ok"><b>사람 검토·수정 화면</b> — <span class="commit">PATCH /events/{id}</span>(auth) + 이벤트 상세 편집폼: 방향·유형·신뢰도 교정, 원본 LLM값 스냅샷(original_*·reviewed_at, 마이그레이션 0006), 수정시 EventImpact 재빌드로 통계 즉시 반영. 목록에 ✓검토됨·"미검토 충돌" 큐</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no">사람 검토·수정 화면 (entity/event correction)</li>
           <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
           <li class="no">골드셋 라벨 확대 → 라이브 F1 측정(현재는 측정 프레임워크만)</li>
+          <li class="no">엔티티(종목 연결) 교정 — 현재 검토는 방향/유형/신뢰도만</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟡</b> — 기업연결 정확도·분류 F1 <b>측정 가능</b>(메트릭·하베스트 구현). 실수치는 골드셋 확장 후 라이브 실행 필요.</div>
+    <div class="crit"><b>완료 기준 🟡</b> — 기업연결 정확도·분류 F1 <b>측정 가능</b>(메트릭·하베스트 구현) + <b>사람 검토·수정 루프 가동</b>(교정→통계 반영). 실 F1 수치는 골드셋 확장 후 라이브 실행 필요.</div>
   </div>
 
   <!-- PHASE 3 -->
@@ -253,8 +254,8 @@
   <!-- PHASE 4 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~72%</span></div>
-      <div class="pbar a"><i style="width:72%"></i></div><div class="pct-lbl" style="color:var(--amber)">72%</div>
+      <div class="title">Phase 4 · 신호와 검증 <span class="badge b-partial">진행 중 ~88%</span></div>
+      <div class="pbar a"><i style="width:88%"></i></div><div class="pct-lbl" style="color:var(--amber)">88%</div>
     </div>
     <p class="sub" style="margin:10px 0 0"><b>방향 A — 검증 통과(2026-07-03).</b> 코퍼스 461건으로 검정력 확보 → "데이터 부족" 블로커 해소. <b>5개 신호모델을 look-ahead 차단 워크포워드로 비교</b>, 무엇이 실제로 통하고 무엇이 프록시인지까지 판별.</p>
     <div class="cols">
@@ -266,25 +267,26 @@
           <li class="ok"><b>경험 기준선</b> — event_type_history 5d 순 <b>+2.1%</b>·적중 64.5%·IC 0.12</li>
           <li class="ok"><b>거시·결합 모델 + 분해</b> — macro_surprise·combined 추가. <b>거시 분해로 IC 0.21이 특정 시리즈가 아닌 <span style="color:var(--amber)">캘린더/국면 프록시</span>임을 규명</b>(4시리즈 IC 동일). <span class="commit">GET /stats/macro-decomposition</span></li>
           <li class="ok"><b>거래 현실 반영</b> — commission·slippage(0.05%) net + 상폐/결측 커버리지(n_dropped_no_outcome)</li>
+          <li class="ok"><b>calibration</b> — confidence 구간별 실제 적중률(ECE·Brier), <span class="commit">GET /stats/calibration</span> + 웹 보정 패널</li>
+          <li class="ok"><b>검증신호 개별 이벤트 노출 + 결합 판정</b> — 이벤트별로 그 유형의 검증 실측 vs LLM 방향을 대비해 <b>일치/충돌</b> 판정(예: insider 긍정 판단 vs 실측 5d −6.6% → 충돌). 목록 배지 + "충돌만"/"미검토 충돌" 필터. <span class="commit">/events · /events/{id}</span></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no"><b>calibration</b> — confidence 0.7 ≈ 실제 70% 검증(신호 신뢰도 정량화). 신호 품질이 제각각이라 결합 전 필수</li>
-          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel로 추가</li>
-          <li class="no">상폐 <b>모델링</b>(현재는 커버리지 보고만)·실패사례 기록</li>
+          <li class="no">펀더멘털·가격·수급 모델을 동일 SignalModel로 추가 <span style="color:var(--muted)">(수급 데이터 수집 선행 필요)</span></li>
+          <li class="no">상폐 <b>모델링</b> — <span style="color:var(--amber)">데이터 부재로 보류</span>: delisted_at 미채움·provider 상폐 미수집, drop 3원인 구분 불가. KRX/OpenDART 상폐목록 수집 선행 필요</li>
           <li class="no">(거시) 릴리즈-이벤트 상대시점 설계로 프록시 아닌 순수 거시신호 분리 — 후순위</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>현재 판정 🟢</b> — 검증 통과. 신뢰 신호는 <b>사건 기반</b>(significant_event_type 5d 순 +4.4%, event_type_history +2.1%). <b>거시=프록시·llm_direction=손실</b>로 배제. 완료 기준(표본외 개선) 5d에서 충족 → 초점이 "모델 확장"에서 <b>"calibration·매수판단 노출"</b>로 이동.</div>
+    <div class="crit"><b>현재 판정 🟢</b> — 검증 통과 + calibration·개별 노출 완료. 신뢰 신호는 <b>사건 기반</b>(significant_event_type 5d 순 +4.4%, event_type_history +2.1%). <b>거시=프록시·llm_direction=손실</b>로 배제. 초점이 이제 <b>"종목 단위 매수판단 노출(Phase 5)"</b>로 이동. 잔여 모델·상폐는 데이터 수집이 선행돼야 하는 별도 트랙.</div>
   </div>
 
   <!-- PHASE 5 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~52%</span></div>
-      <div class="pbar a"><i style="width:52%"></i></div><div class="pct-lbl" style="color:var(--amber)">52%</div>
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~64%</span></div>
+      <div class="pbar a"><i style="width:64%"></i></div><div class="pct-lbl" style="color:var(--amber)">64%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -293,18 +295,19 @@
           <li class="ok">변동 원인 후보·근거 (evidence·channels·direction)</li>
           <li class="ok">이상수익률 차트 (1/5/20/60일·<b>섹터조정 라인</b>) + 점수 구성요소</li>
           <li class="ok"><b>로그인 게이트 수동 인제스트</b> (모달 + Ingest 버튼)</li>
-          <li class="ok"><b>검증 대시보드 확장</b> — /stats: 반응 매트릭스 + <b>Validated Signals 패널</b>(유의 신호 ★) + <b>5모델 백테스트 토글</b> + <b>거시 국면 분해 표</b></li>
+          <li class="ok"><b>검증 대시보드 확장</b> — /stats: 반응 매트릭스 + <b>Validated Signals 패널</b>(유의 신호 ★) + <b>5모델 백테스트 토글</b> + <b>거시 국면 분해 표</b> + 보정 패널</li>
+          <li class="ok"><b>사건 단위 검증신호 결합</b> — 이벤트 상세·목록에 검증신호 vs LLM 방향 일치/충돌 노출 + "미검토 충돌" 검토 큐(사람 검토 루프와 연결)</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
+          <li class="no"><b>종목별 매수판단 화면</b> — 검증 신호를 <b>종목(instrument) 뷰</b>에 집계(현재는 사건·통계 단위까지. 종목 타임라인에 종합 판정 결합) ← <b>다음 단계 후보</b></li>
           <li class="no">관심종목 알림</li>
           <li class="no">시나리오별 상승·하락 요인</li>
-          <li class="no"><b>종목별 매수판단 화면</b> — 검증 신호를 종목 뷰에 결합(현재는 통계 페이지에만)</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>참고</b> — 타임라인·상세는 Phase 1에서 구축, 여기선 확장 단계. 섹터조정 라인·/stats 페이지·로그인 인제스트는 운영/Phase3 노출 과정에서 추가됨.</div>
+    <div class="crit"><b>참고</b> — 타임라인·상세는 Phase 1에서 구축, 여기선 확장 단계. 검증신호는 사건·통계 단위까지 노출됨 → 남은 핵심은 <b>종목 단위 집계 매수판단</b>.</div>
   </div>
 
   <!-- DATA MODEL -->
