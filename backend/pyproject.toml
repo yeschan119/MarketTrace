@@ -38,6 +38,7 @@ dev = [
 markettrace-slice = "markettrace.pipeline.vertical_slice:main"
 markettrace-seed = "markettrace.pipeline.seed:main"
 markettrace-eval = "markettrace.eval.harness:main"
+markettrace-eval-live = "markettrace.eval.live_eval:main"
 markettrace-macro = "markettrace.pipeline.macro_ingest:main"
 markettrace-ingest = "markettrace.api.ingest:main"
 

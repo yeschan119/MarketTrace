@@ -20,6 +20,7 @@ from markettrace.eval.metrics import (
     classification_metrics,
     entity_linking_metrics,
 )
+from markettrace.eval.taxonomy import canonicalize
 
 __all__ = ["Prediction", "EvalReport", "evaluate", "main"]
 
@@ -34,9 +35,16 @@ class Prediction:
 
 @dataclass(frozen=True)
 class EvalReport:
-    """Combined classification + entity-linking scores over a gold set."""
+    """Combined classification + entity-linking scores over a gold set.
+
+    ``classification`` is scored at the *canonical family* level (the headline
+    metric — see :mod:`markettrace.eval.taxonomy` for why raw strings are
+    meaningless); ``raw_classification`` keeps the exact-string score for
+    reference so the fragmentation gap is visible.
+    """
 
     classification: ClassificationReport
+    raw_classification: ClassificationReport
     entity_linking: PRF
     n_examples: int
 
@@ -47,24 +55,32 @@ def evaluate(
 ) -> EvalReport:
     """Run *predict* over every gold example and score the predictions.
 
-    Returns a :class:`EvalReport` bundling event-type macro F1 and
-    micro-averaged entity-linking P/R/F1. Entity matching is case-insensitive
-    (tickers are upper-cased on both sides) to avoid spurious misses.
+    Returns a :class:`EvalReport` bundling event-type macro F1 — both at the
+    canonical-family level (headline) and raw-string level — and micro-averaged
+    entity-linking P/R/F1. Event types are normalised with
+    :func:`~markettrace.eval.taxonomy.canonicalize` before the headline score so
+    ``earnings_release`` and ``earnings_beat`` are not counted as disagreements.
+    Entity matching is case-insensitive (tickers upper-cased on both sides).
     """
-    gold_labels: list[str] = []
-    pred_labels: list[str] = []
+    gold_raw: list[str] = []
+    pred_raw: list[str] = []
+    gold_canon: list[str] = []
+    pred_canon: list[str] = []
     gold_links: dict[str, set[str]] = {}
     pred_links: dict[str, set[str]] = {}
 
     for example in goldset:
         prediction = predict(example)
-        gold_labels.append(example.gold_event_type)
-        pred_labels.append(prediction.event_type)
+        gold_raw.append(example.gold_event_type)
+        pred_raw.append(prediction.event_type)
+        gold_canon.append(canonicalize(example.gold_event_type))
+        pred_canon.append(canonicalize(prediction.event_type))
         gold_links[example.id] = {e.upper() for e in example.gold_entities}
         pred_links[example.id] = {e.upper() for e in prediction.entities}
 
     return EvalReport(
-        classification=classification_metrics(gold_labels, pred_labels),
+        classification=classification_metrics(gold_canon, pred_canon),
+        raw_classification=classification_metrics(gold_raw, pred_raw),
         entity_linking=entity_linking_metrics(gold_links, pred_links),
         n_examples=len(goldset),
     )
@@ -108,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - live path
         "n_examples": report.n_examples,
         "event_type_macro_f1": report.classification.macro_f1,
         "event_type_accuracy": report.classification.accuracy,
+        "event_type_macro_f1_raw": report.raw_classification.macro_f1,
+        "event_type_accuracy_raw": report.raw_classification.accuracy,
         "entity_linking": {
             "precision": report.entity_linking.precision,
             "recall": report.entity_linking.recall,

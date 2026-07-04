@@ -2,37 +2,157 @@
   {
     "id": "us-aapl-earnings-beat",
     "text": "Apple Inc. today announced financial results for its fiscal fourth quarter, posting record revenue of $94.9 billion, up 8 percent year over year and ahead of analyst expectations. Earnings per share of $1.46 beat the consensus estimate of $1.39.",
-    "gold_event_type": "earnings_beat",
+    "gold_event_type": "earnings",
     "gold_entities": ["AAPL"]
+  },
+  {
+    "id": "us-nflx-earnings-miss",
+    "text": "Netflix, Inc. reported third-quarter diluted earnings per share of $2.90, below the consensus analyst estimate of $3.12, as subscriber additions came in lighter than expected.",
+    "gold_event_type": "earnings",
+    "gold_entities": ["NFLX"]
   },
   {
     "id": "us-aapl-product-launch",
     "text": "Apple today unveiled iPhone 16, introducing a new camera system and the A18 chip. The new lineup goes on sale next week and represents the company's most significant hardware update in years.",
-    "gold_event_type": "product_launch",
+    "gold_event_type": "product",
     "gold_entities": ["AAPL"]
   },
   {
-    "id": "us-buyback",
+    "id": "us-msft-buyback",
     "text": "The Board of Directors of Microsoft Corporation has authorized a new share repurchase program of up to $60 billion of the company's common stock. The buyback has no expiration date and may be suspended at any time.",
     "gold_event_type": "buyback",
     "gold_entities": ["MSFT"]
   },
   {
-    "id": "us-dividend",
+    "id": "us-jnj-dividend",
     "text": "Johnson & Johnson announced that its Board of Directors declared a quarterly dividend of $1.24 per share on the company's common stock, an increase of 4.2 percent from the prior quarterly dividend.",
     "gold_event_type": "dividend",
     "gold_entities": ["JNJ"]
   },
   {
-    "id": "kr-samsung-guidance",
+    "id": "kr-samsung-guidance-cut",
     "text": "Samsung Electronics provided guidance that second-quarter operating profit is expected to decline sharply due to weak memory chip demand and falling DRAM prices, falling short of market consensus.",
-    "gold_event_type": "guidance_cut",
+    "gold_event_type": "guidance",
     "gold_entities": ["005930"]
   },
   {
-    "id": "us-lawsuit",
+    "id": "us-dal-guidance-raise",
+    "text": "Delta Air Lines raised its full-year adjusted earnings per share guidance to a range of $7.00 to $7.25, up from its prior outlook, citing stronger-than-expected corporate and international travel demand.",
+    "gold_event_type": "guidance",
+    "gold_entities": ["DAL"]
+  },
+  {
+    "id": "us-patent-litigation",
     "text": "A federal jury found that the company willfully infringed three patents and ordered it to pay $300 million in damages. The company said it strongly disagrees with the verdict and plans to appeal.",
-    "gold_event_type": "lawsuit",
+    "gold_event_type": "regulatory",
+    "gold_entities": []
+  },
+  {
+    "id": "us-xom-reg-fd",
+    "text": "Exxon Mobil Corporation furnished a Regulation FD Disclosure noting that the U.S. Securities and Exchange Commission has opened a formal enforcement inquiry into certain of the company's historical accounting estimates.",
+    "gold_event_type": "regulatory",
+    "gold_entities": ["XOM"]
+  },
+  {
+    "id": "us-tsla-insider-form4",
+    "text": "In a Form 4 filed with the SEC, a director of Tesla, Inc. reported the sale of 5,000 shares of common stock at a weighted average price of $242.10, executed under a pre-arranged Rule 10b5-1 trading plan.",
+    "gold_event_type": "insider_trading",
+    "gold_entities": ["TSLA"]
+  },
+  {
+    "id": "kr-hynix-insider",
+    "text": "SK하이닉스는 등기임원의 자기회사 주식 처분 내역을 임원·주요주주 특정증권등 소유상황보고서를 통해 공시했다. 해당 임원은 보통주 2,000주를 장내 매도했다.",
+    "gold_event_type": "insider_trading",
+    "gold_entities": ["000660"]
+  },
+  {
+    "id": "us-ford-debt-offering",
+    "text": "Ford Motor Company announced that it has priced a public offering of $1.5 billion aggregate principal amount of senior unsecured notes due 2034. The company intends to use the net proceeds for general corporate purposes.",
+    "gold_event_type": "capital_raise",
+    "gold_entities": ["F"]
+  },
+  {
+    "id": "kr-naver-capital-increase",
+    "text": "네이버는 이사회에서 운영자금 및 시설자금 조달을 위한 제3자배정 방식의 유상증자를 결정했다고 공시했다. 신주 발행 규모는 약 5,000억원이다.",
+    "gold_event_type": "capital_raise",
+    "gold_entities": ["035420"]
+  },
+  {
+    "id": "us-merger-agreement",
+    "text": "The company announced today that it has entered into a definitive agreement to acquire a rival software firm for approximately $4.2 billion in cash, in a transaction expected to close in the first half of next year subject to regulatory approval.",
+    "gold_event_type": "merger_acquisition",
+    "gold_entities": []
+  },
+  {
+    "id": "kr-lgchem-ownership",
+    "text": "LG화학의 주식 대량보유상황보고서(5% 룰)가 제출됐다. 주요 주주의 지분율이 기존 6.1%에서 4.8%로 1.3%포인트 감소한 것으로 나타났다.",
+    "gold_event_type": "ownership_change",
+    "gold_entities": ["051910"]
+  },
+  {
+    "id": "kr-samsung-board-appointment",
+    "text": "삼성전자는 이사회를 열고 신임 대표이사 사장을 선임했다고 공시했다. 신임 대표는 반도체 부문을 총괄해 온 인물로, 이사회 승인 절차를 거쳐 취임한다.",
+    "gold_event_type": "governance",
+    "gold_entities": ["005930"]
+  },
+  {
+    "id": "us-dis-exec-departure",
+    "text": "The Walt Disney Company announced that its Chief Financial Officer has notified the Board of Directors of an intention to step down from the role, effective at the end of the fiscal year. A search for a successor is underway.",
+    "gold_event_type": "governance",
+    "gold_entities": ["DIS"]
+  },
+  {
+    "id": "kr-hyundai-shareholder-meeting",
+    "text": "현대자동차는 제56기 정기주주총회 소집을 결의했다고 공시했다. 주총 안건에는 재무제표 승인, 이사 선임, 이사 보수한도 승인 등이 포함된다.",
+    "gold_event_type": "shareholder_meeting",
+    "gold_entities": ["005380"]
+  },
+  {
+    "id": "us-ko-annual-meeting",
+    "text": "The Coca-Cola Company announced the results of its annual meeting of shareholders. Shareholders elected all director nominees and ratified the appointment of the independent registered public accounting firm.",
+    "gold_event_type": "shareholder_meeting",
+    "gold_entities": ["KO"]
+  },
+  {
+    "id": "us-nvda-investor-day",
+    "text": "NVIDIA Corporation announced it will host its annual Investor Day on March 15, 2026. Company management will discuss business strategy and the financial model, with a live webcast available to analysts and investors.",
+    "gold_event_type": "ir_event",
+    "gold_entities": ["NVDA"]
+  },
+  {
+    "id": "kr-samsung-sustainability",
+    "text": "삼성전자가 2025 지속가능경영보고서를 발간했다고 밝혔다. 보고서에는 탄소중립 이행 현황, 공급망 관리, 지배구조 개선 노력 등이 담겼다.",
+    "gold_event_type": "esg_report",
+    "gold_entities": ["005930"]
+  },
+  {
+    "id": "us-lmt-contract",
+    "text": "Lockheed Martin Corporation announced that it has been awarded a $1.1 billion contract by the U.S. Department of Defense to produce additional units and provide sustainment services over a multi-year period.",
+    "gold_event_type": "contract_partnership",
+    "gold_entities": ["LMT"]
+  },
+  {
+    "id": "kr-hynix-investment",
+    "text": "SK하이닉스는 차세대 메모리 반도체 생산능력 확충을 위해 신규 생산라인 구축에 대규모 투자를 집행하기로 결정했다고 공시했다. 총 투자 규모는 수조원대에 이른다.",
+    "gold_event_type": "investment",
+    "gold_entities": ["000660"]
+  },
+  {
+    "id": "us-cpi-macro",
+    "text": "The U.S. Bureau of Labor Statistics reported that the Consumer Price Index for All Urban Consumers rose 0.3 percent in the month on a seasonally adjusted basis, bringing the year-over-year rate to 3.1 percent.",
+    "gold_event_type": "macro",
+    "gold_entities": []
+  },
+  {
+    "id": "kr-samsung-dividend",
+    "text": "삼성전자는 이사회에서 보통주 1주당 361원, 우선주 1주당 362원의 분기 배당을 결정했다고 공시했다. 배당 기준일과 지급 예정일도 함께 공시됐다.",
+    "gold_event_type": "dividend",
+    "gold_entities": ["005930"]
+  },
+  {
+    "id": "us-corporate-update-vague",
+    "text": "The company issued a general corporate update reiterating its previously stated long-term priorities and confirming that it remains on track with its ongoing strategic initiatives. No specific financial figures were disclosed.",
+    "gold_event_type": "other",
     "gold_entities": []
   }
 ]

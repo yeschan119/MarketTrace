@@ -77,3 +77,24 @@ def test_evaluate_wrong_class_lowers_f1() -> None:
 
     report = evaluate(goldset, predict)
     assert report.classification.accuracy == pytest.approx(0.5)
+
+
+def test_canonical_scoring_collapses_synonyms() -> None:
+    # Gold labels are canonical families; the extractor emits fragmented raw
+    # types. Canonical scoring must count them as correct, while the raw score
+    # (exact string) counts them as wrong.
+    goldset = [
+        GoldExample("a", "t1", "earnings", {"AAPL"}),
+        GoldExample("b", "t2", "insider_trading", {"TSLA"}),
+    ]
+    raw_pred = {"a": "earnings_release", "b": "insider_sale"}
+
+    def predict(ex: GoldExample) -> Prediction:
+        return Prediction(event_type=raw_pred[ex.id], entities=set(ex.gold_entities))
+
+    report = evaluate(goldset, predict)
+    # Canonical: earnings_release -> earnings, insider_sale -> insider_trading.
+    assert report.classification.accuracy == pytest.approx(1.0)
+    assert report.classification.macro_f1 == pytest.approx(1.0)
+    # Raw: exact strings never match the canonical gold labels.
+    assert report.raw_classification.accuracy == pytest.approx(0.0)
