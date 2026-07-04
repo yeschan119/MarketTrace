@@ -420,6 +420,16 @@ def run_demo_ingest() -> None:
         except Exception:  # noqa: BLE001 - macro failure must not abort the ingest
             session.rollback()
             logger.exception("ingest: macro ingest failed")
+
+        try:
+            from markettrace.impact.alerting import generate_watchlist_alerts
+
+            created = generate_watchlist_alerts(session)
+            if created:
+                logger.info("ingest: generated %d watchlist alert(s)", created)
+        except Exception:  # noqa: BLE001 - alerting must not abort the ingest
+            session.rollback()
+            logger.exception("ingest: watchlist alert generation failed")
     finally:
         session.close()
 

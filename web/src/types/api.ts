@@ -188,6 +188,28 @@ export interface InstrumentRanking {
   top_factor: TopFactor | null;
 }
 
+export interface WatchlistItem {
+  instrument_id: number;
+  ticker: string;
+  name: string;
+  market: string | null;
+  created_at: string;
+}
+
+export interface Alert {
+  id: number;
+  kind: "conflict" | "significant";
+  created_at: string;
+  read_at: string | null;
+  event_id: number;
+  event_type: string;
+  direction: string;
+  primary_ticker: string | null;
+  instrument_name: string | null;
+  market: string | null;
+  published_at: string;
+}
+
 export interface HealthResponse {
   status: string;
 }

@@ -345,3 +345,39 @@ class PassbookStatementSummaryOut(BaseModel):
     withdrawal_total: int
     deposit_total: int
     entry_count: int
+
+
+class WatchlistItemOut(BaseModel):
+    """An instrument on the admin's watchlist."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    instrument_id: int
+    ticker: str
+    name: str
+    market: str | None
+    created_at: datetime
+
+
+class AlertOut(BaseModel):
+    """An in-app alert joined to its event + instrument for display."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str  # "conflict" | "significant"
+    created_at: datetime
+    read_at: datetime | None
+    event_id: int
+    event_type: str
+    direction: str
+    primary_ticker: str | None
+    instrument_name: str | None
+    market: str | None
+    published_at: datetime
+
+
+class UnreadCountOut(BaseModel):
+    """Unread-alert count for the header bell badge."""
+
+    count: int

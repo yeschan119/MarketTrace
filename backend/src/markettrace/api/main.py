@@ -11,6 +11,7 @@ from markettrace.api.ingest import router as ingest_router
 from markettrace.api.ledger import router as ledger_router
 from markettrace.api.passbook import router as passbook_router
 from markettrace.api.routes import router
+from markettrace.api.watchlist import router as watchlist_router
 from markettrace.config import get_settings
 
 
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     application.include_router(ingest_router)
     application.include_router(ledger_router)
     application.include_router(passbook_router)
+    application.include_router(watchlist_router)
 
     return application
 

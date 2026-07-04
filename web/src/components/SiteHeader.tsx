@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthControls } from "@/components/AuthControls";
+import { AlertBell } from "@/components/AlertBell";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 
 export function SiteHeader() {
@@ -50,6 +51,7 @@ export function SiteHeader() {
         </a>
         {/* Language toggle sits immediately left of the auth / Ingest controls. */}
         <div className="ml-auto flex items-center gap-3">
+          <AlertBell />
           <LanguageToggle />
           <AuthControls />
         </div>

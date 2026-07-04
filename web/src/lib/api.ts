@@ -22,6 +22,8 @@ import type {
   MacroSeriesBacktest,
   CalibrationReport,
   HealthResponse,
+  WatchlistItem,
+  Alert,
 } from "@/types/api";
 
 const API_BASE_URL =
@@ -123,6 +125,27 @@ async function apiPatch<T>(
   return res.json() as Promise<T>;
 }
 
+async function apiDelete(path: string, token?: string): Promise<void> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, { method: "DELETE", headers });
+  if (!res.ok) {
+    throw await buildApiError(res, url);
+  }
+}
+
+// POST that expects a 204 No Content (does not parse a JSON body).
+async function apiPostNoContent(path: string, token?: string): Promise<void> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, { method: "POST", headers });
+  if (!res.ok) {
+    throw await buildApiError(res, url);
+  }
+}
+
 async function apiPostForm<T>(
   path: string,
   body: FormData,
@@ -205,6 +228,38 @@ export const api = {
 
   getMacroObservations(): Promise<MacroObservation[]> {
     return apiFetch<MacroObservation[]>("/macro/observations");
+  },
+
+  // --- Watchlist + in-app alerts ---
+  listWatchlist(): Promise<WatchlistItem[]> {
+    return apiFetch<WatchlistItem[]>("/watchlist");
+  },
+
+  addWatchlist(instrumentId: number | string, token: string): Promise<WatchlistItem> {
+    return apiPost<WatchlistItem>(`/watchlist/${instrumentId}`, undefined, token);
+  },
+
+  removeWatchlist(instrumentId: number | string, token: string): Promise<void> {
+    return apiDelete(`/watchlist/${instrumentId}`, token);
+  },
+
+  listAlerts(unreadOnly = false): Promise<Alert[]> {
+    const query = new URLSearchParams();
+    if (unreadOnly) query.set("unread_only", "true");
+    const qs = query.toString();
+    return apiFetch<Alert[]>(`/alerts${qs ? `?${qs}` : ""}`);
+  },
+
+  getUnreadCount(): Promise<{ count: number }> {
+    return apiFetch<{ count: number }>("/alerts/unread-count");
+  },
+
+  markAlertRead(id: number | string, token: string): Promise<void> {
+    return apiPostNoContent(`/alerts/${id}/read`, token);
+  },
+
+  markAllAlertsRead(token: string): Promise<void> {
+    return apiPostNoContent("/alerts/read-all", token);
   },
 
   login(username: string, password: string): Promise<{ token: string }> {

@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { KoreanName } from "@/components/KoreanName";
+import { WatchButton } from "@/components/WatchButton";
 import { InstrumentSignalCard } from "@/components/InstrumentSignalCard";
 import { InstrumentFactorsCard } from "@/components/InstrumentFactorsCard";
 
@@ -72,6 +73,9 @@ export default function InstrumentTimelinePage() {
               <KoreanName ticker={instrument.ticker} className="ml-2 text-lg" />
             </h1>
             <p className="font-mono text-sm text-gray-500">{instrument.ticker}</p>
+          </div>
+          <div className="ml-auto">
+            <WatchButton instrumentId={instrument.id} />
           </div>
         </div>
       </div>

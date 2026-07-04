@@ -283,3 +283,50 @@ class PassbookStatementRecord(Base):
     entries: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     categories: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+class WatchlistItem(Base):
+    """An instrument the (single admin) user has chosen to watch.
+
+    The watchlist is global — there is one admin — so a row is simply an
+    instrument the user wants alerts for. ``instrument_id`` is unique so watching
+    is idempotent.
+    """
+
+    __tablename__ = "watchlist_items"
+    __table_args__ = (
+        UniqueConstraint("instrument_id", name="uq_watchlist_instrument"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    instrument: Mapped[Instrument] = relationship()
+
+
+class Alert(Base):
+    """An in-app notification generated for a watched instrument's event.
+
+    Created during ingest when a new event on a watched instrument is *notable*
+    — its type is a statistically validated (significant) bucket, and the alert
+    ``kind`` is ``"conflict"`` when the model's stated direction opposes the
+    validated historical drift, else ``"significant"``. ``read_at`` is NULL until
+    the user marks it read. ``(event_id)`` is unique so re-running ingest never
+    duplicates an alert for the same event.
+    """
+
+    __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("event_id", name="uq_alerts_event"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)  # "conflict" | "significant"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    instrument: Mapped[Instrument] = relationship()
+    event: Mapped[Event] = relationship()
