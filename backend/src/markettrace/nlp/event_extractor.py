@@ -24,9 +24,15 @@ esg_report, contract_partnership, investment, product, macro, other. \
 Apply these rules to avoid common misclassifications:
   * macro — ONLY macroeconomic INDICATOR releases (CPI, unemployment, interest \
 rates, GDP). NEVER label a single company's filing as macro.
-  * insider_trading — insider / major-shareholder securities ownership reports \
-(US Form 4; KR 임원·주요주주 소유상황보고서), even when framed as an ownership change.
-  * ownership_change — a major or largest shareholder's stake change (5% rule).
+  * insider_trading — an insider's/executive's or major-shareholder securities \
+HOLDINGS or transaction report (US Form 4; KR 임원·주요주주특정증권등소유상황보고서).
+  * ownership_change — a change in the largest/controlling shareholder's stake \
+(KR 최대주주등소유주식변동신고서) or a 5% bulk-holding report (대량보유보고).
+  * shareholder_meeting — annual/extraordinary general meeting notices or results, \
+director elections, and shareholder votes (label these shareholder_meeting, not \
+governance, even though they involve board matters).
+  * guidance — forward earnings/revenue OUTLOOK, including reaffirming or updating \
+guidance; but actual or provisional RESULTS (잠정실적) are earnings, not guidance.
   * regulatory — enforcement actions, investigations, lawsuits, or sanctions ONLY; \
 a related-party transaction or gift is "other", not regulatory.
   * investment — capex, facility buildout, or business/capital-plan spending; a \
