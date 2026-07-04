@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
+import { KoreanName } from "@/components/KoreanName";
 import type {
   EventTypeStat,
   EventTypeSignificance,
@@ -355,6 +356,7 @@ export default function StatsPage() {
                             </span>
                             <span className="text-sm text-gray-700">
                               {c.instrument_name}
+                              <KoreanName ticker={c.primary_ticker} className="ml-1.5" />
                             </span>
                             <DirectionBadge direction={c.direction} />
                             <span className="ml-auto text-xs text-gray-500">

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
+import { KoreanName } from "@/components/KoreanName";
 import { AbnormalReturnChart } from "@/components/AbnormalReturnChart";
 import { ScoreBars } from "@/components/ScoreBars";
 import { ValidatedSignalCard } from "@/components/ValidatedSignalCard";
@@ -66,6 +67,7 @@ export default function EventDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
                 {event.entities[0] ?? t("eventDetail.unknownInstrument")}
+                <KoreanName ticker={event.entities[0]} className="ml-2 text-lg" />
               </h1>
               <DirectionBadge direction={event.direction} />
             </div>

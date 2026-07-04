@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
+import { KoreanName } from "@/components/KoreanName";
 import { ValidatedSignalBadge } from "@/components/ValidatedSignalBadge";
 import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
@@ -220,6 +221,7 @@ export default function EventsPage() {
                     </span>
                     <span className="truncate text-base font-medium text-gray-900">
                       {group.name}
+                      <KoreanName ticker={group.ticker} className="ml-1.5" />
                     </span>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-3">

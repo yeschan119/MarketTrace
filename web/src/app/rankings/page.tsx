@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
+import { KoreanName } from "@/components/KoreanName";
 import type { InstrumentRanking } from "@/types/api";
 
 const HALF_LIFE_DAYS = 180;
@@ -120,7 +121,10 @@ export default function RankingsPage() {
                       >
                         {r.ticker}
                       </Link>
-                      <div className="text-xs text-gray-500">{r.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {r.name}
+                        <KoreanName ticker={r.ticker} className="ml-1" />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span

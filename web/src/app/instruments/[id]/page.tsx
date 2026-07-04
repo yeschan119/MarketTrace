@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
+import { KoreanName } from "@/components/KoreanName";
 import { InstrumentSignalCard } from "@/components/InstrumentSignalCard";
 import { InstrumentFactorsCard } from "@/components/InstrumentFactorsCard";
 
@@ -66,7 +67,10 @@ export default function InstrumentTimelinePage() {
             {instrument.ticker.slice(0, 4)}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{instrument.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {instrument.name}
+              <KoreanName ticker={instrument.ticker} className="ml-2 text-lg" />
+            </h1>
             <p className="font-mono text-sm text-gray-500">{instrument.ticker}</p>
           </div>
         </div>
