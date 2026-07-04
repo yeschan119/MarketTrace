@@ -250,6 +250,22 @@ const en: Dict = {
     eventsCount: "({n} events)",
     empty: "No events recorded for this instrument.",
     conf: "conf",
+    signal: {
+      title: "Signal summary",
+      subtitle:
+        "What has historically followed this stock's kind of news, from validated event-type drift. Not a price prediction.",
+      basis: "from {n} validated events",
+      none: "No events with a validated signal yet for this stock.",
+      netDrift: "Avg validated drift",
+      validatedEvents: "Validated events",
+      conflicts: "Conflicts (unreviewed)",
+      lean: {
+        bearish: "Caution — validated history leans to the downside.",
+        bullish: "Constructive — validated history leans to the upside.",
+        neutral: "Mixed — no clear validated lean.",
+        none: "Insufficient validated signal.",
+      },
+    },
   },
   direction: { positive: "positive", negative: "negative", neutral: "neutral" },
   chart: {
@@ -631,6 +647,22 @@ const ko: Dict = {
     eventsCount: "(이벤트 {n}건)",
     empty: "이 종목에 기록된 이벤트가 없습니다.",
     conf: "신뢰도",
+    signal: {
+      title: "종목 판정",
+      subtitle:
+        "이 종목의 사건 유형들이 과거 실제로 어떤 결과로 이어졌는지(검증된 사건유형 드리프트)를 집계. 가격 예측이 아닙니다.",
+      basis: "검증 사건 {n}건 기준",
+      none: "이 종목은 아직 검증신호를 낸 사건이 없습니다.",
+      netDrift: "평균 검증 드리프트",
+      validatedEvents: "검증 사건 수",
+      conflicts: "충돌(미검토)",
+      lean: {
+        bearish: "주의 — 검증된 실측이 하락 우위입니다.",
+        bullish: "우호 — 검증된 실측이 상승 우위입니다.",
+        neutral: "혼조 — 뚜렷한 검증 방향 없음.",
+        none: "검증신호 부족.",
+      },
+    },
   },
   direction: { positive: "긍정", negative: "부정", neutral: "중립" },
   chart: {
