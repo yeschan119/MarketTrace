@@ -352,8 +352,8 @@
       <h3>수용 기준 (로드맵 AC1–AC9)</h3>
       <ul class="items">
         <li class="ok">AC1 provider 추상화 (SEC+OpenDART 동일 계약)</li>
-        <li class="ok">AC2 documents 3시각 NOT NULL</li>
-        <li class="ok">AC3 LLM 호출은 event_extractor에만</li>
+        <li class="ok">AC2 documents 3시각 저장 — published_at·first_seen_at NOT NULL(백테스트 as-of 기준), occurred_at은 발생시각 불명 케이스 위해 nullable(설계 의도)</li>
+        <li class="ok">AC3 시장 파이프라인 LLM 호출은 event_extractor에만(impact/ 수치층 무호출). ※ledger 카드명세 OCR은 별개 개인재무 기능의 독립 LLM 경계</li>
         <li class="ok">AC4–AC7 스키마·이상수익률·슬라이스·provenance</li>
         <li class="ok">AC8–AC9 타입 동기화(+섹터필드) + 사건상세 차트 렌더</li>
       </ul>
