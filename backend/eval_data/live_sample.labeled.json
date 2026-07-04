@@ -1,41 +1,611 @@
 {
-  "description": "Assistant-bootstrapped gold labels for a stratified sample of REAL production events (api.miffy178.com, 486-event corpus, 2026-07-04). gold_family is the correct canonical event family judged from the disclosure title + evidence, INDEPENDENT of the extractor's stored_event_type. Used by markettrace-eval-live to score the deployed extractor's actual outputs offline (no LLM call). NOTE: labels are a first bootstrap and should be human-reviewed before treating the F1 as authoritative.",
-  "sampled_at": "2026-07-04",
-  "examples": [
-    {"event_id": 662, "ticker": "068270", "stored_event_type": "treasury_stock_acquisition", "gold_family": "buyback"},
-    {"event_id": 792, "ticker": "068270", "stored_event_type": "treasury_stock_acquisition", "gold_family": "buyback"},
-    {"event_id": 121, "ticker": "AMZN", "stored_event_type": "debt_issuance", "gold_family": "capital_raise"},
-    {"event_id": 827, "ticker": "055550", "stored_event_type": "debt_offering", "gold_family": "capital_raise"},
-    {"event_id": 569, "ticker": "207940", "stored_event_type": "contract_award", "gold_family": "contract_partnership"},
-    {"event_id": 785, "ticker": "028260", "stored_event_type": "contract_award", "gold_family": "contract_partnership"},
-    {"event_id": 454, "ticker": "JNJ", "stored_event_type": "dividend_increase", "gold_family": "dividend"},
-    {"event_id": 725, "ticker": "105560", "stored_event_type": "dividend_declaration", "gold_family": "dividend"},
-    {"event_id": 1, "ticker": "AAPL", "stored_event_type": "earnings_release", "gold_family": "earnings"},
-    {"event_id": 811, "ticker": "068270", "stored_event_type": "earnings_release", "gold_family": "earnings"},
-    {"event_id": 571, "ticker": "207940", "stored_event_type": "esg_report_release", "gold_family": "esg_report"},
-    {"event_id": 802, "ticker": "017670", "stored_event_type": "sustainability_report_release", "gold_family": "esg_report"},
-    {"event_id": 3, "ticker": "AAPL", "stored_event_type": "management_change", "gold_family": "governance"},
-    {"event_id": 805, "ticker": "NVDA", "stored_event_type": "executive_appointment", "gold_family": "governance"},
-    {"event_id": 490, "ticker": "UNH", "stored_event_type": "earnings_guidance", "gold_family": "guidance"},
-    {"event_id": 680, "ticker": "PFE", "stored_event_type": "guidance_reaffirmation", "gold_family": "guidance"},
-    {"event_id": 369, "ticker": "005930", "stored_event_type": "insider_trading_report", "gold_family": "insider_trading"},
-    {"event_id": 813, "ticker": "035720", "stored_event_type": "insider_trading_report", "gold_family": "insider_trading"},
-    {"event_id": 129, "ticker": "AMZN", "stored_event_type": "investment_commitment", "gold_family": "investment"},
-    {"event_id": 814, "ticker": "006400", "stored_event_type": "investment_plan_announcement", "gold_family": "investment"},
-    {"event_id": 484, "ticker": "UNH", "stored_event_type": "conference_announcement", "gold_family": "ir_event"},
-    {"event_id": 748, "ticker": "003670", "stored_event_type": "investor_conference", "gold_family": "ir_event"},
-    {"event_id": 452, "ticker": "XOM", "stored_event_type": "macro_data_release", "gold_family": "investment", "note": "XOM Corporate/capital plan to 2030 — mislabelled macro"},
-    {"event_id": 759, "ticker": "017670", "stored_event_type": "macro_data_release", "gold_family": "other", "note": "대규모기업집단현황공시 (conglomerate status) — mislabelled macro"},
-    {"event_id": 125, "ticker": "AMZN", "stored_event_type": "merger_announcement", "gold_family": "merger_acquisition"},
-    {"event_id": 807, "ticker": "XOM", "stored_event_type": "merger_announcement", "gold_family": "merger_acquisition"},
-    {"event_id": 441, "ticker": "JPM", "stored_event_type": "company_update", "gold_family": "other"},
-    {"event_id": 829, "ticker": "032830", "stored_event_type": "corporate_disclosure", "gold_family": "other"},
-    {"event_id": 370, "ticker": "005930", "stored_event_type": "shareholding_change", "gold_family": "ownership_change"},
-    {"event_id": 824, "ticker": "068270", "stored_event_type": "ownership_change", "gold_family": "insider_trading", "note": "임원·주요주주 소유상황보고서 (insider report) — inconsistent with 369/813"},
-    {"event_id": 804, "ticker": "017670", "stored_event_type": "product_launch", "gold_family": "investment", "note": "AI datacenter buildout plan — mislabelled product_launch"},
-    {"event_id": 126, "ticker": "AMZN", "stored_event_type": "regulation_fd_disclosure", "gold_family": "other"},
-    {"event_id": 800, "ticker": "032830", "stored_event_type": "regulatory_action", "gold_family": "other", "note": "특수관계인 증여 (related-party gift) — mislabelled regulatory_action"},
-    {"event_id": 4, "ticker": "AAPL", "stored_event_type": "shareholder_meeting", "gold_family": "shareholder_meeting"},
-    {"event_id": 762, "ticker": "NVDA", "stored_event_type": "shareholder_vote", "gold_family": "shareholder_meeting"}
-  ]
+ "description": "Human-reviewed gold labels for a stratified sample of REAL production events (api.miffy178.com, 486-corpus, 2026-07-04). gold_family = correct canonical family from disclosure title+evidence, judged independently of stored_event_type. Labelled by two independent annotators (inter-annotator agreement 97.9%, 95/97); the 2 disagreements (126,676) adjudicated to 'other'. Scored offline by markettrace-eval-live (no LLM call).",
+ "sampled_at": "2026-07-04",
+ "inter_annotator_agreement": 0.979,
+ "examples": [
+  {
+   "event_id": 662,
+   "ticker": "068270",
+   "stored_event_type": "treasury_stock_acquisition",
+   "gold_family": "buyback"
+  },
+  {
+   "event_id": 686,
+   "ticker": "005930",
+   "stored_event_type": "share_buyback_announcement",
+   "gold_family": "buyback"
+  },
+  {
+   "event_id": 792,
+   "ticker": "068270",
+   "stored_event_type": "treasury_stock_acquisition",
+   "gold_family": "buyback"
+  },
+  {
+   "event_id": 121,
+   "ticker": "AMZN",
+   "stored_event_type": "debt_issuance",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 414,
+   "ticker": "META",
+   "stored_event_type": "debt_offering",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 468,
+   "ticker": "V",
+   "stored_event_type": "debt_offering",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 540,
+   "ticker": "PFE",
+   "stored_event_type": "debt_offering",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 663,
+   "ticker": "068270",
+   "stored_event_type": "capital_increase",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 827,
+   "ticker": "055550",
+   "stored_event_type": "debt_offering",
+   "gold_family": "capital_raise"
+  },
+  {
+   "event_id": 569,
+   "ticker": "207940",
+   "stored_event_type": "contract_award",
+   "gold_family": "contract_partnership"
+  },
+  {
+   "event_id": 570,
+   "ticker": "207940",
+   "stored_event_type": "contract_award",
+   "gold_family": "contract_partnership"
+  },
+  {
+   "event_id": 603,
+   "ticker": "035420",
+   "stored_event_type": "partnership_announcement",
+   "gold_family": "investment",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 632,
+   "ticker": "028260",
+   "stored_event_type": "contract_award",
+   "gold_family": "contract_partnership"
+  },
+  {
+   "event_id": 700,
+   "ticker": "207940",
+   "stored_event_type": "contract_award",
+   "gold_family": "contract_partnership"
+  },
+  {
+   "event_id": 785,
+   "ticker": "028260",
+   "stored_event_type": "contract_award",
+   "gold_family": "contract_partnership"
+  },
+  {
+   "event_id": 454,
+   "ticker": "JNJ",
+   "stored_event_type": "dividend_increase",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 461,
+   "ticker": "JNJ",
+   "stored_event_type": "dividend_increase",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 469,
+   "ticker": "V",
+   "stored_event_type": "dividend_announcement",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 498,
+   "ticker": "PG",
+   "stored_event_type": "dividend_announcement",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 597,
+   "ticker": "005490",
+   "stored_event_type": "dividend_declaration",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 725,
+   "ticker": "105560",
+   "stored_event_type": "dividend_declaration",
+   "gold_family": "dividend"
+  },
+  {
+   "event_id": 1,
+   "ticker": "AAPL",
+   "stored_event_type": "earnings_release",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 130,
+   "ticker": "AMZN",
+   "stored_event_type": "earnings_release",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 449,
+   "ticker": "XOM",
+   "stored_event_type": "earnings_release",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 507,
+   "ticker": "HD",
+   "stored_event_type": "earnings_conference_call",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 544,
+   "ticker": "CVX",
+   "stored_event_type": "earnings_release",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 811,
+   "ticker": "068270",
+   "stored_event_type": "earnings_release",
+   "gold_family": "earnings"
+  },
+  {
+   "event_id": 571,
+   "ticker": "207940",
+   "stored_event_type": "esg_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 696,
+   "ticker": "000660",
+   "stored_event_type": "sustainability_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 719,
+   "ticker": "035720",
+   "stored_event_type": "sustainability_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 774,
+   "ticker": "005380",
+   "stored_event_type": "sustainability_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 784,
+   "ticker": "006400",
+   "stored_event_type": "sustainability_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 802,
+   "ticker": "017670",
+   "stored_event_type": "sustainability_report_release",
+   "gold_family": "esg_report"
+  },
+  {
+   "event_id": 3,
+   "ticker": "AAPL",
+   "stored_event_type": "management_change",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 68,
+   "ticker": "NVDA",
+   "stored_event_type": "compensation_plan_adoption",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 444,
+   "ticker": "XOM",
+   "stored_event_type": "management_change",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 499,
+   "ticker": "PG",
+   "stored_event_type": "executive_retirement",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 549,
+   "ticker": "CVX",
+   "stored_event_type": "board_appointment",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 805,
+   "ticker": "NVDA",
+   "stored_event_type": "executive_appointment",
+   "gold_family": "governance"
+  },
+  {
+   "event_id": 490,
+   "ticker": "UNH",
+   "stored_event_type": "earnings_guidance",
+   "gold_family": "guidance"
+  },
+  {
+   "event_id": 535,
+   "ticker": "PFE",
+   "stored_event_type": "guidance_update",
+   "gold_family": "guidance"
+  },
+  {
+   "event_id": 545,
+   "ticker": "CVX",
+   "stored_event_type": "earnings_guide",
+   "gold_family": "guidance"
+  },
+  {
+   "event_id": 680,
+   "ticker": "PFE",
+   "stored_event_type": "guidance_reaffirmation",
+   "gold_family": "guidance"
+  },
+  {
+   "event_id": 369,
+   "ticker": "005930",
+   "stored_event_type": "insider_trading_report",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 387,
+   "ticker": "000660",
+   "stored_event_type": "insider_trading_report",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 606,
+   "ticker": "035720",
+   "stored_event_type": "insider_trading_report",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 664,
+   "ticker": "068270",
+   "stored_event_type": "trading_plan",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 716,
+   "ticker": "035420",
+   "stored_event_type": "insider_trading_report",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 813,
+   "ticker": "035720",
+   "stored_event_type": "insider_trading_report",
+   "gold_family": "insider_trading"
+  },
+  {
+   "event_id": 129,
+   "ticker": "AMZN",
+   "stored_event_type": "investment_commitment",
+   "gold_family": "investment"
+  },
+  {
+   "event_id": 577,
+   "ticker": "005380",
+   "stored_event_type": "investment",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 630,
+   "ticker": "028260",
+   "stored_event_type": "investment_commitment",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 768,
+   "ticker": "005930",
+   "stored_event_type": "investment_plan_announcement",
+   "gold_family": "investment"
+  },
+  {
+   "event_id": 803,
+   "ticker": "017670",
+   "stored_event_type": "investment_decision",
+   "gold_family": "investment"
+  },
+  {
+   "event_id": 814,
+   "ticker": "006400",
+   "stored_event_type": "investment_plan_announcement",
+   "gold_family": "investment"
+  },
+  {
+   "event_id": 484,
+   "ticker": "UNH",
+   "stored_event_type": "conference_announcement",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 605,
+   "ticker": "035720",
+   "stored_event_type": "conference_announcement",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 638,
+   "ticker": "105560",
+   "stored_event_type": "conference_announcement",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 651,
+   "ticker": "012330",
+   "stored_event_type": "investor_meeting",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 703,
+   "ticker": "000270",
+   "stored_event_type": "investor_meeting",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 748,
+   "ticker": "003670",
+   "stored_event_type": "investor_conference",
+   "gold_family": "ir_event"
+  },
+  {
+   "event_id": 452,
+   "ticker": "XOM",
+   "stored_event_type": "macro_data_release",
+   "gold_family": "investment",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 676,
+   "ticker": "JPM",
+   "stored_event_type": "macro_data_release",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 743,
+   "ticker": "032830",
+   "stored_event_type": "macro_data_release",
+   "gold_family": "ir_event",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 749,
+   "ticker": "003670",
+   "stored_event_type": "macro_data_release",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 759,
+   "ticker": "017670",
+   "stored_event_type": "macro_data_release",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 125,
+   "ticker": "AMZN",
+   "stored_event_type": "merger_announcement",
+   "gold_family": "merger_acquisition"
+  },
+  {
+   "event_id": 537,
+   "ticker": "PFE",
+   "stored_event_type": "merger_announcement",
+   "gold_family": "merger_acquisition"
+  },
+  {
+   "event_id": 599,
+   "ticker": "035420",
+   "stored_event_type": "stock_acquisition",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 691,
+   "ticker": "000660",
+   "stored_event_type": "merger_announcement",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 755,
+   "ticker": "017670",
+   "stored_event_type": "asset_transfer",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 807,
+   "ticker": "XOM",
+   "stored_event_type": "merger_announcement",
+   "gold_family": "merger_acquisition"
+  },
+  {
+   "event_id": 126,
+   "ticker": "AMZN",
+   "stored_event_type": "regulation_fd_disclosure",
+   "gold_family": "other"
+  },
+  {
+   "event_id": 579,
+   "ticker": "005380",
+   "stored_event_type": "corporate_strategy_update",
+   "gold_family": "other"
+  },
+  {
+   "event_id": 673,
+   "ticker": "032830",
+   "stored_event_type": "transaction_with_related_party",
+   "gold_family": "other"
+  },
+  {
+   "event_id": 744,
+   "ticker": "032830",
+   "stored_event_type": "financial_transaction",
+   "gold_family": "other"
+  },
+  {
+   "event_id": 808,
+   "ticker": "005490",
+   "stored_event_type": "business_plan_announcement",
+   "gold_family": "investment",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 829,
+   "ticker": "032830",
+   "stored_event_type": "corporate_disclosure",
+   "gold_family": "other"
+  },
+  {
+   "event_id": 370,
+   "ticker": "005930",
+   "stored_event_type": "shareholding_change",
+   "gold_family": "ownership_change"
+  },
+  {
+   "event_id": 619,
+   "ticker": "006400",
+   "stored_event_type": "shareholding_change",
+   "gold_family": "ownership_change"
+  },
+  {
+   "event_id": 653,
+   "ticker": "012330",
+   "stored_event_type": "ownership_change",
+   "gold_family": "insider_trading",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 761,
+   "ticker": "017670",
+   "stored_event_type": "ownership_change",
+   "gold_family": "insider_trading",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 816,
+   "ticker": "068270",
+   "stored_event_type": "ownership_change",
+   "gold_family": "insider_trading",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 824,
+   "ticker": "068270",
+   "stored_event_type": "ownership_change",
+   "gold_family": "insider_trading",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 804,
+   "ticker": "017670",
+   "stored_event_type": "product_launch",
+   "gold_family": "investment",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 380,
+   "ticker": "000660",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 482,
+   "ticker": "WMT",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 594,
+   "ticker": "005490",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 677,
+   "ticker": "JPM",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 736,
+   "ticker": "015760",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "regulatory"
+  },
+  {
+   "event_id": 800,
+   "ticker": "032830",
+   "stored_event_type": "regulatory_action",
+   "gold_family": "other",
+   "note": "stored!=gold"
+  },
+  {
+   "event_id": 4,
+   "ticker": "AAPL",
+   "stored_event_type": "shareholder_meeting",
+   "gold_family": "shareholder_meeting"
+  },
+  {
+   "event_id": 131,
+   "ticker": "GOOGL",
+   "stored_event_type": "shareholder_approval",
+   "gold_family": "shareholder_meeting"
+  },
+  {
+   "event_id": 443,
+   "ticker": "XOM",
+   "stored_event_type": "annual_meeting_results",
+   "gold_family": "shareholder_meeting"
+  },
+  {
+   "event_id": 513,
+   "ticker": "BAC",
+   "stored_event_type": "annual_meeting",
+   "gold_family": "shareholder_meeting"
+  },
+  {
+   "event_id": 587,
+   "ticker": "000270",
+   "stored_event_type": "general_meeting_announcement",
+   "gold_family": "shareholder_meeting"
+  },
+  {
+   "event_id": 762,
+   "ticker": "NVDA",
+   "stored_event_type": "shareholder_vote",
+   "gold_family": "shareholder_meeting"
+  }
+ ]
 }

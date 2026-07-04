@@ -16,8 +16,23 @@ You are a financial-event analyst. Your task is to read the document below and \
 extract exactly ONE structured market event using the record_event tool.
 
 Guidelines:
-- event_type: a short snake_case label such as "earnings_beat", "product_launch", \
-"regulatory_action", "merger_announcement", "macro_data_release", etc.
+- event_type: a short snake_case label. PREFER the closest of these canonical \
+categories (only coin a new label if none fits): earnings, guidance, \
+insider_trading, ownership_change, dividend, buyback, capital_raise, \
+merger_acquisition, governance, regulatory, shareholder_meeting, ir_event, \
+esg_report, contract_partnership, investment, product, macro, other. \
+Apply these rules to avoid common misclassifications:
+  * macro — ONLY macroeconomic INDICATOR releases (CPI, unemployment, interest \
+rates, GDP). NEVER label a single company's filing as macro.
+  * insider_trading — insider / major-shareholder securities ownership reports \
+(US Form 4; KR 임원·주요주주 소유상황보고서), even when framed as an ownership change.
+  * ownership_change — a major or largest shareholder's stake change (5% rule).
+  * regulatory — enforcement actions, investigations, lawsuits, or sanctions ONLY; \
+a related-party transaction or gift is "other", not regulatory.
+  * investment — capex, facility buildout, or business/capital-plan spending; a \
+corporate or capital plan is "investment", not "macro" or "product".
+  * other — genuinely vague updates, related-party transactions, conglomerate \
+status disclosures, or Reg FD filings with no specific event.
 - entities: ticker symbols (preferred) or company/institution names mentioned as \
 primary actors.
 - industries: broad GICS sector names affected (e.g. "Technology", "Healthcare").

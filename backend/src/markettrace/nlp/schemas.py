@@ -15,7 +15,13 @@ from pydantic import BaseModel, Field
 class EventExtraction(BaseModel):
     """Structured market-event extracted from a document."""
 
-    event_type: str = Field(description="Category of market event, e.g. 'earnings_beat'.")
+    event_type: str = Field(
+        description=(
+            "Canonical snake_case category of the market event (e.g. 'earnings', "
+            "'insider_trading', 'capital_raise', 'governance'); 'macro' only for "
+            "macroeconomic indicator releases, never a single company's filing."
+        )
+    )
     entities: list[str] = Field(description="Ticker symbols or company names involved.")
     industries: list[str] = Field(description="Industry sectors affected.")
     channels: list[str] = Field(
