@@ -38,6 +38,7 @@ class EventSummary(BaseModel):
     primary_ticker: str | None
     instrument_name: str | None
     market: str | None
+    reviewed_at: datetime | None = None
 
 
 class EventDetail(BaseModel):

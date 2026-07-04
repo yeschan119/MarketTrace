@@ -72,8 +72,10 @@ const en: Dict = {
     signalFilter: {
       all: "All",
       conflict: "Conflicts only",
+      needsReview: "Needs review",
       validated: "Validated only",
     },
+    reviewedMark: "Reviewed",
     noneMatchFilter: "No events match this filter.",
   },
   stats: {
@@ -453,8 +455,10 @@ const ko: Dict = {
     signalFilter: {
       all: "전체",
       conflict: "충돌만",
+      needsReview: "미검토 충돌",
       validated: "검증된 것만",
     },
+    reviewedMark: "검토됨",
     noneMatchFilter: "이 필터에 해당하는 이벤트가 없습니다.",
   },
   stats: {

@@ -12,7 +12,7 @@ import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
 
 type Market = "KR" | "US";
-type SignalFilter = "all" | "conflict" | "validated";
+type SignalFilter = "all" | "conflict" | "needsReview" | "validated";
 
 interface CompanyGroup {
   ticker: string;
@@ -70,6 +70,12 @@ export default function EventsPage() {
     for (const event of events) {
       if (event.market !== market) continue;
       if (signalFilter === "conflict" && verdictFor(event) !== "conflict")
+        continue;
+      // Review queue: conflicts a human hasn't corrected/confirmed yet.
+      if (
+        signalFilter === "needsReview" &&
+        !(verdictFor(event) === "conflict" && !event.reviewed_at)
+      )
         continue;
       if (signalFilter === "validated" && verdictFor(event) === "none")
         continue;
@@ -167,7 +173,7 @@ export default function EventsPage() {
       </div>
 
       <div className="mb-6 ml-0 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 sm:ml-3">
-        {(["all", "conflict", "validated"] as SignalFilter[]).map((f) => (
+        {(["all", "conflict", "needsReview", "validated"] as SignalFilter[]).map((f) => (
           <button
             key={f}
             type="button"
@@ -267,6 +273,14 @@ export default function EventsPage() {
                           </Link>
                           <DirectionBadge direction={event.direction} />
                           <ValidatedSignalBadge verdict={verdictFor(event)} />
+                          {event.reviewed_at && (
+                            <span
+                              className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                              title={t("events.reviewedMark")}
+                            >
+                              ✓ {t("events.reviewedMark")}
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-4 text-sm text-gray-500">
                           <span className="text-gray-600">

@@ -10,6 +10,7 @@ export interface EventSummary {
   primary_ticker: string;
   instrument_name: string;
   market: string | null;
+  reviewed_at: string | null;
 }
 
 export interface Outcome {
