@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
@@ -13,11 +13,13 @@ import { useI18n } from "@/lib/i18n";
  */
 export function WatchButton({
   instrumentId,
+  compact = false,
 }: {
   instrumentId: number | string;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const qc = useQueryClient();
 
   const { data: watchlist } = useQuery({
@@ -38,13 +40,58 @@ export function WatchButton({
       qc.invalidateQueries({ queryKey: ["watchlist"] });
       qc.invalidateQueries({ queryKey: ["alerts"] });
     },
+    onError: (err) => {
+      // A stale/expired token (12h TTL) 401s silently. Clear it so the UI
+      // reverts to the login prompt instead of a dead star.
+      if (isApiError(err) && err.status === 401) {
+        logout();
+      }
+    },
   });
 
+  const sessionExpired =
+    isApiError(mutation.error) && mutation.error.status === 401;
+
   if (!token) {
+    const hint = sessionExpired
+      ? t("watch.sessionExpired")
+      : t("watch.loginToWatch");
+    if (compact) {
+      // Just a dim star with a login hint tooltip; keeps the list row tidy.
+      return (
+        <span
+          className={`text-lg ${sessionExpired ? "text-red-400" : "text-gray-300"}`}
+          title={hint}
+          aria-label={hint}
+        >
+          ☆
+        </span>
+      );
+    }
     return (
-      <span className="text-xs text-gray-400" title={t("watch.loginToWatch")}>
-        ☆ {t("watch.loginToWatch")}
+      <span
+        className={`text-xs ${sessionExpired ? "text-red-500" : "text-gray-400"}`}
+        title={hint}
+      >
+        ☆ {hint}
       </span>
+    );
+  }
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
+        title={watching ? t("watch.watching") : t("watch.watch")}
+        aria-label={watching ? t("watch.watching") : t("watch.watch")}
+        className={`text-lg transition-colors disabled:opacity-50 ${
+          watching ? "text-amber-500 hover:text-amber-600" : "text-gray-300 hover:text-amber-400"
+        }`}
+      >
+        {watching ? "★" : "☆"}
+      </button>
     );
   }
 

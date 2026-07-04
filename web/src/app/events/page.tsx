@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { KoreanName } from "@/components/KoreanName";
+import { WatchButton } from "@/components/WatchButton";
 import { ValidatedSignalBadge } from "@/components/ValidatedSignalBadge";
 import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
@@ -18,6 +19,7 @@ type SignalFilter = "all" | "conflict" | "needsReview" | "validated";
 interface CompanyGroup {
   ticker: string;
   name: string;
+  instrumentId: number | null;
   events: EventSummary[];
 }
 
@@ -86,6 +88,7 @@ export default function EventsPage() {
         group = {
           ticker: event.primary_ticker,
           name: event.instrument_name,
+          instrumentId: event.primary_instrument_id,
           events: [],
         };
         byTicker.set(key, group);
@@ -209,42 +212,49 @@ export default function EventsPage() {
                 key={group.ticker}
                 className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
               >
-                <button
-                  type="button"
-                  onClick={() => toggle(group.ticker)}
-                  aria-expanded={isOpen}
-                  className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-gray-50"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="font-mono text-sm font-semibold text-indigo-600">
-                      {group.ticker}
-                    </span>
-                    <span className="truncate text-base font-medium text-gray-900">
-                      {group.name}
-                      <KoreanName ticker={group.ticker} className="ml-1.5" />
-                    </span>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-3">
-                    <span className="text-sm text-gray-500">
-                      {t("events.companyEvents", { n: group.events.length })}
-                    </span>
-                    <svg
-                      className={`h-5 w-5 text-gray-400 transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                      />
-                    </svg>
-                  </div>
-                </button>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => toggle(group.ticker)}
+                    aria-expanded={isOpen}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-gray-50"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="font-mono text-sm font-semibold text-indigo-600">
+                        {group.ticker}
+                      </span>
+                      <span className="truncate text-base font-medium text-gray-900">
+                        {group.name}
+                        <KoreanName ticker={group.ticker} className="ml-1.5" />
+                      </span>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-3">
+                      <span className="text-sm text-gray-500">
+                        {t("events.companyEvents", { n: group.events.length })}
+                      </span>
+                      <svg
+                        className={`h-5 w-5 text-gray-400 transition-transform ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </div>
+                  </button>
+                  {group.instrumentId != null && (
+                    <div className="flex-shrink-0 pr-3">
+                      <WatchButton instrumentId={group.instrumentId} compact />
+                    </div>
+                  )}
+                </div>
 
                 {isOpen && (
                   <div className="max-h-96 divide-y divide-gray-100 overflow-y-auto border-t border-gray-200">

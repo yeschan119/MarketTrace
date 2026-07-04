@@ -35,6 +35,7 @@ class EventSummary(BaseModel):
     direction: str
     confidence: float
     published_at: datetime
+    primary_instrument_id: int | None
     primary_ticker: str | None
     instrument_name: str | None
     market: str | None

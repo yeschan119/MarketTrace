@@ -7,6 +7,7 @@ export interface EventSummary {
   direction: "positive" | "negative" | "neutral" | string;
   confidence: number;
   published_at: string;
+  primary_instrument_id: number | null;
   primary_ticker: string;
   instrument_name: string;
   market: string | null;

@@ -23,8 +23,16 @@ const en: Dict = {
     ledger: "Ledger",
     passbook: "Passbook",
     alerts: "Alerts",
+    watchlist: "Watchlist",
   },
   common: { unknownError: "Unknown error" },
+  watchlist: {
+    title: "Watchlist",
+    subtitle: "Instruments you watch for alerts",
+    empty: "Your watchlist is empty.",
+    howToAdd: "Add instruments with the ☆ button on the Events list or an instrument page.",
+    events: "Events",
+  },
   alerts: {
     title: "Alerts",
     subtitle: "Notable events on your watched instruments",
@@ -39,6 +47,7 @@ const en: Dict = {
     watch: "Watch",
     watching: "Watching",
     loginToWatch: "Log in to watch",
+    sessionExpired: "Session expired — log in again",
   },
   auth: {
     login: "Login",
@@ -473,8 +482,16 @@ const ko: Dict = {
     ledger: "가계부",
     passbook: "통장관리",
     alerts: "알림",
+    watchlist: "관심종목",
   },
   common: { unknownError: "알 수 없는 오류" },
+  watchlist: {
+    title: "관심종목",
+    subtitle: "알림을 받을 관심종목 목록",
+    empty: "관심종목이 비어 있습니다.",
+    howToAdd: "이벤트 목록이나 종목 페이지의 ☆ 버튼으로 관심종목을 추가하세요.",
+    events: "이벤트",
+  },
   alerts: {
     title: "알림",
     subtitle: "관심종목에서 주목할 만한 이벤트",
@@ -489,6 +506,7 @@ const ko: Dict = {
     watch: "관심등록",
     watching: "관심등록됨",
     loginToWatch: "로그인 후 관심등록",
+    sessionExpired: "세션 만료 — 다시 로그인하세요",
   },
   auth: {
     login: "로그인",

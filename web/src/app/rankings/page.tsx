@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { KoreanName } from "@/components/KoreanName";
+import { WatchButton } from "@/components/WatchButton";
 import type { InstrumentRanking } from "@/types/api";
 
 const HALF_LIFE_DAYS = 180;
@@ -115,12 +116,15 @@ export default function RankingsPage() {
                   >
                     <td className="px-4 py-3 font-mono text-gray-400">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/instruments/${r.instrument_id}`}
-                        className="font-medium text-indigo-600 hover:underline"
-                      >
-                        {r.ticker}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <WatchButton instrumentId={r.instrument_id} compact />
+                        <Link
+                          href={`/instruments/${r.instrument_id}`}
+                          className="font-medium text-indigo-600 hover:underline"
+                        >
+                          {r.ticker}
+                        </Link>
+                      </div>
                       <div className="text-xs text-gray-500">
                         {r.name}
                         <KoreanName ticker={r.ticker} className="ml-1" />
