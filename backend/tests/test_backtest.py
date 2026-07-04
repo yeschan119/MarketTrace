@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from datetime import date as _date
 
 import pytest
 from sqlalchemy import create_engine
@@ -16,6 +17,7 @@ from markettrace.db.models import (
     EventImpact,
     Instrument,
     MacroObservation,
+    Price,
 )
 from markettrace.impact.backtest import (
     BacktestEvent,
@@ -404,6 +406,73 @@ def test_macro_enrichment_is_look_ahead_safe(mem_session) -> None:
     assert by_day[2] is None  # STRICTLY before -> the Jan-2 release itself is excluded
     assert by_day[3] == pytest.approx(0.7)  # sees the Jan-2 surprise
     assert by_day[4] == pytest.approx(0.7)
+
+
+def test_pre_event_momentum_is_look_ahead_safe(mem_session) -> None:
+    """pre_event_momentum uses only prices dated strictly before the event."""
+    inst = Instrument(market="US", ticker="AAPL", name="Apple")
+    mem_session.add(inst)
+    mem_session.flush()
+
+    # 25 trading days of prices rising 1/day, then a jump on the event day itself.
+    for i in range(25):
+        mem_session.add(
+            Price(
+                instrument_id=inst.id,
+                date=_date(2026, 1, 1) + timedelta(days=i),
+                open=100.0 + i,
+                high=100.0 + i,
+                low=100.0 + i,
+                close=100.0 + i,
+                adj_close=100.0 + i,
+                volume=1000.0,
+            )
+        )
+    # Event on 2026-01-25 (i=24, adj_close 124). Window=20 → uses price 20 trading
+    # days before the last pre-event close, never the event-day price.
+    event_day = datetime(2026, 1, 25, tzinfo=UTC)
+    doc = Document(
+        source="sec_edgar",
+        external_id="acc-1",
+        url="https://example.com",
+        title="8-K",
+        content_hash="h1",
+        market="US",
+        published_at=event_day,
+        first_seen_at=event_day,
+    )
+    mem_session.add(doc)
+    mem_session.flush()
+    event = Event(
+        document_id=doc.id,
+        primary_instrument_id=inst.id,
+        event_type="earnings",
+        direction="positive",
+        horizon_days=5,
+        confidence=0.7,
+        model="t",
+        model_version="v1",
+        analyzed_at=event_day,
+    )
+    mem_session.add(event)
+    mem_session.flush()
+    mem_session.add(
+        EventImpact(
+            event_id=event.id,
+            instrument_id=inst.id,
+            event_type="earnings",
+            direction="positive",
+            horizon_days=5,
+            abnormal_return=0.01,
+            computed_at=event_day,
+        )
+    )
+    mem_session.commit()
+
+    (loaded,) = _load_backtest_events(mem_session, horizon_days=5)
+    # Last close strictly before the event = 2026-01-24 (adj 123, i=23). Twenty
+    # trading days earlier = i=3 (adj 103). Momentum = 123/103 - 1.
+    assert loaded.pre_event_momentum == pytest.approx(123.0 / 103.0 - 1.0)
 
 
 def _seed_two_series(session) -> None:

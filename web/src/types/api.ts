@@ -58,6 +58,7 @@ export type BacktestModel =
   | "event_type_history"
   | "significant_event_type"
   | "macro_surprise"
+  | "price_momentum"
   | "combined"
   | "llm_direction";
 

@@ -12,6 +12,7 @@ from markettrace.impact.signal import (
     DirectionSignal,
     EventTypeSignal,
     MacroSurpriseSignal,
+    PriceMomentumSignal,
     SignificantEventTypeSignal,
     make_signal_model,
 )
@@ -25,6 +26,7 @@ class _Ev:
     abnormal_return: float | None = None
     direction: str | None = None
     macro_surprise: float | None = None
+    pre_event_momentum: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +167,40 @@ def test_macro_ignores_missing_outcome() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PriceMomentumSignal — expanding mean conditioned on pre-event momentum (sign)
+# ---------------------------------------------------------------------------
+
+
+def test_momentum_none_makes_no_call() -> None:
+    sig = PriceMomentumSignal(min_train=1)
+    sig.observe(_Ev(abnormal_return=0.02, pre_event_momentum=0.1))
+    assert sig.predict(_Ev(pre_event_momentum=None)) is None
+
+
+def test_momentum_learns_per_regime_sign() -> None:
+    sig = PriceMomentumSignal(min_train=2)
+    sig.observe(_Ev(abnormal_return=0.03, pre_event_momentum=0.08))
+    sig.observe(_Ev(abnormal_return=0.05, pre_event_momentum=0.02))
+    sig.observe(_Ev(abnormal_return=-0.04, pre_event_momentum=-0.06))
+    sig.observe(_Ev(abnormal_return=-0.02, pre_event_momentum=-0.01))
+    assert sig.predict(_Ev(pre_event_momentum=0.5)) == pytest.approx(0.04)
+    assert sig.predict(_Ev(pre_event_momentum=-0.9)) == pytest.approx(-0.03)
+
+
+def test_momentum_undertrained_regime_predicts_none() -> None:
+    sig = PriceMomentumSignal(min_train=3)
+    sig.observe(_Ev(abnormal_return=0.03, pre_event_momentum=0.8))
+    sig.observe(_Ev(abnormal_return=0.05, pre_event_momentum=0.2))
+    assert sig.predict(_Ev(pre_event_momentum=0.4)) is None  # only 2 in the + bucket
+
+
+def test_momentum_ignores_missing_outcome() -> None:
+    sig = PriceMomentumSignal(min_train=1)
+    sig.observe(_Ev(abnormal_return=None, pre_event_momentum=0.5))
+    assert sig.predict(_Ev(pre_event_momentum=0.5)) is None
+
+
+# ---------------------------------------------------------------------------
 # CombinedSignal — equal-weight mean of constituent expected-return models
 # ---------------------------------------------------------------------------
 
@@ -245,6 +281,7 @@ def test_registered_model_names() -> None:
         "event_type_history",
         "significant_event_type",
         "macro_surprise",
+        "price_momentum",
         "combined",
         "llm_direction",
     )

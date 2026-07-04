@@ -524,6 +524,10 @@ function BacktestSection({
       value: "macro_surprise",
       label: t("stats.backtest.model.macro_surprise"),
     },
+    {
+      value: "price_momentum",
+      label: t("stats.backtest.model.price_momentum"),
+    },
     { value: "combined", label: t("stats.backtest.model.combined") },
     { value: "llm_direction", label: t("stats.backtest.model.llm_direction") },
   ];

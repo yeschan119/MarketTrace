@@ -44,7 +44,7 @@ from math import sqrt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from markettrace.db.models import Document, Event, EventImpact, MacroObservation
+from markettrace.db.models import Document, Event, EventImpact, MacroObservation, Price
 from markettrace.impact.signal import EventTypeSignal, MacroSurpriseSignal, SignalModel
 
 __all__ = [
@@ -60,6 +60,9 @@ __all__ = [
 # Minimum prior same-type observations before a type starts being predicted.
 DEFAULT_MIN_TRAIN_PER_TYPE = 3
 
+# Trading-day lookback for pre-event price momentum (PriceMomentumSignal feature).
+_MOMENTUM_WINDOW = 20
+
 
 @dataclass(frozen=True)
 class BacktestEvent:
@@ -72,6 +75,9 @@ class BacktestEvent:
     # Freshest macro surprise published strictly before this event (or None). Read
     # only by MacroSurpriseSignal; look-ahead-safe by construction of that cutoff.
     macro_surprise: float | None = None
+    # Instrument's cumulative return over the window ending strictly before this
+    # event (or None). Read only by PriceMomentumSignal; look-ahead-safe.
+    pre_event_momentum: float | None = None
 
 
 @dataclass(frozen=True)
@@ -222,11 +228,37 @@ def _load_backtest_events(
             EventImpact.event_type,
             EventImpact.abnormal_return,
             EventImpact.direction,
+            EventImpact.instrument_id,
         )
         .join(Event, Event.id == EventImpact.event_id)
         .join(Document, Document.id == Event.document_id)
         .where(EventImpact.horizon_days == horizon_days)
     ).all()
+
+    # Per-instrument adjusted-close series for look-ahead-safe pre-event momentum.
+    prices_by_inst: dict[int, tuple[list, list[float]]] = {}
+    for iid, pdate, px in session.execute(
+        select(Price.instrument_id, Price.date, Price.adj_close).order_by(
+            Price.instrument_id, Price.date
+        )
+    ).all():
+        dates, vals = prices_by_inst.setdefault(iid, ([], []))
+        dates.append(pdate)
+        vals.append(px)
+
+    def _pre_event_momentum(instrument_id: int, before: datetime) -> float | None:
+        series = prices_by_inst.get(instrument_id)
+        if series is None:
+            return None
+        dates, vals = series
+        # Prices strictly before the event date only (dates[:idx]).
+        idx = bisect.bisect_left(dates, before.date())
+        if idx < _MOMENTUM_WINDOW + 1:
+            return None
+        start = vals[idx - 1 - _MOMENTUM_WINDOW]
+        if start == 0:
+            return None
+        return vals[idx - 1] / start - 1.0
 
     macro_stmt = select(
         MacroObservation.published_at, MacroObservation.surprise_score
@@ -248,6 +280,7 @@ def _load_backtest_events(
             abnormal_return=r[2],
             direction=r[3],
             macro_surprise=_latest_macro_surprise(r[0]),
+            pre_event_momentum=_pre_event_momentum(r[4], r[0]),
         )
         for r in rows
     ]

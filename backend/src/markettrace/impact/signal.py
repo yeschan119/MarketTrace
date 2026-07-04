@@ -43,6 +43,7 @@ __all__ = [
     "DirectionSignal",
     "EventTypeSignal",
     "MacroSurpriseSignal",
+    "PriceMomentumSignal",
     "SignalInput",
     "SignalModel",
     "SignificantEventTypeSignal",
@@ -79,6 +80,9 @@ class SignalInput(Protocol):
     # Freshest macro surprise known at the event's filing time (or None). Read by
     # MacroSurpriseSignal; other models ignore it.
     macro_surprise: float | None
+    # Instrument's cumulative return over a fixed window ending strictly before
+    # the event (or None). Read by PriceMomentumSignal; other models ignore it.
+    pre_event_momentum: float | None
 
 
 class SignalModel(Protocol):
@@ -222,6 +226,46 @@ class MacroSurpriseSignal:
         return sum(prior) / len(prior)
 
 
+class PriceMomentumSignal:
+    """Expanding-window mean abnormal return conditioned on pre-event momentum.
+
+    Keys history on the *sign* of the instrument's cumulative return over a fixed
+    window ending strictly before the event (``sign(pre_event_momentum)`` ∈
+    {-1, 0, +1}) and predicts that bucket's historical mean. It asks whether a
+    stock's recent price trend before the news carries information about the
+    post-event abnormal return — a classic drift-vs-reversal question.
+
+    Direction-agnostic and measurement-first, mirroring
+    :class:`MacroSurpriseSignal`: the momentum→return relationship is *learned*,
+    not assumed. Look-ahead-safe because ``pre_event_momentum`` is computed only
+    from prices dated strictly before the event, and only prior-observed
+    (momentum, return) pairs enter the estimate.
+    """
+
+    name = "price_momentum"
+
+    def __init__(self, *, min_train: int) -> None:
+        self.min_train = min_train
+        self._history: dict[int, list[float]] = {}
+
+    def observe(self, event: SignalInput) -> None:
+        """Record one realised return, keyed by the sign of pre-event momentum."""
+        if event.abnormal_return is None or event.pre_event_momentum is None:
+            return
+        self._history.setdefault(_sign_int(event.pre_event_momentum), []).append(
+            event.abnormal_return
+        )
+
+    def predict(self, event: SignalInput) -> float | None:
+        """Mean return for the event's momentum regime, or ``None`` if unknown."""
+        if event.pre_event_momentum is None:
+            return None
+        prior = self._history.get(_sign_int(event.pre_event_momentum))
+        if prior is None or len(prior) < self.min_train:
+            return None
+        return sum(prior) / len(prior)
+
+
 class CombinedSignal:
     """Equal-weight combination of several expected-return signal models.
 
@@ -285,6 +329,8 @@ def make_signal_model(name: str, *, min_train: int) -> SignalModel:
         return SignificantEventTypeSignal(min_train=min_train)
     if name == MacroSurpriseSignal.name:
         return MacroSurpriseSignal(min_train=min_train)
+    if name == PriceMomentumSignal.name:
+        return PriceMomentumSignal(min_train=min_train)
     if name == CombinedSignal.name:
         # Combine the two expected-return models (matching units); the LLM-direction
         # and significance-gated models are kept separate/standalone by design.
@@ -301,6 +347,7 @@ SIGNAL_MODEL_NAMES: tuple[str, ...] = (
     EventTypeSignal.name,
     SignificantEventTypeSignal.name,
     MacroSurpriseSignal.name,
+    PriceMomentumSignal.name,
     CombinedSignal.name,
     DirectionSignal.name,
 )
