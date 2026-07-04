@@ -103,7 +103,7 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 513 tests · ruff clean</span>
+      <span class="pill">✅ 543 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
       <span class="pill">🧭 방향 A: 측정·검증 우선</span>
       <span class="pill">✅ 코퍼스 486건 (KR 275 · US 211)</span>
@@ -124,10 +124,10 @@
   <div class="strip">
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">88%</div><div class="bar"><i style="width:88%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">92%</div><div class="bar"><i style="width:92%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">82%</div><div class="bar"><i style="width:82%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">95%</div><div class="bar"><i style="width:95%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -142,7 +142,7 @@
     <div class="node n-todo">Feature Store<small>미구현</small></div>
     <div class="node n-done">영향 분석<small>이상수익률 1/5/20/60·섹터·통계·거시 surprise</small></div>
     <div class="node n-partial">신호·검증<small>5모델 백테스트·유의게이트 5d +4.4%·거시=프록시 판명</small></div>
-    <div class="node n-done">API·대시보드<small>FastAPI + Next.js</small></div>
+    <div class="node n-done">API·대시보드<small>FastAPI + Next.js · 관심종목·알림</small></div>
     <div class="node n-todo">사후 성과 측정<small>미구현</small></div>
   </div>
 
@@ -200,8 +200,8 @@
   <!-- PHASE 2 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~88%</span></div>
-      <div class="pbar a"><i style="width:88%"></i></div><div class="pct-lbl" style="color:var(--amber)">88%</div>
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~92%</span></div>
+      <div class="pbar a"><i style="width:92%"></i></div><div class="pct-lbl" style="color:var(--amber)">92%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -213,17 +213,19 @@
           <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 골드셋, markettrace-eval CLI</li>
           <li class="ok"><b>정규 택소노미 + 라이브 분류 F1 실측</b> — event_type 자유텍스트가 110개로 파편화 → <span class="commit">eval/taxonomy.py</span> 정규화(110→18계열). 골드셋 6→26 + 실이벤트 97건 <b>2인 검수(일치도 97.9%)</b>. 배포 추출기 <b>77.3%</b> → 오류패턴(macro·regulatory 과적용 등) 프롬프트 교정 → 라이브 재추출 <b>91.8% (+14.5%p)</b>. <span class="commit">markettrace-eval-live</span></li>
           <li class="ok"><b>사람 검토·수정 화면</b> — <span class="commit">PATCH /events/{id}</span>(auth) + 이벤트 상세 편집폼: 방향·유형·신뢰도 교정, 원본 LLM값 스냅샷(original_*·reviewed_at, 마이그레이션 0006), 수정시 EventImpact 재빌드로 통계 즉시 반영. 목록에 ✓검토됨·"미검토 충돌" 큐</li>
+          <li class="ok"><b>event_type enum 강제 + 코퍼스 마이그레이션</b> — 자유텍스트가 재파편화되던 문제를 <b>원천 차단</b>. 정규 18계열을 추출 tool 스키마 <span class="commit">enum</span>으로 강제(Anthropic·OpenAI) + pydantic validator canonicalize. 마이그레이션 0007이 <b>기존 486건을 18계열로 결정론적 축약</b>(무LLM비용)→ 라이브 significance/backtest가 계열단위 재그룹핑(검정력↑). <span class="commit">nlp/taxonomy.py</span></li>
+          <li class="ok"><b>기존 코퍼스 재추출 도구</b> — <span class="commit">markettrace-reextract</span>: 개선 프롬프트(91.8%)를 기존 이벤트에 in-place 재적용(outcomes보존·event_impacts재빌드·검수이벤트 스킵·dry-run). ⚠️<b>prod 실행은 미완</b>(크리덴셜 필요)</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
           <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
-          <li class="no">기존 486건 <b>재추출</b>로 개선 프롬프트 반영(현재 개선은 향후 추출만) + entity_linking F1 별도 측정(entity_linker 경유)</li>
+          <li class="no">기존 486건 <b>재추출 실제 실행</b> — 도구·enum은 완료, prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행만 남음(오분류 교정·direction 갱신) + entity_linking F1 별도 측정</li>
           <li class="no">엔티티(종목 연결) 교정 — 현재 검토는 방향/유형/신뢰도만</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟢</b> — 기업연결·분류 F1 <b>실측 완료</b>: 정규계열 분류 라이브 <b>91.8%(89/97)</b>, 검수 일치도 97.9%. 프롬프트 교정으로 systematic 오류 제거(잔여는 대부분 본질 모호 'other'). <b>사람 검토·수정 루프 가동</b>(교정→통계 반영). 남은 건 기존 코퍼스 재추출·entity 교정 UI.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 분류 F1 <b>실측 91.8%(89/97)</b>·검수 97.9%. <b>enum 강제 + 마이그레이션으로 파편화 원천 차단</b>(기존 486건 18계열 축약 배포됨). <b>사람 검토·수정 루프 가동</b>. 남은 건 재추출 <b>실행</b>(도구 준비완료)·entity 교정 UI.</div>
   </div>
 
   <!-- PHASE 3 -->
@@ -287,8 +289,8 @@
   <!-- PHASE 5 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~82%</span></div>
-      <div class="pbar a"><i style="width:82%"></i></div><div class="pct-lbl" style="color:var(--amber)">82%</div>
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~95%</span></div>
+      <div class="pbar a"><i style="width:95%"></i></div><div class="pct-lbl" style="color:var(--amber)">95%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -301,15 +303,17 @@
           <li class="ok"><b>사건 단위 검증신호 결합</b> — 이벤트 상세·목록에 검증신호 vs LLM 방향 일치/충돌 노출 + "미검토 충돌" 검토 큐(사람 검토 루프와 연결)</li>
           <li class="ok"><b>종목별 매수판단 화면</b> — 종목 뷰에 검증신호 집계 <b>종합 판정</b>(주의/우호/혼조 + 평균 드리프트·검증사건수·충돌수) + <b>상승·하락 요인 분해</b>(유형별 검증 드리프트로 종목이 왜 오르내리나). 판정+근거 완성. <span class="commit">/instruments/{id}</span></li>
           <li class="ok"><b>종목 간 랭킹 + 매수판단 정교화</b> — 단순 평균을 <b>확신도 × 최근성 가중</b>(반감기 180일)으로 정교화해 전 종목을 가로질러 랭킹. 최근·고확신 사건이 더 크게 반영. 실측 38종목 랭킹(카카오·삼성·네이버 순 insider −6.6% 주의). <span class="commit">/rankings · GET /stats/instrument-ranking</span></li>
+          <li class="ok"><b>관심종목 + 앱 내 알림</b> — watchlist(★)에 등록한 종목에 <b>검증 유의(significant) 유형</b> 이벤트가 뜨면 알림. LLM 방향이 검증 드리프트와 반대면 <b>충돌(conflict)</b>. 외부 인프라 없이 앱 내 알림함(헤더 벨 배지·<span class="commit">/alerts</span>)·읽음처리. 무료티어 스케줄러 없어 <b>ingest시 + 관심등록 즉시</b> 발화. 이벤트목록·랭킹·종목페이지에서 ★로 추가·<span class="commit">/watchlist</span> 목록. <span class="commit">watchlist_items·alerts 테이블(0008)</span></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="no">관심종목 알림 <span style="color:var(--muted)">(알림 인프라 필요)</span></li>
+          <li class="ok" style="color:var(--green);font-weight:600">핵심 완료 — 알림까지 가동</li>
+          <li class="no"><span style="color:var(--muted)">(선택) 외부 푸시(Telegram 등)·실시간 트리거 — 현재는 앱 내·ingest 발화</span></li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>참고</b> — 타임라인·상세는 Phase 1에서 구축, 여기선 확장 단계. 검증신호는 사건·통계 단위까지 노출됨 → 남은 핵심은 <b>종목 단위 집계 매수판단</b>.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 타임라인·상세→검증신호(사건·통계·종목)→랭킹→<b>관심종목 알림</b>까지 전 층위 완결. 남은 건 선택적 외부 푸시뿐.</div>
   </div>
 
   <!-- DATA MODEL -->
@@ -367,7 +371,7 @@
     <div class="mini">
       <h3>✅ Events — 486건</h3>
       <ul class="items">
-        <li class="ok"><b>KR 275 · US 211 = 486건</b> (earnings 70 · regulatory 59 · insider 55 …)</li>
+        <li class="ok"><b>KR 275 · US 211 = 486건</b> · event_type은 이제 <b>정규 18계열</b>(enum 강제 + 0007 마이그레이션으로 파편화 축약, 라이브 확인)</li>
         <li class="ok">유의 사건유형 <b>9버킷</b> 확인(p&lt;0.05, 표본충분). 전부 음(−) 초과수익 드리프트</li>
         <li class="ok"><b>상태 확인은 항상 라이브 API 먼저</b> — 정적 문서는 stale (6/17 "45건"으로 낡아 있었음)</li>
       </ul>
@@ -383,27 +387,27 @@
   </div>
 
   <!-- THIS SESSION -->
-  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-04 · 종목 랭킹 → 정합성 감사 → 라이브 분류 F1)</span></h2>
+  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-04 · 재추출 도구 → enum화 → 관심종목 알림)</span></h2>
   <div class="mini">
     <ul class="items">
-      <li class="ok"><b>종목 간 랭킹 + 매수판단 정교화</b> — 단순평균을 <b>확신도 × 최근성 가중</b>(반감기 180일)으로 정교화해 전 종목 랭킹. <span class="commit">/rankings · GET /stats/instrument-ranking</span>. 실측 38종목(카카오·삼성·네이버 순 insider −6.6% 주의)</li>
-      <li class="ok"><b>roadmap·blueprint 정합성 감사(ralph)</b> — 독립 코드 리뷰 2회. §2 원칙·Phase 주장 모두 코드와 일치, <b>드리프트 없음</b>. AC2/AC3 문구만 실제에 맞게 교정</li>
-      <li class="ok"><b>정규 택소노미 + 라이브 분류 F1</b> — event_type 자유텍스트 110개 파편화 규명 → 정규화(110→18계열). 실이벤트 97건 <b>2인 검수(일치 97.9%)</b>. 배포 추출기 <b>77.3%</b> → 오류패턴(macro·regulatory 과적용·insider 불일치) 프롬프트 교정 → 라이브 재추출 <b>91.8% (+14.5%p)</b></li>
-      <li class="ok"><b>평가 인프라</b> — <span class="commit">eval/taxonomy.py</span> · <span class="commit">markettrace-eval-live</span>(배포 출력 오프라인 F1) + 검수 골드셋 아티팩트</li>
+      <li class="ok"><b>event_type enum 강제 + 코퍼스 마이그레이션</b> — 정규 18계열을 추출 스키마 <span class="commit">enum</span>으로 강제(파편화 원천 차단) + validator canonicalize. 마이그레이션 0007이 기존 486건을 18계열로 결정론적 축약(무LLM비용)→ 라이브 significance/backtest 계열단위 재그룹핑. <span class="commit">nlp/taxonomy.py</span> 단일소스</li>
+      <li class="ok"><b>기존 코퍼스 재추출 도구</b> — <span class="commit">markettrace-reextract</span>: 개선 프롬프트를 기존 이벤트에 in-place 재적용(outcomes보존·impacts재빌드·검수스킵·dry-run 기본·재fetch). 배포됨, ⚠️prod 실행만 미완</li>
+      <li class="ok"><b>관심종목 + 앱 내 알림(Phase 5 마감)</b> — watchlist(★)·검증 유의/충돌 이벤트 알림(헤더 벨·<span class="commit">/alerts</span>·읽음). ingest+관심등록시 발화. 이벤트목록·랭킹·종목·<span class="commit">/watchlist</span>에서 ★ 추가. 테이블 0008</li>
+      <li class="ok"><b>종목 한글 이름 표시</b> — 이름 옆 연한 한글(국내·미국 40종목, 예 "NAVER Corporation 네이버"). 5개 화면. <span class="commit">lib/instrumentNames.ts</span></li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 413 → <b style="color:var(--ink)">513</b> · ruff 클린. 추출 품질 <b style="color:var(--ink)">77.3%→91.8%</b> 실측·검증(잔여 오류는 대부분 본질 모호 'other'). ⚠️ 개선 프롬프트는 <b>향후 추출만</b> 적용 — 기존 486건은 재적재 시 반영.
-      Phase 2 80 → <b style="color:var(--ink)">88%</b> · Phase 5 76 → <b style="color:var(--ink)">82%</b>.</p>
+      테스트 513 → <b style="color:var(--ink)">543</b> · ruff 클린. 분류 파편화 <b>enum으로 원천 차단</b> + 기존 486건 <b>18계열 축약 배포</b>(무비용, 검정력↑).
+      Phase 2 88 → <b style="color:var(--ink)">92%</b> · Phase 5 82 → <b style="color:var(--ink)">95%</b>(알림까지 완결).</p>
   </div>
 
   <!-- NEXT -->
   <h2><span class="num">»</span> 다음 추천 단계</h2>
   <div class="mini">
     <ul class="items next">
-      <li><b>① 기존 코퍼스 재추출</b> — 개선 프롬프트(91.8%)를 기존 486건에 반영(재적재) → 신호 통계도 파편화 감소로 검정력↑. entity_linking F1 별도 측정(entity_linker 경유)</li>
-      <li><b>② 관심종목 알림(Phase 5)</b> — Telegram 등 알림 인프라 + 관심종목 저장·트리거. 실사용자 기능(무료티어 spin-down 고려)</li>
+      <li><b>① 기존 코퍼스 재추출 <i>실행</i></b> — 도구(<span class="commit">markettrace-reextract</span>)·enum·마이그레이션 모두 완료. 남은 건 prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행뿐 → 오분류 자체 교정·direction/confidence 갱신(enum 축약은 이미 반영됨). Render Shell에서 실행</li>
+      <li><b>② entity_linking F1 별도 측정</b> — entity_linker 경유로 종목 연결 정확도 실측(추출기 직접 측정은 회사명↔티커 미스매치로 무의미했음) + 엔티티 교정 UI</li>
       <li><b>③ 데이터 수집 트랙</b> — 펀더멘털·수급을 동일 <code>SignalModel</code>로 + 상폐목록(KRX/OpenDART) 수집해 생존편향 차단. 착수비용 큰 별도 트랙</li>
-      <li><b>④ event_type enum화(선택)</b> — 정규 18계열을 추출 스키마 enum으로 강제해 파편화 원천 차단(기존 데이터 마이그레이션 동반)</li>
+      <li><b>④ (선택) 외부 푸시 알림</b> — 현재 앱 내·ingest 발화. Telegram 등 외부 채널·실시간 트리거는 선택 확장</li>
     </ul>
   </div>
 
