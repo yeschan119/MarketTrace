@@ -69,6 +69,12 @@ const en: Dict = {
     companyEvents: "{n} events",
     noneInMarket: "No events in this market.",
     expandHint: "Select a company to see its events, latest first.",
+    signalFilter: {
+      all: "All",
+      conflict: "Conflicts only",
+      validated: "Validated only",
+    },
+    noneMatchFilter: "No events match this filter.",
   },
   stats: {
     loading: "Loading statistics...",
@@ -211,6 +217,14 @@ const en: Dict = {
         "No statistically significant signal for this event type yet (n≥5, p<0.05). Treat the model's read as unconfirmed.",
       up: "up",
       down: "down",
+      short: {
+        conflict: "Conflict",
+        conflictTitle: "Model read conflicts with validated history",
+        agree: "Confirmed",
+        agreeTitle: "Model read matches validated history",
+        info: "Signal",
+        infoTitle: "Validated signal exists; model is neutral",
+      },
     },
   },
   instrument: {
@@ -422,6 +436,12 @@ const ko: Dict = {
     companyEvents: "이벤트 {n}건",
     noneInMarket: "이 시장의 이벤트가 없습니다.",
     expandHint: "기업을 선택하면 해당 기업의 이벤트를 최신순으로 보여줍니다.",
+    signalFilter: {
+      all: "전체",
+      conflict: "충돌만",
+      validated: "검증된 것만",
+    },
+    noneMatchFilter: "이 필터에 해당하는 이벤트가 없습니다.",
   },
   stats: {
     loading: "통계 불러오는 중...",
@@ -562,6 +582,14 @@ const ko: Dict = {
         "이 사건유형은 아직 통계적으로 유의한 검증신호가 없습니다(n≥5, p<0.05). 모델 판단은 미검증으로 보세요.",
       up: "상승",
       down: "하락",
+      short: {
+        conflict: "충돌",
+        conflictTitle: "모델 판단이 검증된 실측과 충돌",
+        agree: "검증됨",
+        agreeTitle: "모델 판단이 검증된 실측과 일치",
+        info: "신호",
+        infoTitle: "검증신호 있음, 모델은 중립",
+      },
     },
   },
   instrument: {

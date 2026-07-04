@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import type { EventTypeSignificance } from "@/types/api";
+import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 
 interface Props {
   eventType: string;
@@ -27,23 +27,7 @@ function formatT(v: number | null): string {
   return v.toFixed(2);
 }
 
-type Verdict = "conflict" | "agree" | "info" | "none";
-
-// Sign of the validated mean abnormal return → market-relative direction.
-function histDir(mean: number | null): "up" | "down" | null {
-  if (mean == null || mean === 0) return null;
-  return mean > 0 ? "up" : "down";
-}
-
-// LLM direction → the same up/down axis (neutral has no axis).
-function llmDir(direction: string): "up" | "down" | null {
-  const k = direction.toLowerCase();
-  if (k === "positive") return "up";
-  if (k === "negative") return "down";
-  return null;
-}
-
-const verdictStyles: Record<Verdict, string> = {
+const verdictStyles: Record<SignalVerdict, string> = {
   conflict: "border-amber-300 bg-amber-50 text-amber-800",
   agree: "border-emerald-200 bg-emerald-50 text-emerald-800",
   info: "border-indigo-200 bg-indigo-50 text-indigo-800",
@@ -62,32 +46,12 @@ export function ValidatedSignalCard({ eventType, direction, horizonDays }: Props
     return null;
   }
 
-  // Validated buckets for THIS event type, ordered by horizon.
-  const rows = data
-    .filter(
-      (r) =>
-        r.event_type === eventType &&
-        r.significant_5pct &&
-        r.sufficient_sample,
-    )
-    .sort((a, b) => a.horizon_days - b.horizon_days);
-
-  // Headline row: prefer the event's own horizon, else the most significant.
-  const headline: EventTypeSignificance | undefined =
-    rows.find((r) => r.horizon_days === horizonDays) ??
-    [...rows].sort((a, b) => (a.p_value ?? 1) - (b.p_value ?? 1))[0];
-
-  const hd = histDir(headline?.mean_abnormal_return ?? null);
-  const ld = llmDir(direction);
-
-  let verdict: Verdict;
-  if (!headline || hd == null) {
-    verdict = "none";
-  } else if (ld == null) {
-    verdict = "info";
-  } else {
-    verdict = ld === hd ? "agree" : "conflict";
-  }
+  const { verdict, rows, headline, histDirection: hd } = assessSignal(
+    data,
+    eventType,
+    direction,
+    horizonDays,
+  );
 
   const llmLabel = ["positive", "negative", "neutral"].includes(
     direction.toLowerCase(),

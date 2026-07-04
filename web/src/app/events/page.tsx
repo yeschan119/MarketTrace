@@ -7,9 +7,12 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
+import { ValidatedSignalBadge } from "@/components/ValidatedSignalBadge";
+import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
 
 type Market = "KR" | "US";
+type SignalFilter = "all" | "conflict" | "validated";
 
 interface CompanyGroup {
   ticker: string;
@@ -24,10 +27,33 @@ export default function EventsPage() {
     queryFn: () => api.listEvents(),
   });
 
+  const { data: significance } = useQuery({
+    queryKey: ["significance"],
+    queryFn: () => api.getEventTypeSignificance(),
+  });
+
   const [market, setMarket] = useState<Market>("KR");
+  const [signalFilter, setSignalFilter] = useState<SignalFilter>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const events = useMemo(() => data ?? [], [data]);
+
+  // Validated-signal verdict per event, cached by (event_type, direction)
+  // since those two fully determine the verdict at list granularity.
+  const verdictFor = useMemo(() => {
+    const cache = new Map<string, SignalVerdict>();
+    return (event: EventSummary): SignalVerdict => {
+      if (!significance) return "none";
+      const key = `${event.event_type}|${event.direction}`;
+      let v = cache.get(key);
+      if (v === undefined) {
+        v = assessSignal(significance, event.event_type, event.direction)
+          .verdict;
+        cache.set(key, v);
+      }
+      return v;
+    };
+  }, [significance]);
 
   const counts = useMemo(() => {
     let kr = 0;
@@ -43,6 +69,10 @@ export default function EventsPage() {
     const byTicker = new Map<string, CompanyGroup>();
     for (const event of events) {
       if (event.market !== market) continue;
+      if (signalFilter === "conflict" && verdictFor(event) !== "conflict")
+        continue;
+      if (signalFilter === "validated" && verdictFor(event) === "none")
+        continue;
       const key = event.primary_ticker;
       let group = byTicker.get(key);
       if (!group) {
@@ -65,7 +95,7 @@ export default function EventsPage() {
     }
     result.sort((a, b) => b.events.length - a.events.length);
     return result;
-  }, [events, market]);
+  }, [events, market, signalFilter, verdictFor]);
 
   if (isLoading) {
     return (
@@ -136,14 +166,37 @@ export default function EventsPage() {
         ))}
       </div>
 
+      <div className="mb-6 ml-0 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 sm:ml-3">
+        {(["all", "conflict", "validated"] as SignalFilter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setSignalFilter(f)}
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              signalFilter === f
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t(`events.signalFilter.${f}`)}
+          </button>
+        ))}
+      </div>
+
       {groups.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
-          {t("events.noneInMarket")}
+          {t(
+            signalFilter === "all"
+              ? "events.noneInMarket"
+              : "events.noneMatchFilter",
+          )}
         </div>
       ) : (
         <div className="space-y-3">
           {groups.map((group) => {
-            const isOpen = expanded.has(group.ticker);
+            // Under an active signal filter, open groups so matches are visible.
+            const isOpen =
+              signalFilter !== "all" || expanded.has(group.ticker);
             return (
               <div
                 key={group.ticker}
@@ -213,6 +266,7 @@ export default function EventsPage() {
                             </span>
                           </Link>
                           <DirectionBadge direction={event.direction} />
+                          <ValidatedSignalBadge verdict={verdictFor(event)} />
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-4 text-sm text-gray-500">
                           <span className="text-gray-600">
