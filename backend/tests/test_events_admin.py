@@ -7,8 +7,9 @@ rebuild that keeps signed_abnormal_return consistent after a direction edit.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
+import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from markettrace.api.auth import create_token
-from markettrace.api.deps import get_db
+from markettrace.api.deps import get_db, get_price_provider_factory
 from markettrace.api.main import create_app
 from markettrace.db.models import (
     Base,
@@ -25,6 +26,7 @@ from markettrace.db.models import (
     EventImpact,
     Instrument,
     Outcome,
+    Price,
 )
 from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult
@@ -221,3 +223,151 @@ def test_confidence_only_edit_snapshots_but_keeps_direction(
 
     session.expire_all()
     assert _impacts(session, eid) == before  # direction unchanged → impacts intact
+
+
+# ---------------------------------------------------------------------------
+# Instrument correction (re-link a mis-classified company)
+# ---------------------------------------------------------------------------
+
+_EVENT_DATE = date(2026, 1, 2)  # seeded document.published_at
+
+
+def _flat_price_frame() -> pl.DataFrame:
+    """Daily OHLCV frame of constant price spanning the recompute window.
+
+    Constant price → every raw and market return is 0, so the recomputed
+    abnormal returns are all 0 — distinct from the seeded outcomes (0.02, -0.04),
+    which proves the recompute re-fetched prices rather than reusing old rows.
+    """
+    start = _EVENT_DATE - timedelta(days=10)
+    dates = [start + timedelta(days=i) for i in range(160)]  # covers the 60d horizon
+    n = len(dates)
+    return pl.DataFrame(
+        {
+            "date": dates,
+            "open": [100.0] * n,
+            "high": [100.0] * n,
+            "low": [100.0] * n,
+            "close": [100.0] * n,
+            "adj_close": [100.0] * n,
+            "volume": [1_000_000.0] * n,
+        }
+    )
+
+
+class _FlatPriceProvider:
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        return _flat_price_frame()
+
+
+class _RaisingPriceProvider:
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        raise RuntimeError("price provider unavailable")
+
+
+def _override_price_provider(client: TestClient, provider) -> None:
+    client.app.dependency_overrides[get_price_provider_factory] = lambda: (
+        lambda market: provider
+    )
+
+
+@pytest.fixture
+def other_instrument(session: Session) -> Instrument:
+    """A second instrument to re-link the event onto."""
+    instrument = Instrument(
+        market="KR", ticker="000660", name="SK hynix", industry="Tech"
+    )
+    session.add(instrument)
+    session.flush()
+    return instrument
+
+
+def test_instrument_correction_relinks_and_recomputes(
+    client: TestClient,
+    token: str,
+    seeded: dict,
+    other_instrument: Instrument,
+    session: Session,
+) -> None:
+    eid = seeded["event_id"]
+    old_iid = seeded["instrument_id"]
+    _override_price_provider(client, _FlatPriceProvider())
+
+    resp = client.patch(
+        f"/events/{eid}",
+        json={"primary_instrument_id": other_instrument.id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["primary_instrument_id"] == other_instrument.id
+    assert body["primary_ticker"] == "000660"
+    assert body["instrument_name"] == "SK hynix"
+    assert body["original_primary_instrument_id"] == old_iid
+    assert body["entities"] == ["000660"]
+    assert body["reviewed_at"] is not None
+
+    session.expire_all()
+    event = session.get(Event, eid)
+    assert event.primary_instrument_id == other_instrument.id
+
+    # Outcomes were re-fetched against the new instrument: they now carry its id
+    # and the recomputed (flat-price) abnormal returns of 0, replacing the seeded
+    # 0.02 / -0.04 — proof the recompute ran rather than reusing old rows.
+    outcomes = session.scalars(select(Outcome).where(Outcome.event_id == eid)).all()
+    assert outcomes, "expected recomputed outcomes"
+    assert all(o.instrument_id == other_instrument.id for o in outcomes)
+    assert {o.horizon_days for o in outcomes} == {1, 5, 20, 60}
+    assert all(o.abnormal_return == pytest.approx(0.0) for o in outcomes)
+
+    # Impacts were rebuilt for the new instrument too.
+    impacts = session.scalars(
+        select(EventImpact).where(EventImpact.event_id == eid)
+    ).all()
+    assert all(i.instrument_id == other_instrument.id for i in impacts)
+
+    # Prices for the new instrument were persisted by the recompute.
+    assert session.scalars(
+        select(Price).where(Price.instrument_id == other_instrument.id)
+    ).first() is not None
+
+
+def test_instrument_correction_unknown_instrument_422(
+    client: TestClient, token: str, seeded: dict
+) -> None:
+    _override_price_provider(client, _FlatPriceProvider())
+    resp = client.patch(
+        f"/events/{seeded['event_id']}",
+        json={"primary_instrument_id": 999999},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 422
+
+
+def test_instrument_correction_price_failure_rolls_back(
+    client: TestClient,
+    token: str,
+    seeded: dict,
+    other_instrument: Instrument,
+    session: Session,
+) -> None:
+    eid = seeded["event_id"]
+    old_iid = seeded["instrument_id"]
+    session.commit()  # persist seeded state so a rollback returns to it
+    _override_price_provider(client, _RaisingPriceProvider())
+
+    resp = client.patch(
+        f"/events/{eid}",
+        json={"primary_instrument_id": other_instrument.id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 502
+
+    # Rolled back atomically: linkage, review flag, and outcomes are untouched.
+    session.expire_all()
+    event = session.get(Event, eid)
+    assert event.primary_instrument_id == old_iid
+    assert event.reviewed_at is None
+    outcomes = session.scalars(select(Outcome).where(Outcome.event_id == eid)).all()
+    assert all(o.instrument_id == old_iid for o in outcomes)
+    assert {o.horizon_days for o in outcomes} == {1, 5}  # seeded set, unchanged

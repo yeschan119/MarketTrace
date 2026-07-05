@@ -144,10 +144,15 @@ export interface EventDetail {
   evidence: string[];
   model: string;
   model_version: string;
+  primary_instrument_id: number | null;
+  primary_ticker: string | null;
+  instrument_name: string | null;
+  market: string | null;
   reviewed_at: string | null;
   original_direction: string | null;
   original_event_type: string | null;
   original_confidence: number | null;
+  original_primary_instrument_id: number | null;
   document: Document;
   outcomes: Outcome[];
 }
@@ -156,12 +161,21 @@ export interface EventUpdate {
   direction?: string;
   event_type?: string;
   confidence?: number;
+  primary_instrument_id?: number;
 }
 
 export interface Instrument {
   id: string;
   ticker: string;
   name: string;
+}
+
+export interface InstrumentSummary {
+  id: number;
+  market: string;
+  ticker: string;
+  name: string;
+  industry: string | null;
 }
 
 export interface InstrumentTimeline {

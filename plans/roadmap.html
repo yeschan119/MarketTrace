@@ -124,7 +124,7 @@
   <div class="strip">
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">92%</div><div class="bar"><i style="width:92%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">94%</div><div class="bar"><i style="width:94%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">95%</div><div class="bar"><i style="width:95%"></i></div></div>
@@ -200,8 +200,8 @@
   <!-- PHASE 2 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~92%</span></div>
-      <div class="pbar a"><i style="width:92%"></i></div><div class="pct-lbl" style="color:var(--amber)">92%</div>
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~94%</span></div>
+      <div class="pbar a"><i style="width:94%"></i></div><div class="pct-lbl" style="color:var(--amber)">94%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -215,17 +215,17 @@
           <li class="ok"><b>사람 검토·수정 화면</b> — <span class="commit">PATCH /events/{id}</span>(auth) + 이벤트 상세 편집폼: 방향·유형·신뢰도 교정, 원본 LLM값 스냅샷(original_*·reviewed_at, 마이그레이션 0006), 수정시 EventImpact 재빌드로 통계 즉시 반영. 목록에 ✓검토됨·"미검토 충돌" 큐</li>
           <li class="ok"><b>event_type enum 강제 + 코퍼스 마이그레이션</b> — 자유텍스트가 재파편화되던 문제를 <b>원천 차단</b>. 정규 18계열을 추출 tool 스키마 <span class="commit">enum</span>으로 강제(Anthropic·OpenAI) + pydantic validator canonicalize. 마이그레이션 0007이 <b>기존 486건을 18계열로 결정론적 축약</b>(무LLM비용)→ 라이브 significance/backtest가 계열단위 재그룹핑(검정력↑). <span class="commit">nlp/taxonomy.py</span></li>
           <li class="ok"><b>기존 코퍼스 재추출 도구</b> — <span class="commit">markettrace-reextract</span>: 개선 프롬프트(91.8%)를 기존 이벤트에 in-place 재적용(outcomes보존·event_impacts재빌드·검수이벤트 스킵·dry-run). ⚠️<b>prod 실행은 미완</b>(크리덴셜 필요)</li>
+          <li class="ok"><b>엔티티(종목 연결) 교정 UI</b> — 잘못 연결된 종목을 검토화면에서 교정. <span class="commit">PATCH /events/{id}</span>에 <span class="commit">primary_instrument_id</span> 추가 + <span class="commit">GET /instruments</span> 선택 목록. 종목 변경은 이상수익률이 종목 가격에 의존하므로 <b>가격 재조회 후 outcomes/impacts 동기 재계산</b>(실패 시 원자적 롤백 502). 원본 연결 스냅샷(original_primary_instrument_id, 마이그레이션 0009). 550 tests</li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
           <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
           <li class="no">기존 486건 <b>재추출 실제 실행</b> — 도구·enum은 완료, prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행만 남음(오분류 교정·direction 갱신) + entity_linking F1 별도 측정</li>
-          <li class="no">엔티티(종목 연결) 교정 — 현재 검토는 방향/유형/신뢰도만</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟢</b> — 분류 F1 <b>실측 91.8%(89/97)</b>·검수 97.9%. <b>enum 강제 + 마이그레이션으로 파편화 원천 차단</b>(기존 486건 18계열 축약 배포됨). <b>사람 검토·수정 루프 가동</b>. 남은 건 재추출 <b>실행</b>(도구 준비완료)·entity 교정 UI.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 분류 F1 <b>실측 91.8%(89/97)</b>·검수 97.9%. <b>enum 강제 + 마이그레이션으로 파편화 원천 차단</b>(기존 486건 18계열 축약 배포됨). <b>사람 검토·수정 루프 가동</b>(방향·유형·신뢰도 + <b>종목 연결 교정</b>). 남은 건 재추출 <b>실행</b>(도구 준비완료)·Prefect 배치.</div>
   </div>
 
   <!-- PHASE 3 -->

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from markettrace.api.deps import get_db
@@ -20,6 +20,7 @@ from markettrace.api.schemas import (
     EventTypeStatOut,
     InstrumentOut,
     InstrumentRankingOut,
+    InstrumentSummary,
     InstrumentTimeline,
     MacroObservationOut,
     MacroSeriesBacktestOut,
@@ -100,6 +101,8 @@ def build_event_detail(db: Session, event: Event) -> EventDetail:
     )
     outcomes = db.scalars(outcomes_stmt).all()
 
+    instrument = event.primary_instrument
+
     return EventDetail(
         id=event.id,
         event_type=event.event_type,
@@ -115,10 +118,15 @@ def build_event_detail(db: Session, event: Event) -> EventDetail:
         evidence=list(event.evidence) if event.evidence else [],
         model=event.model,
         model_version=event.model_version,
+        primary_instrument_id=instrument.id if instrument else None,
+        primary_ticker=instrument.ticker if instrument else None,
+        instrument_name=instrument.name if instrument else None,
+        market=instrument.market if instrument else None,
         reviewed_at=event.reviewed_at,
         original_direction=event.original_direction,
         original_event_type=event.original_event_type,
         original_confidence=event.original_confidence,
+        original_primary_instrument_id=event.original_primary_instrument_id,
         document=DocumentOut.model_validate(document),
         outcomes=[OutcomeOut.model_validate(o) for o in outcomes],
     )
@@ -131,6 +139,32 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return build_event_detail(db, event)
+
+
+@router.get("/instruments", response_model=list[InstrumentSummary])
+def list_instruments(
+    q: str | None = None,
+    market: str | None = None,
+    db: Session = Depends(get_db),
+) -> list[InstrumentSummary]:
+    """List instruments for the review picker (correct a mis-linked company).
+
+    Optional ``?q=`` filters case-insensitively on ticker or name (substring),
+    and ``?market=`` restricts to a single market. Sorted by market then ticker;
+    the seeded universe is small (~tens of names) so no pagination is needed.
+    """
+    stmt = select(Instrument)
+    if market:
+        stmt = stmt.where(func.lower(Instrument.market) == market.lower())
+    if q:
+        needle = f"%{q.lower()}%"
+        stmt = stmt.where(
+            func.lower(Instrument.ticker).like(needle)
+            | func.lower(Instrument.name).like(needle)
+        )
+    stmt = stmt.order_by(Instrument.market.asc(), Instrument.ticker.asc())
+    rows = db.scalars(stmt).all()
+    return [InstrumentSummary.model_validate(r) for r in rows]
 
 
 @router.get("/instruments/{instrument_id}/timeline", response_model=InstrumentTimeline)

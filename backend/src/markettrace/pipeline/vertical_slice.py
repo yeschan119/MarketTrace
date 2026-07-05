@@ -19,7 +19,14 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
 
-from markettrace.db.models import Event, EventImpact, Instrument, ModelRun, Outcome
+from markettrace.db.models import (
+    Document,
+    Event,
+    EventImpact,
+    Instrument,
+    ModelRun,
+    Outcome,
+)
 from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult, compute_event_outcomes
 from markettrace.impact.sector_index import resolve_sector_index
@@ -29,7 +36,13 @@ from markettrace.nlp.entity_linker import link_entities, resolve_instrument
 from markettrace.nlp.novelty import novelty_score
 from markettrace.providers.base import DocumentRef
 
-__all__ = ["SliceResult", "run_slice", "recompute_document_outcomes", "main"]
+__all__ = [
+    "SliceResult",
+    "run_slice",
+    "recompute_document_outcomes",
+    "recompute_event_outcomes",
+    "main",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +252,51 @@ def _compute_and_persist_outcomes(
         session.add(impact)
 
     return outcomes, sector_index_ticker
+
+
+def recompute_event_outcomes(
+    session,
+    *,
+    event,
+    instrument,
+    price_provider,
+    market_index_ticker: str,
+    sector_index_ticker: str | None = None,
+    horizons: tuple[int, ...] = (1, 5, 20, 60),
+) -> list[OutcomeResult]:
+    """Delete and recompute one event's outcomes + impacts against *instrument*.
+
+    Used by the review endpoint when an admin corrects a mis-linked company:
+    abnormal returns depend on the instrument's own price series, so the stored
+    outcomes must be re-fetched and recomputed (unlike a direction edit, which
+    only re-signs existing outcomes). The event's :class:`Document` supplies the
+    event date, and the event's current ``direction`` drives the rebuilt impact
+    signs. Does not commit — the caller owns the transaction, so a failed price
+    fetch can be rolled back atomically.
+    """
+    now = datetime.now(UTC)
+    document = session.get(Document, event.document_id)
+    if document is None:
+        raise ValueError(f"event {event.id} has no document")
+    event_date = document.published_at.date()
+
+    session.execute(delete(Outcome).where(Outcome.event_id == event.id))
+    session.execute(delete(EventImpact).where(EventImpact.event_id == event.id))
+
+    outcomes, _ = _compute_and_persist_outcomes(
+        session,
+        event=event,
+        instrument=instrument,
+        ticker=instrument.ticker,
+        market=instrument.market,
+        price_provider=price_provider,
+        event_date=event_date,
+        market_index_ticker=market_index_ticker,
+        sector_index_ticker=sector_index_ticker,
+        horizons=horizons,
+        now=now,
+    )
+    return outcomes
 
 
 def _needs_recompute(session, event, horizons: tuple[int, ...]) -> bool:

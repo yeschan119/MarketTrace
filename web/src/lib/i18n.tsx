@@ -262,6 +262,12 @@ const en: Dict = {
       direction: "Direction",
       eventType: "Event type",
       confidence: "Confidence",
+      company: "Company",
+      companyPlaceholder: "Search ticker or name…",
+      recomputeNote:
+        "Changing the company re-fetches prices and recomputes this event's returns.",
+      recomputeFailed:
+        "Price fetch failed while recomputing — the company was not changed.",
       save: "Save",
       saving: "Saving…",
       noChanges: "No changes",
@@ -719,6 +725,10 @@ const ko: Dict = {
       direction: "방향",
       eventType: "사건유형",
       confidence: "신뢰도",
+      company: "종목",
+      companyPlaceholder: "티커·종목명 검색…",
+      recomputeNote: "종목을 바꾸면 가격을 다시 받아 이 사건의 수익률을 재계산합니다.",
+      recomputeFailed: "재계산 중 가격 조회 실패 — 종목은 변경되지 않았습니다.",
       save: "저장",
       saving: "저장 중…",
       noChanges: "변경 없음",

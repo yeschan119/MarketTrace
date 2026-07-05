@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 from sqlalchemy.orm import Session
 
@@ -22,3 +22,19 @@ def get_db() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+def get_price_provider_factory() -> Callable[[str], object]:
+    """Return a ``market -> PriceProvider`` factory.
+
+    The instrument-correction path (PATCH /events/{id}) re-fetches prices to
+    recompute outcomes for the newly linked company. Isolating the factory as a
+    dependency lets tests inject a fake provider (no network) via
+    ``app.dependency_overrides[get_price_provider_factory]``.
+    """
+    from markettrace.providers.registry import get_price_provider
+
+    def factory(market: str) -> object:
+        return get_price_provider(market)
+
+    return factory

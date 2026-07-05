@@ -8,6 +8,7 @@ import type {
   EventTypeStat,
   EventTypeSignificance,
   InstrumentRanking,
+  InstrumentSummary,
   InstrumentTimeline,
   LedgerCategory,
   LedgerEntry,
@@ -184,6 +185,14 @@ export const api = {
     token: string
   ): Promise<EventDetail> {
     return apiPatch<EventDetail>(`/events/${id}`, patch, token);
+  },
+
+  listInstruments(q?: string, market?: string): Promise<InstrumentSummary[]> {
+    const query = new URLSearchParams();
+    if (q) query.set("q", q);
+    if (market) query.set("market", market);
+    const qs = query.toString();
+    return apiFetch<InstrumentSummary[]>(`/instruments${qs ? `?${qs}` : ""}`);
   },
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {
