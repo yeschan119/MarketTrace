@@ -103,11 +103,11 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 543 tests · ruff clean</span>
+      <span class="pill">✅ 579 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
       <span class="pill">🧭 방향 A: 측정·검증 우선</span>
-      <span class="pill">✅ 코퍼스 486건 (KR 275 · US 211)</span>
-      <span class="pill">기준일: 2026-07-04</span>
+      <span class="pill">✅ 코퍼스 약 500건 (KR+US)</span>
+      <span class="pill">기준일: 2026-07-07</span>
     </div>
   </div>
 </header>
@@ -127,7 +127,7 @@
     <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">92%</div><div class="bar"><i style="width:92%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">95%</div><div class="bar"><i style="width:95%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">98%</div><div class="bar"><i style="width:98%"></i></div></div>
   </div>
 
   <!-- PIPELINE FLOW -->
@@ -289,8 +289,8 @@
   <!-- PHASE 5 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~95%</span></div>
-      <div class="pbar a"><i style="width:95%"></i></div><div class="pct-lbl" style="color:var(--amber)">95%</div>
+      <div class="title">Phase 5 · 사용자 기능 <span class="badge b-partial">진행 중 ~98%</span></div>
+      <div class="pbar a"><i style="width:98%"></i></div><div class="pct-lbl" style="color:var(--amber)">98%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -304,16 +304,20 @@
           <li class="ok"><b>종목별 매수판단 화면</b> — 종목 뷰에 검증신호 집계 <b>종합 판정</b>(주의/우호/혼조 + 평균 드리프트·검증사건수·충돌수) + <b>상승·하락 요인 분해</b>(유형별 검증 드리프트로 종목이 왜 오르내리나). 판정+근거 완성. <span class="commit">/instruments/{id}</span></li>
           <li class="ok"><b>종목 간 랭킹 + 매수판단 정교화</b> — 단순 평균을 <b>확신도 × 최근성 가중</b>(반감기 180일)으로 정교화해 전 종목을 가로질러 랭킹. 최근·고확신 사건이 더 크게 반영. 실측 38종목 랭킹(카카오·삼성·네이버 순 insider −6.6% 주의). <span class="commit">/rankings · GET /stats/instrument-ranking</span></li>
           <li class="ok"><b>관심종목 + 앱 내 알림</b> — watchlist(★)에 등록한 종목에 <b>검증 유의(significant) 유형</b> 이벤트가 뜨면 알림. LLM 방향이 검증 드리프트와 반대면 <b>충돌(conflict)</b>. 외부 인프라 없이 앱 내 알림함(헤더 벨 배지·<span class="commit">/alerts</span>)·읽음처리. 무료티어 스케줄러 없어 <b>ingest시 + 관심등록 즉시</b> 발화. 이벤트목록·랭킹·종목페이지에서 ★로 추가·<span class="commit">/watchlist</span> 목록. <span class="commit">watchlist_items·alerts 테이블(0008)</span></li>
+          <li class="ok"><b>종목 검색 진입점 (사용자 최종기능 ②)</b> — 티커·회사명·별칭(alias) 대소문자 무시 검색, 이벤트 많은 종목 우선. 검색 → 기존 종목 분석 뷰(타임라인·판정·요인)로 진입. <span class="commit">/instruments · GET /instruments/search</span></li>
+          <li class="ok"><b>급락 스크리너 + 정직한 하락 진단 (사용자 최종기능 ①)</b> — 20일 고점 대비 낙폭(수정주가)이 임계 이하인 종목을 검증 사건이력과 대비해 진단: <b>persistent_risk</b>(최근사건+검증 음드리프트=하락 지속 가능)·<b>unexplained_drop</b>(사건근거 없음=관찰)·<b>possible_overreaction</b>(비음(-)근거+하락=반등 후보). ★<b>랭킹 38종목이 전부 bearish·bullish 0</b> → 시스템은 "오를 종목"을 직접 주장하지 않음. 화면에 정직성 배너 명시. 최신가 선행용 <span class="commit">markettrace-refresh-prices</span> CLI + <span class="commit">/screener · GET /stats/drawdown-screener</span></li>
+          <li class="ok"><b>반등 백테스트 (스크리너 검증)</b> — possible_overreaction을 신호로 주장하기 전 검증. 고정 a priori 규칙(≤임계 하락 후 매수→horizon 순수익)이라 전부 표본외, 벤치마크 있으면 시장조정, 포지션 비중첩, 미채점(forward 없음)은 <b>n_dropped_no_outcome</b>로 정직집계. 가격이력 충분해질 때까지 "이력 부족"으로 관찰 유지. <span class="commit">GET /stats/rebound-backtest</span></li>
         </ul>
       </div>
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
-          <li class="ok" style="color:var(--green);font-weight:600">핵심 완료 — 알림까지 가동</li>
+          <li class="ok" style="color:var(--green);font-weight:600">핵심 완료 — 알림·검색·급락진단까지 가동</li>
+          <li class="no"><span style="color:var(--muted)"><b>운영 선행</b>: prod에서 <span class="commit">markettrace-refresh-prices</span> 실행해야 스크리너/반등백테스트에 실데이터(그 전엔 정직한 빈 상태)</span></li>
           <li class="no"><span style="color:var(--muted)">(선택) 외부 푸시(Telegram 등)·실시간 트리거 — 현재는 앱 내·ingest 발화</span></li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟢</b> — 타임라인·상세→검증신호(사건·통계·종목)→랭킹→<b>관심종목 알림</b>까지 전 층위 완결. 남은 건 선택적 외부 푸시뿐.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 타임라인·상세→검증신호(사건·통계·종목)→랭킹→<b>관심종목 알림</b>→<b>종목 검색·급락 진단</b>까지 전 층위 완결. 사용자 최종기능 2건 반영. 남은 건 가격 리프레시 <b>실행</b>(도구 준비완료)·선택적 외부 푸시.</div>
   </div>
 
   <!-- DATA MODEL -->
@@ -366,12 +370,12 @@
   </div>
 
   <!-- CURRENT DATA STATE -->
-  <h2><span class="num">▲</span> 현재 데이터 상태 <span style="font-size:13px;font-weight:500;color:var(--muted)">(라이브 API 확인 · 2026-07-04)</span></h2>
+  <h2><span class="num">▲</span> 현재 데이터 상태 <span style="font-size:13px;font-weight:500;color:var(--muted)">(라이브 API 확인 · 2026-07-07)</span></h2>
   <div class="grid2">
     <div class="mini">
-      <h3>✅ Events — 486건</h3>
+      <h3>✅ Events — 약 500건</h3>
       <ul class="items">
-        <li class="ok"><b>KR 275 · US 211 = 486건</b> · event_type은 이제 <b>정규 18계열</b>(enum 강제 + 0007 마이그레이션으로 파편화 축약, 라이브 확인)</li>
+        <li class="ok"><b>KR+US 약 500건</b>(라이브 확인, 지속 적재 중) · event_type은 <b>정규 18계열</b>(enum 강제 + 0007 마이그레이션으로 파편화 축약)</li>
         <li class="ok">유의 사건유형 <b>9버킷</b> 확인(p&lt;0.05, 표본충분). 전부 음(−) 초과수익 드리프트</li>
         <li class="ok"><b>상태 확인은 항상 라이브 API 먼저</b> — 정적 문서는 stale (6/17 "45건"으로 낡아 있었음)</li>
       </ul>
@@ -387,32 +391,32 @@
   </div>
 
   <!-- THIS SESSION -->
-  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-04 · 재추출 도구 → enum화 → 관심종목 알림)</span></h2>
+  <h2><span class="num">✓</span> 최근 성과 <span style="font-size:13px;font-weight:500;color:var(--muted)">(2026-07-07 · 사용자 최종기능 2건: 종목 검색 + 급락 스크리너/반등 백테스트)</span></h2>
   <div class="mini">
     <ul class="items">
-      <li class="ok"><b>event_type enum 강제 + 코퍼스 마이그레이션</b> — 정규 18계열을 추출 스키마 <span class="commit">enum</span>으로 강제(파편화 원천 차단) + validator canonicalize. 마이그레이션 0007이 기존 486건을 18계열로 결정론적 축약(무LLM비용)→ 라이브 significance/backtest 계열단위 재그룹핑. <span class="commit">nlp/taxonomy.py</span> 단일소스</li>
-      <li class="ok"><b>기존 코퍼스 재추출 도구</b> — <span class="commit">markettrace-reextract</span>: 개선 프롬프트를 기존 이벤트에 in-place 재적용(outcomes보존·impacts재빌드·검수스킵·dry-run 기본·재fetch). 배포됨, ⚠️prod 실행만 미완</li>
-      <li class="ok"><b>관심종목 + 앱 내 알림(Phase 5 마감)</b> — watchlist(★)·검증 유의/충돌 이벤트 알림(헤더 벨·<span class="commit">/alerts</span>·읽음). ingest+관심등록시 발화. 이벤트목록·랭킹·종목·<span class="commit">/watchlist</span>에서 ★ 추가. 테이블 0008</li>
-      <li class="ok"><b>종목 한글 이름 표시</b> — 이름 옆 연한 한글(국내·미국 40종목, 예 "NAVER Corporation 네이버"). 5개 화면. <span class="commit">lib/instrumentNames.ts</span></li>
+      <li class="ok"><b>종목 검색 진입점 (최종기능 ②)</b> — 상태분석 화면(타임라인·판정·요인)은 이미 대부분 존재 → 검색 진입점만 추가. 티커·회사명·별칭 대소문자 무시·이벤트 많은순. <span class="commit">/instruments · GET /instruments/search</span> (커밋 4e33339)</li>
+      <li class="ok"><b>급락 스크리너 + 정직한 하락 진단 (최종기능 ①)</b> — ★핵심: 랭킹 38종목 전부 bearish·bullish 0 = 시스템은 "내려갈 종목" 엣지지 "오를 종목" 아님 → "오른다" 직접주장 대신 <b>지속악재/원인미상/과잉반응</b> 진단으로 정직 재정의. 가격은 이벤트창에만 적재라 최신가 리프레시 잡(<span class="commit">markettrace-refresh-prices</span>) 선행. 20일 고점대비 낙폭(수정주가). <span class="commit">/screener · GET /stats/drawdown-screener</span> (커밋 2880c2e)</li>
+      <li class="ok"><b>반등 백테스트</b> — possible_overreaction을 신호로 주장하기 전 검증. 고정 규칙·전부 표본외·시장조정·비중첩·정직 커버리지(n_dropped_no_outcome). 가격이력 부족하면 "이력 부족"으로 관찰 유지. <span class="commit">impact/rebound_backtest.py · GET /stats/rebound-backtest</span> (커밋 087426d)</li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 513 → <b style="color:var(--ink)">543</b> · ruff 클린. 분류 파편화 <b>enum으로 원천 차단</b> + 기존 486건 <b>18계열 축약 배포</b>(무비용, 검정력↑).
-      Phase 2 88 → <b style="color:var(--ink)">92%</b> · Phase 5 82 → <b style="color:var(--ink)">95%</b>(알림까지 완결).</p>
+      테스트 543 → <b style="color:var(--ink)">579</b> · ruff 클린 · 프론트 tsc+build 통과. 3커밋 <b>push·배포 트리거됨</b>.
+      Phase 5 95 → <b style="color:var(--ink)">98%</b>(사용자 최종기능 2건 반영). ⚠️운영 선행: prod <span class="commit">markettrace-refresh-prices</span> 실행 후 실데이터.</p>
   </div>
 
   <!-- NEXT -->
   <h2><span class="num">»</span> 다음 추천 단계</h2>
   <div class="mini">
     <ul class="items next">
-      <li><b>① 기존 코퍼스 재추출 <i>실행</i></b> — 도구(<span class="commit">markettrace-reextract</span>)·enum·마이그레이션 모두 완료. 남은 건 prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행뿐 → 오분류 자체 교정·direction/confidence 갱신(enum 축약은 이미 반영됨). Render Shell에서 실행</li>
-      <li><b>② entity_linking F1 별도 측정</b> — entity_linker 경유로 종목 연결 정확도 실측(추출기 직접 측정은 회사명↔티커 미스매치로 무의미했음) + 엔티티 교정 UI</li>
-      <li><b>③ 데이터 수집 트랙</b> — 펀더멘털·수급을 동일 <code>SignalModel</code>로 + 상폐목록(KRX/OpenDART) 수집해 생존편향 차단. 착수비용 큰 별도 트랙</li>
-      <li><b>④ (선택) 외부 푸시 알림</b> — 현재 앱 내·ingest 발화. Telegram 등 외부 채널·실시간 트리거는 선택 확장</li>
+      <li><b>① 가격 리프레시 <i>실행</i> (급락 스크리너 가동)</b> — Render Shell에서 <span class="commit">markettrace-refresh-prices</span> 실행 → 유니버스 최근 일봉 적재 → <span class="commit">/screener</span>가 실제 급락 종목·진단을, <span class="commit">/stats/rebound-backtest</span>가 실제 표본을 표시. 주기적으로 돌릴수록 반등 백테스트 이력 축적 → possible_overreaction 검증</li>
+      <li><b>② 기존 코퍼스 재추출 <i>실행</i></b> — 도구(<span class="commit">markettrace-reextract</span>)·enum·마이그레이션 완료. prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행 → 오분류 교정·direction/confidence 갱신</li>
+      <li><b>③ entity_linking F1 별도 측정</b> — entity_linker 경유 종목 연결 정확도 실측 + 엔티티 교정 UI(로컬 브랜치 feat/entity-correction-ui 미머지)</li>
+      <li><b>④ 데이터 수집 트랙</b> — 펀더멘털·수급을 동일 <code>SignalModel</code>로 + 상폐목록(KRX/OpenDART) 수집해 생존편향 차단. 착수비용 큰 별도 트랙</li>
+      <li><b>⑤ (선택) 외부 푸시 알림</b> — 현재 앱 내·ingest 발화. Telegram 등 외부 채널·실시간 트리거는 선택 확장</li>
     </ul>
   </div>
 
   <footer>
-    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-04<br>
+    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-07<br>
     공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
   </footer>
 
