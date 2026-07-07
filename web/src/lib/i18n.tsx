@@ -16,6 +16,7 @@ type Dict = { [key: string]: string | Dict };
 
 const en: Dict = {
   nav: {
+    search: "Search",
     events: "Events",
     rankings: "Rankings",
     stats: "Stats",
@@ -26,6 +27,16 @@ const en: Dict = {
     watchlist: "Watchlist",
   },
   common: { unknownError: "Unknown error" },
+  search: {
+    title: "Search instruments",
+    subtitle: "Find a stock by ticker, name, or alias to see its analysis.",
+    placeholder: "Ticker, company name, or alias…",
+    searching: "Searching…",
+    noResults: "No instruments match “{q}”.",
+    hint: "Type at least one character to search.",
+    eventsCount: "{count} events",
+    noEvents: "no events yet",
+  },
   watchlist: {
     title: "Watchlist",
     subtitle: "Instruments you watch for alerts",
@@ -475,6 +486,7 @@ const en: Dict = {
 
 const ko: Dict = {
   nav: {
+    search: "검색",
     events: "이벤트",
     rankings: "랭킹",
     stats: "통계",
@@ -485,6 +497,16 @@ const ko: Dict = {
     watchlist: "관심종목",
   },
   common: { unknownError: "알 수 없는 오류" },
+  search: {
+    title: "종목 검색",
+    subtitle: "티커·회사명·별칭으로 종목을 찾아 분석 상태를 확인하세요.",
+    placeholder: "티커, 회사명, 또는 별칭…",
+    searching: "검색 중…",
+    noResults: "“{q}”에 해당하는 종목이 없습니다.",
+    hint: "검색하려면 한 글자 이상 입력하세요.",
+    eventsCount: "이벤트 {count}건",
+    noEvents: "아직 이벤트 없음",
+  },
   watchlist: {
     title: "관심종목",
     subtitle: "알림을 받을 관심종목 목록",

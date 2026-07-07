@@ -14,6 +14,12 @@ export function SiteHeader() {
           MarketTrace
         </a>
         <a
+          href="/instruments"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.search")}
+        </a>
+        <a
           href="/events"
           className="text-sm font-medium text-gray-600 hover:text-gray-900"
         >

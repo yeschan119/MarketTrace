@@ -87,6 +87,19 @@ class InstrumentOut(BaseModel):
     name: str
 
 
+class InstrumentSearchOut(BaseModel):
+    """Lightweight instrument row for the search entry point."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticker: str
+    name: str
+    market: str
+    industry: str | None = None
+    event_count: int
+
+
 class InstrumentTimeline(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

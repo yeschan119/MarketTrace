@@ -8,6 +8,7 @@ import type {
   EventTypeStat,
   EventTypeSignificance,
   InstrumentRanking,
+  InstrumentSearchResult,
   InstrumentTimeline,
   LedgerCategory,
   LedgerEntry,
@@ -188,6 +189,13 @@ export const api = {
 
   getInstrumentTimeline(id: string): Promise<InstrumentTimeline> {
     return apiFetch<InstrumentTimeline>(`/instruments/${id}/timeline`);
+  },
+
+  searchInstruments(q: string, limit = 20): Promise<InstrumentSearchResult[]> {
+    const query = new URLSearchParams({ q, limit: String(limit) });
+    return apiFetch<InstrumentSearchResult[]>(
+      `/instruments/search?${query.toString()}`
+    );
   },
 
   getInstrumentRanking(

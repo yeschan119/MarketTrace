@@ -16,6 +16,7 @@ from markettrace.api.main import create_app
 from markettrace.db.models import (
     Base,
     Document,
+    EntityAlias,
     Event,
     EventImpact,
     Instrument,
@@ -199,6 +200,59 @@ def test_instrument_timeline(client: TestClient, seeded: dict) -> None:
 def test_instrument_timeline_404(client: TestClient) -> None:
     resp = client.get("/instruments/99999/timeline")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /instruments/search
+# ---------------------------------------------------------------------------
+
+
+def test_search_instruments_by_ticker(client: TestClient, seeded: dict) -> None:
+    resp = client.get("/instruments/search", params={"q": "aapl"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    row = data[0]
+    assert row["id"] == seeded["instrument_id"]
+    assert row["ticker"] == "AAPL"
+    assert row["market"] == "US"
+    assert row["event_count"] == 1
+
+
+def test_search_instruments_by_name_case_insensitive(
+    client: TestClient, seeded: dict
+) -> None:
+    resp = client.get("/instruments/search", params={"q": "apple"})
+    assert resp.status_code == 200
+    assert [r["ticker"] for r in resp.json()] == ["AAPL"]
+
+
+def test_search_instruments_by_alias(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    ts_session.add(
+        EntityAlias(
+            instrument_id=seeded["instrument_id"],
+            alias="애플",
+            alias_type="brand",
+        )
+    )
+    ts_session.flush()
+    resp = client.get("/instruments/search", params={"q": "애플"})
+    assert resp.status_code == 200
+    assert [r["id"] for r in resp.json()] == [seeded["instrument_id"]]
+
+
+def test_search_instruments_blank_query_returns_empty(client: TestClient) -> None:
+    resp = client.get("/instruments/search", params={"q": "   "})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_search_instruments_no_match(client: TestClient, seeded: dict) -> None:
+    resp = client.get("/instruments/search", params={"q": "zzzznope"})
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 # ---------------------------------------------------------------------------

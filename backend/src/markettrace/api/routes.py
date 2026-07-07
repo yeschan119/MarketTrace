@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from markettrace.api.deps import get_db
@@ -20,6 +20,7 @@ from markettrace.api.schemas import (
     EventTypeStatOut,
     InstrumentOut,
     InstrumentRankingOut,
+    InstrumentSearchOut,
     InstrumentTimeline,
     MacroObservationOut,
     MacroSeriesBacktestOut,
@@ -28,6 +29,7 @@ from markettrace.api.schemas import (
 from markettrace.config import get_settings
 from markettrace.db.models import (
     Document,
+    EntityAlias,
     Event,
     Instrument,
     MacroObservation,
@@ -131,6 +133,55 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return build_event_detail(db, event)
+
+
+# Max rows returned by the search entry point regardless of the requested limit.
+_SEARCH_MAX_LIMIT = 50
+
+
+@router.get("/instruments/search", response_model=list[InstrumentSearchOut])
+def search_instruments(
+    q: str, limit: int = 20, db: Session = Depends(get_db)
+) -> list[InstrumentSearchOut]:
+    """Case-insensitive instrument search over ticker, name, and aliases.
+
+    Powers the search-box entry point into the per-instrument analysis view.
+    Results are ordered by how many events reference the instrument (most
+    covered first) so the richest analyses surface at the top.
+    """
+    query = q.strip()
+    if not query:
+        return []
+    capped = max(1, min(limit, _SEARCH_MAX_LIMIT))
+    like = f"%{query}%"
+    alias_ids = select(EntityAlias.instrument_id).where(EntityAlias.alias.ilike(like))
+    event_count = func.count(Event.id)
+    stmt = (
+        select(Instrument, event_count)
+        .outerjoin(Event, Event.primary_instrument_id == Instrument.id)
+        .where(
+            or_(
+                Instrument.ticker.ilike(like),
+                Instrument.name.ilike(like),
+                Instrument.id.in_(alias_ids),
+            )
+        )
+        .group_by(Instrument.id)
+        .order_by(event_count.desc(), Instrument.ticker.asc())
+        .limit(capped)
+    )
+    rows = db.execute(stmt).all()
+    return [
+        InstrumentSearchOut(
+            id=inst.id,
+            ticker=inst.ticker,
+            name=inst.name,
+            market=inst.market,
+            industry=inst.industry,
+            event_count=count,
+        )
+        for inst, count in rows
+    ]
 
 
 @router.get("/instruments/{instrument_id}/timeline", response_model=InstrumentTimeline)

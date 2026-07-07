@@ -169,6 +169,15 @@ export interface InstrumentTimeline {
   events: EventSummary[];
 }
 
+export interface InstrumentSearchResult {
+  id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  industry: string | null;
+  event_count: number;
+}
+
 export interface TopFactor {
   event_type: string;
   drift: number;
