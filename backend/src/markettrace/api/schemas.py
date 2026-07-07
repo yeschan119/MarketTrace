@@ -169,6 +169,38 @@ class InstrumentRankingOut(BaseModel):
     top_factor: TopFactorOut | None
 
 
+class DrawdownScreenerOut(BaseModel):
+    """One sharply-fallen instrument plus the honest event-based diagnosis.
+
+    ``diagnosis`` is deliberately conservative given the corpus has no validated
+    *bullish* signal: it never asserts "will rise". ``possible_overreaction`` is
+    a candidate flag pending the mean-reversion backtest, not a buy call.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    instrument_id: int
+    ticker: str
+    name: str
+    market: str
+    # Drawdown from the trailing-window high (<= 0), and the bars behind it.
+    drawdown: float
+    current_price: float
+    current_date: date
+    high_price: float
+    high_date: date
+    latest_date: date
+    is_stale: bool
+    # Validated event context (reused from the instrument ranking).
+    recent_event_count: int
+    lean: str | None
+    weighted_score: float | None
+    validated_count: int
+    top_factor: TopFactorOut | None
+    # "persistent_risk" | "unexplained_drop" | "possible_overreaction"
+    diagnosis: str
+
+
 class BacktestResultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -19,6 +19,7 @@ const en: Dict = {
     search: "Search",
     events: "Events",
     rankings: "Rankings",
+    screener: "Drops",
     stats: "Stats",
     macro: "Macro",
     ledger: "Ledger",
@@ -36,6 +37,42 @@ const en: Dict = {
     hint: "Type at least one character to search.",
     eventsCount: "{count} events",
     noEvents: "no events yet",
+  },
+  screener: {
+    title: "Sharp drops",
+    subtitle:
+      "Stocks down hard from their 20-day high, each diagnosed against validated event history.",
+    disclaimer:
+      "This is a diagnosis, not a buy call. This system has no validated bullish signal — every validated event type drifts negative — so it never asserts a stock will rise. “Possible overreaction” flags a rebound candidate pending backtest validation only.",
+    loading: "Loading…",
+    failTitle: "Failed to load the screener.",
+    empty: "No instruments are down past the threshold with fresh prices.",
+    thresholdLabel: "Min drop",
+    includeStale: "Include stale prices",
+    staleTag: "stale",
+    col: {
+      instrument: "Instrument",
+      drawdown: "Drawdown",
+      priceRange: "Now / 20d high",
+      diagnosis: "Diagnosis",
+      recentEvents: "Recent events",
+      lean: "Validated lean",
+      topFactor: "Top factor",
+    },
+    diagnosis: {
+      persistent_risk: "Persistent risk",
+      unexplained_drop: "Unexplained drop",
+      possible_overreaction: "Possible overreaction",
+      persistent_riskDesc:
+        "Recent event(s) and a validated-negative lean — the fall is consistent with this name’s history; caution likely continues.",
+      unexplained_dropDesc:
+        "No recent events in our data explain this fall. An observation, not a signal — we have no event basis.",
+      possible_overreactionDesc:
+        "Recent event(s) but no validated-negative basis. A rebound candidate pending backtest validation — not a buy call.",
+    },
+    asOf: "as of {date}",
+    eventsInWindow: "{count} in 30d",
+    noLean: "—",
   },
   watchlist: {
     title: "Watchlist",
@@ -489,6 +526,7 @@ const ko: Dict = {
     search: "검색",
     events: "이벤트",
     rankings: "랭킹",
+    screener: "급락",
     stats: "통계",
     macro: "거시",
     ledger: "가계부",
@@ -506,6 +544,42 @@ const ko: Dict = {
     hint: "검색하려면 한 글자 이상 입력하세요.",
     eventsCount: "이벤트 {count}건",
     noEvents: "아직 이벤트 없음",
+  },
+  screener: {
+    title: "급락 종목",
+    subtitle:
+      "20일 고점 대비 큰폭 하락한 종목을, 검증된 사건 이력에 비추어 진단합니다.",
+    disclaimer:
+      "이것은 매수 추천이 아니라 진단입니다. 이 시스템은 검증된 상승 신호가 없습니다 — 검증된 사건유형은 전부 음(−)의 드리프트라 '오른다'를 주장하지 않습니다. '과잉반응 가능'은 백테스트 검증 전의 반등 후보 표시일 뿐입니다.",
+    loading: "불러오는 중…",
+    failTitle: "스크리너를 불러오지 못했습니다.",
+    empty: "기준치 이상 하락한 신선한 가격의 종목이 없습니다.",
+    thresholdLabel: "최소 낙폭",
+    includeStale: "오래된 가격 포함",
+    staleTag: "오래됨",
+    col: {
+      instrument: "종목",
+      drawdown: "낙폭",
+      priceRange: "현재가 / 20일 고점",
+      diagnosis: "진단",
+      recentEvents: "최근 사건",
+      lean: "검증 성향",
+      topFactor: "주요 요인",
+    },
+    diagnosis: {
+      persistent_risk: "지속 악재",
+      unexplained_drop: "원인 미상 하락",
+      possible_overreaction: "과잉반응 가능",
+      persistent_riskDesc:
+        "최근 사건 + 검증된 음(−) 성향 — 하락이 이 종목의 이력과 일치하며, 주의가 이어질 가능성.",
+      unexplained_dropDesc:
+        "데이터상 이 하락을 설명하는 최근 사건이 없습니다. 신호가 아니라 관찰 — 사건 근거가 없습니다.",
+      possible_overreactionDesc:
+        "최근 사건은 있으나 검증된 음(−) 근거는 없음. 백테스트 검증 전의 반등 후보 — 매수 신호 아님.",
+    },
+    asOf: "{date} 기준",
+    eventsInWindow: "30일 내 {count}건",
+    noLean: "—",
   },
   watchlist: {
     title: "관심종목",

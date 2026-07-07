@@ -42,6 +42,7 @@ markettrace-eval-live = "markettrace.eval.live_eval:main"
 markettrace-macro = "markettrace.pipeline.macro_ingest:main"
 markettrace-ingest = "markettrace.api.ingest:main"
 markettrace-reextract = "markettrace.pipeline.reextract:main"
+markettrace-refresh-prices = "markettrace.pipeline.price_refresh:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

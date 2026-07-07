@@ -32,6 +32,12 @@ export function SiteHeader() {
           {t("nav.rankings")}
         </a>
         <a
+          href="/screener"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {t("nav.screener")}
+        </a>
+        <a
           href="/watchlist"
           className="text-sm font-medium text-gray-600 hover:text-gray-900"
         >

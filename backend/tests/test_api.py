@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,6 +22,7 @@ from markettrace.db.models import (
     Instrument,
     MacroObservation,
     Outcome,
+    Price,
 )
 
 
@@ -253,6 +254,144 @@ def test_search_instruments_no_match(client: TestClient, seeded: dict) -> None:
     resp = client.get("/instruments/search", params={"q": "zzzznope"})
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# ---------------------------------------------------------------------------
+# GET /stats/drawdown-screener
+# ---------------------------------------------------------------------------
+
+# A clear -20% drop: peak 120, latest 96, over 12 consecutive bars.
+_DROP_CLOSES = [100, 105, 110, 115, 120, 118, 112, 108, 104, 100, 98, 96]
+
+
+def _seed_prices(
+    session: Session,
+    instrument_id: int,
+    closes: list[float],
+    *,
+    end: date | None = None,
+) -> None:
+    """Seed daily bars ending at ``end`` (default today), one per calendar day."""
+    end = end or date.today()
+    n = len(closes)
+    for i, c in enumerate(closes):
+        session.add(
+            Price(
+                instrument_id=instrument_id,
+                date=end - timedelta(days=n - 1 - i),
+                open=c,
+                high=c,
+                low=c,
+                close=c,
+                adj_close=c,
+                volume=1_000_000.0,
+            )
+        )
+    session.flush()
+
+
+def _add_instrument(session: Session, ticker: str, name: str) -> Instrument:
+    inst = Instrument(market="US", ticker=ticker, name=name)
+    session.add(inst)
+    session.flush()
+    return inst
+
+
+def test_drawdown_screener_flags_drop(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    inst_id = seeded["instrument_id"]
+    _seed_prices(ts_session, inst_id, _DROP_CLOSES)
+
+    resp = client.get("/stats/drawdown-screener", params={"threshold": -0.15})
+    assert resp.status_code == 200
+    row = next(r for r in resp.json() if r["instrument_id"] == inst_id)
+
+    assert row["drawdown"] == pytest.approx(96 / 120 - 1)
+    assert row["high_price"] == 120
+    assert row["current_price"] == 96
+    assert row["is_stale"] is False
+    # The seeded earnings event is from 2024 — not within recent_days — so the
+    # drop has no event basis in our data.
+    assert row["recent_event_count"] == 0
+    assert row["diagnosis"] == "unexplained_drop"
+
+
+def test_drawdown_screener_excludes_shallow_drop(
+    client: TestClient, ts_session: Session
+) -> None:
+    inst = _add_instrument(ts_session, "SHAL", "Shallow Co")
+    # Peak 104, latest 98 -> about -5.8%, above the -15% threshold.
+    _seed_prices(ts_session, inst.id, [100, 101, 102, 103, 104, 103, 102, 101, 100, 99, 98])
+
+    resp = client.get("/stats/drawdown-screener", params={"threshold": -0.15})
+    ids = [r["instrument_id"] for r in resp.json()]
+    assert inst.id not in ids
+
+
+def test_drawdown_screener_staleness(
+    client: TestClient, ts_session: Session
+) -> None:
+    inst = _add_instrument(ts_session, "STAL", "Stale Co")
+    _seed_prices(
+        ts_session, inst.id, _DROP_CLOSES, end=date.today() - timedelta(days=30)
+    )
+
+    # Stale prices are excluded by default...
+    resp = client.get("/stats/drawdown-screener", params={"threshold": -0.15})
+    assert inst.id not in [r["instrument_id"] for r in resp.json()]
+
+    # ...but returned (flagged) when include_stale is set.
+    resp2 = client.get(
+        "/stats/drawdown-screener",
+        params={"threshold": -0.15, "include_stale": True},
+    )
+    row = next(r for r in resp2.json() if r["instrument_id"] == inst.id)
+    assert row["is_stale"] is True
+
+
+def test_drawdown_screener_recent_event_is_overreaction(
+    client: TestClient, ts_session: Session
+) -> None:
+    inst = _add_instrument(ts_session, "OVR", "Overreact Co")
+    _seed_prices(ts_session, inst.id, _DROP_CLOSES)
+
+    doc = Document(
+        source="reuters",
+        external_id="ovr-1",
+        url="https://example.com/ovr/1",
+        content_hash="ovrhash1",
+        market="US",
+        published_at=datetime.now(UTC),
+        first_seen_at=_now(),
+    )
+    ts_session.add(doc)
+    ts_session.flush()
+    ts_session.add(
+        Event(
+            document_id=doc.id,
+            primary_instrument_id=inst.id,
+            event_type="product_launch",
+            direction="positive",
+            confidence=0.8,
+            horizon_days=5,
+            model="gpt-4",
+            model_version="2024-01",
+            analyzed_at=_now(),
+        )
+    )
+    ts_session.flush()
+
+    resp = client.get("/stats/drawdown-screener", params={"threshold": -0.15})
+    row = next(r for r in resp.json() if r["instrument_id"] == inst.id)
+    # A recent event exists but nothing validates a negative lean -> candidate.
+    assert row["recent_event_count"] == 1
+    assert row["diagnosis"] == "possible_overreaction"
+
+
+def test_drawdown_screener_rejects_positive_threshold(client: TestClient) -> None:
+    resp = client.get("/stats/drawdown-screener", params={"threshold": 0.1})
+    assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------

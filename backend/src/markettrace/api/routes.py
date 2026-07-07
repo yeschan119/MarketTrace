@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, select
@@ -13,6 +13,7 @@ from markettrace.api.schemas import (
     BacktestResultOut,
     CalibrationReportOut,
     DocumentOut,
+    DrawdownScreenerOut,
     EventContributionOut,
     EventDetail,
     EventSummary,
@@ -25,6 +26,7 @@ from markettrace.api.schemas import (
     MacroObservationOut,
     MacroSeriesBacktestOut,
     OutcomeOut,
+    TopFactorOut,
 )
 from markettrace.config import get_settings
 from markettrace.db.models import (
@@ -34,6 +36,7 @@ from markettrace.db.models import (
     Instrument,
     MacroObservation,
     Outcome,
+    Price,
 )
 from markettrace.impact.backtest import (
     DEFAULT_MIN_TRAIN_PER_TYPE,
@@ -41,6 +44,12 @@ from markettrace.impact.backtest import (
     run_walk_forward_backtest,
 )
 from markettrace.impact.calibration import compute_confidence_calibration
+from markettrace.impact.drawdown import (
+    DEFAULT_WINDOW,
+    PricePoint,
+    classify_drop,
+    compute_drawdown,
+)
 from markettrace.impact.instrument_ranking import (
     DEFAULT_HALF_LIFE_DAYS,
     RankingEventInput,
@@ -287,6 +296,132 @@ def get_instrument_ranking(
         inputs, significance, date.today(), half_life_days=half_life_days
     )
     return [InstrumentRankingOut.model_validate(r) for r in ranked[:limit]]
+
+
+@router.get("/stats/drawdown-screener", response_model=list[DrawdownScreenerOut])
+def get_drawdown_screener(
+    threshold: float = -0.15,
+    window: int = DEFAULT_WINDOW,
+    max_stale_days: int = 5,
+    recent_days: int = 30,
+    include_stale: bool = False,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> list[DrawdownScreenerOut]:
+    """Screen sharply-fallen instruments and diagnose each against event history.
+
+    Feature 1: of the names down hard, which fall is *explained* by validated
+    negative-drift events (``persistent_risk``), which has *no* event basis in
+    our data (``unexplained_drop``), and which dropped despite a non-negative
+    validated basis (``possible_overreaction`` — a rebound *candidate* pending
+    the mean-reversion backtest, never a buy call).
+
+    Drawdown is measured from the trailing ``window`` trading-day high on adjusted
+    closes. Only instruments down at least ``threshold`` (e.g. -0.15) are
+    returned. Prices here are refreshed by ``markettrace-refresh-prices``; an
+    instrument whose latest bar is older than ``max_stale_days`` is flagged
+    ``is_stale`` and excluded unless ``include_stale`` is set (a stale drawdown
+    does not describe *today*). Sorted by drawdown ascending (deepest first).
+    """
+    if window < 1:
+        raise HTTPException(status_code=400, detail="window must be positive")
+    if threshold > 0:
+        raise HTTPException(status_code=400, detail="threshold must be <= 0")
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be positive")
+
+    today = date.today()
+    recent_cutoff = today - timedelta(days=recent_days)
+
+    # Validated event context, reused from the instrument ranking so the drop
+    # diagnosis rests on the same significance gate as the rest of the app.
+    significance = compute_event_type_significance(db)
+    rank_stmt = (
+        select(Event, Document)
+        .join(Document, Event.document_id == Document.id)
+        .where(Event.primary_instrument_id.is_not(None))
+    )
+    inputs: list[RankingEventInput] = []
+    recent_event_counts: dict[int, int] = {}
+    for event, document in db.execute(rank_stmt).all():
+        instrument = event.primary_instrument
+        if instrument is None:
+            continue
+        inputs.append(
+            RankingEventInput(
+                instrument_id=instrument.id,
+                ticker=instrument.ticker,
+                name=instrument.name,
+                market=instrument.market,
+                event_type=event.event_type,
+                direction=event.direction,
+                confidence=event.confidence,
+                published_at=document.published_at,
+                reviewed_at=event.reviewed_at,
+            )
+        )
+        if document.published_at.date() >= recent_cutoff:
+            recent_event_counts[instrument.id] = (
+                recent_event_counts.get(instrument.id, 0) + 1
+            )
+
+    ranked_by_id = {
+        r.instrument_id: r
+        for r in rank_instruments(inputs, significance, today)
+    }
+
+    rows: list[DrawdownScreenerOut] = []
+    instruments = db.scalars(
+        select(Instrument).where(Instrument.delisted_at.is_(None))
+    ).all()
+    for inst in instruments:
+        price_rows = db.execute(
+            select(Price.date, Price.adj_close)
+            .where(Price.instrument_id == inst.id)
+            .order_by(Price.date.desc())
+            .limit(window)
+        ).all()
+        result = compute_drawdown(
+            [PricePoint(date=d, adj_close=ac) for d, ac in price_rows],
+            window=window,
+        )
+        if result is None or result.drawdown > threshold:
+            continue
+
+        is_stale = (today - result.latest_date).days > max_stale_days
+        if is_stale and not include_stale:
+            continue
+
+        recent_count = recent_event_counts.get(inst.id, 0)
+        rk = ranked_by_id.get(inst.id)
+        rows.append(
+            DrawdownScreenerOut(
+                instrument_id=inst.id,
+                ticker=inst.ticker,
+                name=inst.name,
+                market=inst.market,
+                drawdown=result.drawdown,
+                current_price=result.current_price,
+                current_date=result.current_date,
+                high_price=result.high_price,
+                high_date=result.high_date,
+                latest_date=result.latest_date,
+                is_stale=is_stale,
+                recent_event_count=recent_count,
+                lean=rk.lean if rk else None,
+                weighted_score=rk.weighted_score if rk else None,
+                validated_count=rk.validated_count if rk else 0,
+                top_factor=(
+                    TopFactorOut.model_validate(rk.top_factor)
+                    if rk and rk.top_factor
+                    else None
+                ),
+                diagnosis=classify_drop(rk.lean if rk else None, recent_count),
+            )
+        )
+
+    rows.sort(key=lambda r: r.drawdown)
+    return rows[:limit]
 
 
 @router.get("/stats/backtest", response_model=list[BacktestResultOut])

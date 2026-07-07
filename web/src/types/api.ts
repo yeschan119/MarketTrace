@@ -184,6 +184,31 @@ export interface TopFactor {
   count: number;
 }
 
+export type DropDiagnosis =
+  | "persistent_risk"
+  | "unexplained_drop"
+  | "possible_overreaction";
+
+export interface DrawdownScreenerRow {
+  instrument_id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  drawdown: number;
+  current_price: number;
+  current_date: string;
+  high_price: number;
+  high_date: string;
+  latest_date: string;
+  is_stale: boolean;
+  recent_event_count: number;
+  lean: "bearish" | "bullish" | "neutral" | null;
+  weighted_score: number | null;
+  validated_count: number;
+  top_factor: TopFactor | null;
+  diagnosis: DropDiagnosis;
+}
+
 export interface InstrumentRanking {
   instrument_id: number;
   ticker: string;

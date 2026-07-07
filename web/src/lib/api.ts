@@ -7,6 +7,7 @@ import type {
   EventUpdate,
   EventTypeStat,
   EventTypeSignificance,
+  DrawdownScreenerRow,
   InstrumentRanking,
   InstrumentSearchResult,
   InstrumentTimeline,
@@ -206,6 +207,17 @@ export const api = {
     if (halfLifeDays != null) query.set("half_life_days", String(halfLifeDays));
     return apiFetch<InstrumentRanking[]>(
       `/stats/instrument-ranking?${query.toString()}`
+    );
+  },
+
+  getDrawdownScreener(
+    threshold = -0.15,
+    includeStale = false
+  ): Promise<DrawdownScreenerRow[]> {
+    const query = new URLSearchParams({ threshold: String(threshold) });
+    if (includeStale) query.set("include_stale", "true");
+    return apiFetch<DrawdownScreenerRow[]>(
+      `/stats/drawdown-screener?${query.toString()}`
     );
   },
 
