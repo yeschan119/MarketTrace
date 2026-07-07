@@ -8,6 +8,7 @@ import type {
   EventTypeStat,
   EventTypeSignificance,
   DrawdownScreenerRow,
+  ReboundBacktestRow,
   InstrumentRanking,
   InstrumentSearchResult,
   InstrumentTimeline,
@@ -218,6 +219,13 @@ export const api = {
     if (includeStale) query.set("include_stale", "true");
     return apiFetch<DrawdownScreenerRow[]>(
       `/stats/drawdown-screener?${query.toString()}`
+    );
+  },
+
+  getReboundBacktest(threshold = -0.15): Promise<ReboundBacktestRow[]> {
+    const query = new URLSearchParams({ threshold: String(threshold) });
+    return apiFetch<ReboundBacktestRow[]>(
+      `/stats/rebound-backtest?${query.toString()}`
     );
   },
 

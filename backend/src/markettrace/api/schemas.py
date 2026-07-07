@@ -201,6 +201,32 @@ class DrawdownScreenerOut(BaseModel):
     diagnosis: str
 
 
+class ReboundBacktestOut(BaseModel):
+    """Out-of-sample result of the mean-reversion drop->rebound rule at one horizon.
+
+    Validates (or refutes) the screener's ``possible_overreaction`` flag. A large
+    ``n_dropped_no_outcome`` relative to ``n_signals`` means sparse price history —
+    the numbers are underpowered, not an edge.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    horizon_days: int
+    threshold: float
+    window: int
+    n_signals_total: int
+    n_dropped_no_outcome: int
+    n_signals: int
+    hit_rate: float | None
+    mean_forward_return: float | None
+    mean_forward_return_net: float | None
+    mean_abnormal_return: float | None
+    mean_abnormal_return_net: float | None
+    market_adjusted: bool
+    commission_per_trade: float
+    slippage_per_trade: float
+
+
 class BacktestResultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

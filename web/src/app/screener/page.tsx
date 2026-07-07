@@ -8,9 +8,108 @@ import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { KoreanName } from "@/components/KoreanName";
 import { WatchButton } from "@/components/WatchButton";
-import type { DropDiagnosis, DrawdownScreenerRow } from "@/types/api";
+import type {
+  DropDiagnosis,
+  DrawdownScreenerRow,
+  ReboundBacktestRow,
+} from "@/types/api";
 
 const THRESHOLD = -0.15;
+
+function ReboundBacktestPanel() {
+  const { t } = useI18n();
+  const { data } = useQuery({
+    queryKey: ["rebound-backtest", THRESHOLD],
+    queryFn: () => api.getReboundBacktest(THRESHOLD),
+  });
+
+  const rows: ReboundBacktestRow[] = data ?? [];
+  const totalScored = rows.reduce((s, r) => s + r.n_signals, 0);
+  const marketAdjusted = rows.some((r) => r.market_adjusted);
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-900">
+          {t("screener.rebound.title")}
+        </h2>
+        {totalScored > 0 ? (
+          <span className="text-xs text-gray-400">
+            {marketAdjusted
+              ? t("screener.rebound.marketAdjusted")
+              : t("screener.rebound.raw")}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 text-xs text-gray-500">{t("screener.rebound.subtitle")}</p>
+
+      {totalScored === 0 ? (
+        <p className="mt-3 rounded border border-dashed border-gray-300 p-3 text-xs text-gray-500">
+          {t("screener.rebound.insufficient")}
+        </p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[520px] text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-left uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4 font-medium">
+                  {t("screener.rebound.colHorizon")}
+                </th>
+                <th className="py-2 pr-4 text-right font-medium">
+                  {t("screener.rebound.colSignals")}
+                </th>
+                <th className="py-2 pr-4 text-right font-medium">
+                  {t("screener.rebound.colHitRate")}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t("screener.rebound.colNet")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const net = r.market_adjusted
+                  ? r.mean_abnormal_return_net
+                  : r.mean_forward_return_net;
+                return (
+                  <tr key={r.horizon_days} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 pr-4 font-mono text-gray-700">
+                      {t("screener.rebound.days", { n: r.horizon_days })}
+                    </td>
+                    <td className="py-2 pr-4 text-right text-gray-600">
+                      {r.n_signals === 0
+                        ? "—"
+                        : t("screener.rebound.coverage", {
+                            scored: r.n_signals,
+                            dropped: r.n_dropped_no_outcome,
+                          })}
+                    </td>
+                    <td className="py-2 pr-4 text-right font-mono text-gray-700">
+                      {r.hit_rate == null ? "—" : `${(r.hit_rate * 100).toFixed(0)}%`}
+                    </td>
+                    <td
+                      className={`py-2 text-right font-mono font-semibold ${
+                        net == null
+                          ? "text-gray-400"
+                          : net > 0
+                            ? "text-emerald-700"
+                            : "text-amber-700"
+                      }`}
+                    >
+                      {net == null
+                        ? "—"
+                        : `${net > 0 ? "+" : ""}${(net * 100).toFixed(1)}%`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const diagnosisStyles: Record<DropDiagnosis, string> = {
   persistent_risk: "border-amber-300 bg-amber-50 text-amber-800",
@@ -47,6 +146,8 @@ export default function ScreenerPage() {
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
         {t("screener.disclaimer")}
       </div>
+
+      <ReboundBacktestPanel />
 
       <label className="inline-flex items-center gap-2 text-sm text-gray-600">
         <input

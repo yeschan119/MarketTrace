@@ -395,6 +395,35 @@ def test_drawdown_screener_rejects_positive_threshold(client: TestClient) -> Non
 
 
 # ---------------------------------------------------------------------------
+# GET /stats/rebound-backtest
+# ---------------------------------------------------------------------------
+
+
+def test_rebound_backtest_scores_a_drop(
+    client: TestClient, ts_session: Session
+) -> None:
+    inst = _add_instrument(ts_session, "REB", "Rebound Co")
+    # Flat then a cliff (-20%) then recovery: a scorable 1-day rebound signal.
+    _seed_prices(
+        ts_session, inst.id, [100.0] * 12 + [80, 88, 90], end=date(2026, 2, 1)
+    )
+
+    resp = client.get("/stats/rebound-backtest", params={"threshold": -0.15})
+    assert resp.status_code == 200
+    data = resp.json()
+    horizons = {r["horizon_days"] for r in data}
+    assert horizons == {1, 5, 20, 60}
+    h1 = next(r for r in data if r["horizon_days"] == 1)
+    assert h1["n_signals"] >= 1
+    assert h1["threshold"] == -0.15
+
+
+def test_rebound_backtest_rejects_positive_threshold(client: TestClient) -> None:
+    resp = client.get("/stats/rebound-backtest", params={"threshold": 0.2})
+    assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
 # GET /stats/event-types
 # ---------------------------------------------------------------------------
 

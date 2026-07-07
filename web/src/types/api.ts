@@ -184,6 +184,23 @@ export interface TopFactor {
   count: number;
 }
 
+export interface ReboundBacktestRow {
+  horizon_days: number;
+  threshold: number;
+  window: number;
+  n_signals_total: number;
+  n_dropped_no_outcome: number;
+  n_signals: number;
+  hit_rate: number | null;
+  mean_forward_return: number | null;
+  mean_forward_return_net: number | null;
+  mean_abnormal_return: number | null;
+  mean_abnormal_return_net: number | null;
+  market_adjusted: boolean;
+  commission_per_trade: number;
+  slippage_per_trade: number;
+}
+
 export type DropDiagnosis =
   | "persistent_risk"
   | "unexplained_drop"

@@ -73,6 +73,21 @@ const en: Dict = {
     asOf: "as of {date}",
     eventsInWindow: "{count} in 30d",
     noLean: "—",
+    rebound: {
+      title: "Rebound backtest",
+      subtitle:
+        "Does buying after such a drop pay off? Fixed rule, out-of-sample, net of costs.",
+      insufficient:
+        "Not enough clean price history to validate a rebound edge yet — refresh recent prices to build it. Until then “possible overreaction” stays an observation, not a signal.",
+      marketAdjusted: "market-adjusted",
+      raw: "raw (no benchmark)",
+      colHorizon: "Horizon",
+      colSignals: "Signals",
+      colHitRate: "Hit rate",
+      colNet: "Mean net return",
+      days: "{n}d",
+      coverage: "{scored} scored / {dropped} no outcome",
+    },
   },
   watchlist: {
     title: "Watchlist",
@@ -580,6 +595,21 @@ const ko: Dict = {
     asOf: "{date} 기준",
     eventsInWindow: "30일 내 {count}건",
     noLean: "—",
+    rebound: {
+      title: "반등 백테스트",
+      subtitle:
+        "이런 하락 후 매수가 유효한가? 고정 규칙·표본외·비용 차감.",
+      insufficient:
+        "반등 엣지를 검증할 만큼 깨끗한 가격 이력이 아직 부족합니다 — 최근가를 리프레시해 쌓으세요. 그때까지 '과잉반응 가능'은 신호가 아니라 관찰로 유지됩니다.",
+      marketAdjusted: "시장조정",
+      raw: "원시(벤치마크 없음)",
+      colHorizon: "기간",
+      colSignals: "신호",
+      colHitRate: "적중률",
+      colNet: "평균 순수익",
+      days: "{n}일",
+      coverage: "채점 {scored} / 결과없음 {dropped}",
+    },
   },
   watchlist: {
     title: "관심종목",

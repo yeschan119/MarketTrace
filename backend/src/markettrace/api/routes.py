@@ -26,6 +26,7 @@ from markettrace.api.schemas import (
     MacroObservationOut,
     MacroSeriesBacktestOut,
     OutcomeOut,
+    ReboundBacktestOut,
     TopFactorOut,
 )
 from markettrace.config import get_settings
@@ -55,6 +56,7 @@ from markettrace.impact.instrument_ranking import (
     RankingEventInput,
     rank_instruments,
 )
+from markettrace.impact.rebound_backtest import run_rebound_backtest
 from markettrace.impact.signal import SIGNAL_MODEL_NAMES, make_signal_model
 from markettrace.impact.significance import compute_event_type_significance
 from markettrace.impact.statistics import (
@@ -451,6 +453,36 @@ def get_backtest(
         for h in _BACKTEST_HORIZONS
     ]
     return [BacktestResultOut.model_validate(r) for r in results]
+
+
+@router.get("/stats/rebound-backtest", response_model=list[ReboundBacktestOut])
+def get_rebound_backtest(
+    threshold: float = -0.15,
+    db: Session = Depends(get_db),
+) -> list[ReboundBacktestOut]:
+    """Out-of-sample test of the drop->rebound rule behind ``possible_overreaction``.
+
+    For each horizon, measures the forward return after a name falls at least
+    ``threshold`` from its trailing-window high — net of costs and market-adjusted
+    where a benchmark is present. The rule is fixed a priori, so every signal is
+    out-of-sample. ``n_dropped_no_outcome`` exposes coverage: with sparse,
+    event-window-only prices the sample is thin until ``markettrace-refresh-prices``
+    accumulates history, and a thin sample is reported, not hidden.
+    """
+    if threshold > 0:
+        raise HTTPException(status_code=400, detail="threshold must be <= 0")
+
+    settings = get_settings()
+    benchmark_tickers = {"US": "SPY", "KR": settings.kr_market_index_ticker}
+    results = run_rebound_backtest(
+        db,
+        horizons=_BACKTEST_HORIZONS,
+        benchmark_tickers=benchmark_tickers,
+        threshold=threshold,
+        commission_per_trade=settings.backtest_commission_per_trade,
+        slippage_per_trade=settings.backtest_slippage_per_trade,
+    )
+    return [ReboundBacktestOut.model_validate(r) for r in results]
 
 
 @router.get("/stats/macro-decomposition", response_model=list[MacroSeriesBacktestOut])
