@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DocumentOut(BaseModel):
@@ -98,6 +98,57 @@ class InstrumentSearchOut(BaseModel):
     market: str
     industry: str | None = None
     event_count: int
+
+
+class InstrumentAnalyzeRequest(BaseModel):
+    """Login-gated ad hoc issuer analysis request from the search page."""
+
+    market: str
+    ticker: str | None = None
+    name: str | None = None
+    industry: str | None = None
+    max_filings: int = Field(default=10, ge=1, le=10)
+
+    @field_validator("market")
+    @classmethod
+    def _valid_market(cls, value: str) -> str:
+        market = value.strip().upper()
+        if market not in {"KR", "US"}:
+            raise ValueError("market must be KR or US")
+        return market
+
+    @field_validator("ticker")
+    @classmethod
+    def _valid_ticker(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        ticker = value.strip().upper()
+        if not ticker:
+            return None
+        if len(ticker) > 20:
+            raise ValueError("ticker is too long")
+        return ticker
+
+    @field_validator("name", "industry")
+    @classmethod
+    def _blank_to_none(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def _ticker_or_name_required(self) -> InstrumentAnalyzeRequest:
+        if self.ticker is None and self.name is None:
+            raise ValueError("ticker or name is required")
+        return self
+
+
+class InstrumentAnalyzeResponse(BaseModel):
+    status: str
+    market: str
+    ticker: str
+    max_filings: int
 
 
 class InstrumentTimeline(BaseModel):

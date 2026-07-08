@@ -15,10 +15,11 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import func, select
 
 from markettrace.api.auth import require_auth
+from markettrace.api.schemas import InstrumentAnalyzeRequest, InstrumentAnalyzeResponse
 from markettrace.config import get_settings
 from markettrace.db.models import Document
 from markettrace.db.session import make_engine, make_session_factory
@@ -29,6 +30,7 @@ from markettrace.pipeline.seed import (
     seed_watchlist,
 )
 from markettrace.pipeline.vertical_slice import recompute_document_outcomes, run_slice
+from markettrace.providers.base import IssuerResolution
 from markettrace.providers.caching import CachingPriceProvider
 from markettrace.providers.registry import (
     get_disclosure_provider,
@@ -36,7 +38,7 @@ from markettrace.providers.registry import (
 )
 from markettrace.storage.object_store import ObjectStore
 
-__all__ = ["router", "run_demo_ingest"]
+__all__ = ["router", "run_demo_ingest", "run_instrument_ingest"]
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +222,7 @@ def _ingest_issuer_filings(
     industry: str | None,
     market_index_ticker: str,
     forms,
+    limit: int | None = None,
 ) -> int:
     """Seed one corpus issuer and ingest its recent filings (idempotent).
 
@@ -244,8 +247,9 @@ def _ingest_issuer_filings(
         logger.exception("corpus: listing failed for %s", ticker)
         return 0
 
+    cap = limit if limit is not None else _CORPUS_PER_ISSUER
     ingested = 0
-    for ref in refs[:_CORPUS_PER_ISSUER]:
+    for ref in refs[:cap]:
         existing = session.scalars(
             select(Document).where(
                 Document.source == ref.source,
@@ -271,6 +275,131 @@ def _ingest_issuer_filings(
             logger.exception("corpus: ingest failed for %s/%s", ref.source, ref.external_id)
     logger.info("corpus: %s ingested %d new filing(s)", ticker, ingested)
     return ingested
+
+
+def _normalize_ad_hoc_ticker(market: str, ticker: str) -> str:
+    """Normalize user-entered ticker values for provider resolution."""
+    ticker = ticker.strip().upper()
+    if market == "KR" and ticker.isdigit() and len(ticker) < 6:
+        return ticker.zfill(6)
+    return ticker
+
+
+def _resolve_ad_hoc_issuer(
+    disclosure, request: InstrumentAnalyzeRequest
+) -> IssuerResolution | None:
+    """Resolve a user-entered ticker or company name to one provider issuer."""
+    queries: list[str] = []
+    if request.ticker:
+        queries.append(_normalize_ad_hoc_ticker(request.market, request.ticker))
+    if request.name and request.name not in queries:
+        queries.append(request.name)
+
+    for query in queries:
+        resolution = disclosure.resolve_issuer(query)
+        if resolution is not None:
+            return resolution
+    return None
+
+
+def _build_ad_hoc_providers(settings, market: str):
+    """Build disclosure/price providers and market-index config for ad hoc ingest."""
+    if market == "US":
+        return (
+            get_disclosure_provider("US", user_agent=settings.sec_user_agent),
+            CachingPriceProvider(get_price_provider("US")),
+            _CORPUS_MARKET_INDEX,
+            _CORPUS_FORMS,
+        )
+
+    if settings.opendart_api_key is None:
+        return (None, None, None, None)
+
+    return (
+        get_disclosure_provider("KR"),
+        CachingPriceProvider(get_price_provider("KR")),
+        settings.kr_market_index_ticker,
+        None,
+    )
+
+
+def _ingest_requested_instrument(
+    session,
+    store,
+    settings,
+    request: InstrumentAnalyzeRequest,
+) -> int:
+    """Resolve one requested issuer and run the vertical slice for recent filings.
+
+    This powers the search-page "analyze this ticker" action. It deliberately
+    drives providers by ticker, then reuses the same idempotent corpus ingestion
+    primitive as the scheduled/manual corpus path.
+    """
+    from markettrace.nlp.event_extractor import EventExtractor
+
+    market = request.market
+    disclosure, price, market_index_ticker, forms = _build_ad_hoc_providers(settings, market)
+    if disclosure is None or price is None or market_index_ticker is None:
+        logger.warning("ad-hoc ingest: disclosure provider unavailable for %s", market)
+        return 0
+
+    resolution = _resolve_ad_hoc_issuer(disclosure, request)
+    if resolution is None:
+        logger.warning(
+            "ad-hoc ingest: no issuer resolved for %s/%s",
+            market,
+            request.ticker or request.name,
+        )
+        return 0
+    industry = request.industry
+
+    return _ingest_issuer_filings(
+        session,
+        store,
+        disclosure=disclosure,
+        price=price,
+        extractor=EventExtractor(),
+        market=market,
+        issuer_id=resolution.issuer_id,
+        ticker=resolution.ticker,
+        name=resolution.name or request.name or resolution.ticker,
+        industry=industry,
+        market_index_ticker=market_index_ticker,
+        forms=forms,
+        limit=request.max_filings,
+    )
+
+
+def run_instrument_ingest(request: InstrumentAnalyzeRequest) -> None:
+    """Background worker for a single user-requested ticker analysis."""
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    session = make_session_factory(engine)()
+    store = ObjectStore(settings.object_store_dir)
+    try:
+        ingested = _ingest_requested_instrument(session, store, settings, request)
+        logger.info(
+            "ad-hoc ingest: completed %s/%s with %d new filing(s)",
+            request.market,
+            request.ticker,
+            ingested,
+        )
+        try:
+            from markettrace.impact.alerting import generate_watchlist_alerts
+
+            created = generate_watchlist_alerts(session)
+            if created:
+                logger.info("ad-hoc ingest: generated %d watchlist alert(s)", created)
+        except Exception:  # noqa: BLE001 - alerting must not abort the ingest
+            session.rollback()
+            logger.exception("ad-hoc ingest: watchlist alert generation failed")
+    except Exception:  # noqa: BLE001 - background failures must be logged with context
+        session.rollback()
+        logger.exception(
+            "ad-hoc ingest: failed for %s/%s", request.market, request.ticker
+        )
+    finally:
+        session.close()
 
 
 def _ingest_corpus_us(session, store, settings) -> None:
@@ -442,6 +571,47 @@ def ingest(
     """Start the demo ingestion in the background; return immediately."""
     background_tasks.add_task(run_demo_ingest)
     return {"status": "started"}
+
+
+@router.post(
+    "/instruments/analyze",
+    status_code=202,
+    response_model=InstrumentAnalyzeResponse,
+)
+def analyze_instrument(
+    request: InstrumentAnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_auth),
+) -> InstrumentAnalyzeResponse:
+    """Start ad hoc disclosure ingestion for one searched ticker.
+
+    The request is auth-gated because it can spend provider quota and LLM calls.
+    Work runs in the background; the Events page will show the new rows once the
+    filings have been fetched, extracted, and scored.
+    """
+    if request.market == "KR" and get_settings().opendart_api_key is None:
+        raise HTTPException(status_code=503, detail="OpenDART API key is not configured")
+    settings = get_settings()
+    disclosure, _, _, _ = _build_ad_hoc_providers(settings, request.market)
+    if disclosure is None:
+        raise HTTPException(status_code=503, detail="Disclosure provider is not configured")
+    resolution = _resolve_ad_hoc_issuer(disclosure, request)
+    if resolution is None:
+        raise HTTPException(status_code=404, detail="No matching listed company found")
+
+    normalized = request.model_copy(
+        update={
+            "ticker": resolution.ticker,
+            "name": resolution.name or request.name,
+        }
+    )
+    background_tasks.add_task(run_instrument_ingest, normalized)
+    return InstrumentAnalyzeResponse(
+        status="started",
+        market=normalized.market,
+        ticker=normalized.ticker,
+        max_filings=normalized.max_filings,
+    )
 
 
 def _ingest_summary(session) -> dict[str, object]:

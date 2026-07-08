@@ -19,11 +19,14 @@ from markettrace.api.ingest import (
     _ingest_corpus_us,
     _ingest_macro,
     _ingest_one,
+    _ingest_requested_instrument,
     _ingest_summary,
     main,
 )
 from markettrace.api.main import create_app
+from markettrace.api.schemas import InstrumentAnalyzeRequest
 from markettrace.db.models import Base, Document, Event, Instrument
+from markettrace.providers.base import IssuerResolution
 
 
 class _Settings:
@@ -88,6 +91,114 @@ def test_ingest_valid_token_returns_202(
     assert resp.status_code == 202
     assert resp.json() == {"status": "started"}
     assert called, "background ingest task was not scheduled/invoked"
+
+
+def test_analyze_instrument_no_auth_header(ingest_client: TestClient) -> None:
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "US", "ticker": "AAPL"},
+    )
+    assert resp.status_code == 401
+
+
+def test_analyze_instrument_valid_token_schedules_background_task(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    requests: list[InstrumentAnalyzeRequest] = []
+    monkeypatch.setattr(ingest_mod, "run_instrument_ingest", requests.append)
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            assert query == "AAPL"
+            return IssuerResolution("0000320193", "AAPL", "Apple Inc.")
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "us", "ticker": "aapl", "name": "Apple Inc."},
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 202
+    assert resp.json() == {
+        "status": "started",
+        "market": "US",
+        "ticker": "AAPL",
+        "max_filings": 10,
+    }
+    assert len(requests) == 1
+    assert requests[0].market == "US"
+    assert requests[0].ticker == "AAPL"
+
+
+def test_analyze_instrument_normalizes_short_kr_ticker(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    requests: list[InstrumentAnalyzeRequest] = []
+    monkeypatch.setattr(ingest_mod, "run_instrument_ingest", requests.append)
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            assert query == "005930"
+            return IssuerResolution("00126380", "005930", "삼성전자")
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "KR", "ticker": "5930", "max_filings": 3},
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 202
+    assert resp.json()["ticker"] == "005930"
+    assert requests[0].ticker == "005930"
+
+
+def test_analyze_instrument_company_name_only_resolves_ticker(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    requests: list[InstrumentAnalyzeRequest] = []
+    monkeypatch.setattr(ingest_mod, "run_instrument_ingest", requests.append)
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            assert query == "삼성전자"
+            return IssuerResolution("00126380", "005930", "삼성전자")
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "KR", "name": "삼성전자"},
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 202
+    assert resp.json()["ticker"] == "005930"
+    assert requests[0].ticker == "005930"
+    assert requests[0].name == "삼성전자"
+
+
+def test_analyze_instrument_unknown_company_returns_404(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    monkeypatch.setattr(ingest_mod, "run_instrument_ingest", lambda request: None)
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            return None
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "US", "name": "definitely unknown issuer"},
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +423,70 @@ def test_corpus_one_filing_failure_does_not_abort_issuer(
 
     # acc-0 failed but acc-1 was still ingested.
     assert sliced == ["acc-1"]
+
+
+def test_requested_us_instrument_resolves_ticker_and_ingests_recent_filings(
+    monkeypatch, mem_session, fake_settings
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            captured["query"] = query
+            return IssuerResolution("0001045810", "NVDA", "NVIDIA Corporation")
+
+        def list_for_issuer(self, issuer_id, since, *, primary_ticker=None, forms=None):
+            captured["issuer_id"] = issuer_id
+            captured["primary_ticker"] = primary_ticker
+            captured["forms"] = forms
+            return _corpus_refs(3)
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+    monkeypatch.setattr(ingest_mod, "get_price_provider", lambda *a, **kw: object())
+    monkeypatch.setattr("markettrace.nlp.event_extractor.EventExtractor", lambda *a, **kw: object())
+
+    sliced: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod, "run_slice", lambda *a, **kw: sliced.append(kw["ref"].external_id)
+    )
+
+    request = InstrumentAnalyzeRequest(
+        market="US",
+        ticker="nvda",
+        name="NVIDIA Corporation",
+        industry="Technology",
+        max_filings=2,
+    )
+    ingested = _ingest_requested_instrument(mem_session, None, fake_settings, request)
+
+    assert ingested == 2
+    assert captured["query"] == "NVDA"
+    assert captured["issuer_id"] == "0001045810"
+    assert captured["primary_ticker"] == "NVDA"
+    assert captured["forms"] == ingest_mod._CORPUS_FORMS
+    assert sliced == ["acc-0", "acc-1"]
+    inst = mem_session.query(Instrument).filter_by(ticker="NVDA").one()
+    assert inst.name == "NVIDIA Corporation"
+
+
+def test_requested_instrument_missing_issuer_id_is_noop(
+    monkeypatch, mem_session, fake_settings
+) -> None:
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            return None
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+    monkeypatch.setattr(ingest_mod, "get_price_provider", lambda *a, **kw: object())
+
+    sliced: list[bool] = []
+    monkeypatch.setattr(ingest_mod, "run_slice", lambda *a, **kw: sliced.append(True))
+
+    request = InstrumentAnalyzeRequest(market="US", ticker="NOPE", max_filings=2)
+    ingested = _ingest_requested_instrument(mem_session, None, fake_settings, request)
+
+    assert ingested == 0
+    assert not sliced
 
 
 # ---------------------------------------------------------------------------

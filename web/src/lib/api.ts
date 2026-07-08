@@ -10,6 +10,8 @@ import type {
   DrawdownScreenerRow,
   ReboundBacktestRow,
   InstrumentRanking,
+  InstrumentAnalyzeRequest,
+  InstrumentAnalyzeResponse,
   InstrumentSearchResult,
   InstrumentTimeline,
   LedgerCategory,
@@ -296,6 +298,17 @@ export const api = {
 
   ingest(token: string): Promise<{ status: string }> {
     return apiPost<{ status: string }>("/ingest", undefined, token);
+  },
+
+  analyzeInstrument(
+    request: InstrumentAnalyzeRequest,
+    token: string
+  ): Promise<InstrumentAnalyzeResponse> {
+    return apiPost<InstrumentAnalyzeResponse>(
+      "/instruments/analyze",
+      request,
+      token
+    );
   },
 
   getLedgerStatement(

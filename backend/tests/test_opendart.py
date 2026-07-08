@@ -28,6 +28,20 @@ PRIMARY_RCEPT_NO = "20240330000123"
 _KST = timezone(timedelta(hours=9))
 
 _XML_CONTENT = "<dart><company>삼성전자</company></dart>"
+_CORP_CODE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<result>
+  <list>
+    <corp_code>00126380</corp_code>
+    <corp_name>삼성전자</corp_name>
+    <stock_code>005930</stock_code>
+  </list>
+  <list>
+    <corp_code>00164779</corp_code>
+    <corp_name>현대자동차</corp_name>
+    <stock_code>005380</stock_code>
+  </list>
+</result>
+"""
 
 _STATUS_013_JSON = json.dumps({"status": "013", "message": "조회된 데이타가 없습니다."})
 _STATUS_ERROR_JSON = json.dumps({"status": "010", "message": "미등록 인증키입니다."})
@@ -42,6 +56,7 @@ def _make_zip(xml_text: str) -> bytes:
 
 
 _ZIP_BYTES = _make_zip(_XML_CONTENT)
+_CORP_CODE_ZIP_BYTES = _make_zip(_CORP_CODE_XML)
 
 
 def _make_handler(list_body: str, zip_bytes: bytes):
@@ -54,6 +69,17 @@ def _make_handler(list_body: str, zip_bytes: bytes):
                 200, text=list_body, headers={"Content-Type": "application/json"}
             )
         if "document.xml" in url:
+            return httpx.Response(
+                200, content=zip_bytes, headers={"Content-Type": "application/zip"}
+            )
+        return httpx.Response(404)
+
+    return handler
+
+
+def _make_corp_code_handler(zip_bytes: bytes):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "corpCode.xml" in str(request.url):
             return httpx.Response(
                 200, content=zip_bytes, headers={"Content-Type": "application/zip"}
             )
@@ -202,3 +228,40 @@ class TestListForIssuer:
         via_issuer = provider.list_for_issuer(CORP_CODE, since, primary_ticker="005930")
         via_corp = provider.list_for_corp(CORP_CODE, since, primary_ticker="005930")
         assert via_issuer == via_corp
+
+
+# ---------------------------------------------------------------------------
+# resolve_issuer
+# ---------------------------------------------------------------------------
+
+
+class TestResolveIssuer:
+    def test_resolves_by_stock_code(self):
+        transport = httpx.MockTransport(_make_corp_code_handler(_CORP_CODE_ZIP_BYTES))
+        client = httpx.Client(transport=transport)
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        resolved = provider.resolve_issuer("5930")
+
+        assert resolved is not None
+        assert resolved.issuer_id == "00126380"
+        assert resolved.ticker == "005930"
+        assert resolved.name == "삼성전자"
+
+    def test_resolves_by_company_name(self):
+        transport = httpx.MockTransport(_make_corp_code_handler(_CORP_CODE_ZIP_BYTES))
+        client = httpx.Client(transport=transport)
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        resolved = provider.resolve_issuer("현대자동차")
+
+        assert resolved is not None
+        assert resolved.issuer_id == "00164779"
+        assert resolved.ticker == "005380"
+
+    def test_unknown_returns_none(self):
+        transport = httpx.MockTransport(_make_corp_code_handler(_CORP_CODE_ZIP_BYTES))
+        client = httpx.Client(transport=transport)
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        assert provider.resolve_issuer("없는회사") is None

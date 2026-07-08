@@ -28,6 +28,15 @@ class RawDocument:
     content_bytes: bytes | None = None
 
 
+@dataclass(frozen=True)
+class IssuerResolution:
+    """A market provider's canonical issuer id + primary ticker match."""
+
+    issuer_id: str
+    ticker: str
+    name: str | None = None
+
+
 @runtime_checkable
 class DisclosureProvider(Protocol):
     market: str
@@ -43,6 +52,8 @@ class DisclosureProvider(Protocol):
     ) -> list[DocumentRef]: ...
 
     def fetch_raw(self, ref: DocumentRef) -> RawDocument: ...
+
+    def resolve_issuer(self, query: str) -> IssuerResolution | None: ...
 
 
 @runtime_checkable

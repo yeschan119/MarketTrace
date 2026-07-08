@@ -9,6 +9,7 @@ transport.
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from collections.abc import Collection
 from datetime import UTC, datetime, timedelta, timezone
@@ -16,7 +17,12 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
-from markettrace.providers.base import DisclosureProvider, DocumentRef, RawDocument
+from markettrace.providers.base import (
+    DisclosureProvider,
+    DocumentRef,
+    IssuerResolution,
+    RawDocument,
+)
 
 __all__ = ["OpenDartProvider"]
 
@@ -27,6 +33,33 @@ _VIEWER_URL = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
 
 # DART timestamps are Korea Standard Time (UTC+9).
 _KST = timezone(timedelta(hours=9))
+
+
+def _normalize_company_query(value: str) -> str:
+    """Normalize Korean/English issuer lookup text without losing Hangul."""
+    return " ".join(re.sub(r"[^\w]+", " ", value.casefold()).split())
+
+
+def _company_match_rank(query: str, ticker: str, name: str) -> tuple[int, int] | None:
+    normalized_query = _normalize_company_query(query)
+    normalized_ticker = _normalize_company_query(ticker)
+    normalized_name = _normalize_company_query(name)
+    if not normalized_query:
+        return None
+    if normalized_query == normalized_ticker:
+        return (0, len(normalized_name))
+    if normalized_query.isdigit() and normalized_ticker.endswith(normalized_query):
+        return (0, len(normalized_name))
+    if normalized_query == normalized_name:
+        return (1, len(normalized_name))
+    if normalized_name.startswith(normalized_query):
+        return (2, len(normalized_name))
+    if normalized_query in normalized_name:
+        return (3, len(normalized_name))
+    query_tokens = normalized_query.split()
+    if query_tokens and all(token in normalized_name for token in query_tokens):
+        return (4, len(normalized_name))
+    return None
 
 
 class OpenDartProvider:
@@ -169,6 +202,41 @@ class OpenDartProvider:
             if stock_code and stock_code in wanted and corp_code:
                 out[stock_code] = corp_code
         return out
+
+    def resolve_issuer(self, query: str) -> IssuerResolution | None:
+        """Resolve a KRX ticker or Korean company-name query via corpCode.xml."""
+        normalized_query = query.strip()
+        if not normalized_query:
+            return None
+
+        resp = self._client.get(_CORPCODE_URL, params={"crtfc_key": self._api_key})
+        resp.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
+            xml_bytes = archive.read(archive.namelist()[0])
+        root = ET.fromstring(xml_bytes)
+
+        best: tuple[tuple[int, int], IssuerResolution] | None = None
+        for item in root.iter("list"):
+            stock_code = (item.findtext("stock_code") or "").strip()
+            corp_code = (item.findtext("corp_code") or "").strip()
+            corp_name = (item.findtext("corp_name") or "").strip()
+            if not stock_code or not corp_code or not corp_name:
+                continue
+            rank = _company_match_rank(normalized_query, stock_code, corp_name)
+            if rank is None:
+                continue
+            candidate = (
+                rank,
+                IssuerResolution(
+                    issuer_id=corp_code,
+                    ticker=stock_code,
+                    name=corp_name,
+                ),
+            )
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+
+        return best[1] if best is not None else None
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all corps in the configured watchlist since ``since``.

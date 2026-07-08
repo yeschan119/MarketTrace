@@ -178,6 +178,21 @@ export interface InstrumentSearchResult {
   event_count: number;
 }
 
+export interface InstrumentAnalyzeRequest {
+  market: "KR" | "US";
+  ticker?: string | null;
+  name?: string | null;
+  industry?: string | null;
+  max_filings?: number;
+}
+
+export interface InstrumentAnalyzeResponse {
+  status: string;
+  market: string;
+  ticker: string;
+  max_filings: number;
+}
+
 export interface TopFactor {
   event_type: string;
   drift: number;

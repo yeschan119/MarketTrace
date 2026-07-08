@@ -7,6 +7,7 @@ an ``httpx.Client`` so tests can supply a mock transport.
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Collection
 from datetime import UTC, datetime
@@ -14,7 +15,12 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from markettrace.providers.base import DisclosureProvider, DocumentRef, RawDocument
+from markettrace.providers.base import (
+    DisclosureProvider,
+    DocumentRef,
+    IssuerResolution,
+    RawDocument,
+)
 
 if TYPE_CHECKING:
     pass
@@ -33,6 +39,31 @@ _ARCHIVE_URL = (
 _DEFAULT_MAX_RETRIES = 5
 _DEFAULT_BACKOFF_BASE = 1.0
 _RETRY_STATUS = frozenset({429, 503})
+
+
+def _normalize_company_query(value: str) -> str:
+    """Normalize ticker/company-name lookup text for conservative matching."""
+    return " ".join(re.sub(r"[^\w]+", " ", value.casefold()).split())
+
+
+def _company_match_rank(query: str, ticker: str, name: str) -> tuple[int, int] | None:
+    normalized_query = _normalize_company_query(query)
+    normalized_ticker = _normalize_company_query(ticker)
+    normalized_name = _normalize_company_query(name)
+    if not normalized_query:
+        return None
+    if normalized_query == normalized_ticker:
+        return (0, len(normalized_name))
+    if normalized_query == normalized_name:
+        return (1, len(normalized_name))
+    if normalized_name.startswith(normalized_query):
+        return (2, len(normalized_name))
+    if normalized_query in normalized_name:
+        return (3, len(normalized_name))
+    query_tokens = normalized_query.split()
+    if query_tokens and all(token in normalized_name for token in query_tokens):
+        return (4, len(normalized_name))
+    return None
 
 
 class SecEdgarProvider:
@@ -242,6 +273,35 @@ class SecEdgarProvider:
             if ticker in wanted and "cik_str" in row:
                 out[ticker] = f"{int(row['cik_str']):010d}"
         return out
+
+    def resolve_issuer(self, query: str) -> IssuerResolution | None:
+        """Resolve a ticker or company-name query via SEC's official ticker map."""
+        normalized_query = query.strip()
+        if not normalized_query:
+            return None
+
+        resp = self._get(_COMPANY_TICKERS_URL)
+        resp.raise_for_status()
+
+        best: tuple[tuple[int, int], IssuerResolution] | None = None
+        for row in resp.json().values():
+            ticker = str(row.get("ticker", "")).upper()
+            name = str(row.get("title", "")).strip()
+            if not ticker or not name or "cik_str" not in row:
+                continue
+            rank = _company_match_rank(normalized_query, ticker, name)
+            if rank is None:
+                continue
+            resolution = IssuerResolution(
+                issuer_id=f"{int(row['cik_str']):010d}",
+                ticker=ticker,
+                name=name,
+            )
+            candidate = (rank, resolution)
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+
+        return best[1] if best is not None else None
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all CIKs in the configured watchlist since ``since``.

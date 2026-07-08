@@ -30,13 +30,23 @@ const en: Dict = {
   common: { unknownError: "Unknown error" },
   search: {
     title: "Search instruments",
-    subtitle: "Find a stock by ticker, name, or alias to see its analysis.",
+    subtitle:
+      "Find a stock by ticker, name, or alias. If it is not in Events yet, run filing analysis by company name.",
     placeholder: "Ticker, company name, or alias…",
     searching: "Searching…",
     noResults: "No instruments match “{q}”.",
     hint: "Type at least one character to search.",
     eventsCount: "{count} events",
     noEvents: "no events yet",
+    tickerLabel: "Ticker (optional)",
+    nameLabel: "Company name",
+    namePlaceholder: "Optional",
+    analyzeButton: "Analyze filings",
+    analyzing: "Starting…",
+    analyzeStarted:
+      "{ticker} analysis started. New events will appear after extraction finishes.",
+    analyzeFailed: "Analysis request failed.",
+    loginRequired: "Log in to run analysis.",
   },
   screener: {
     title: "Sharp drops",
@@ -552,13 +562,23 @@ const ko: Dict = {
   common: { unknownError: "알 수 없는 오류" },
   search: {
     title: "종목 검색",
-    subtitle: "티커·회사명·별칭으로 종목을 찾아 분석 상태를 확인하세요.",
+    subtitle:
+      "티커·회사명·별칭으로 종목을 찾고, 이벤트에 없으면 회사명만으로 공시 분석을 실행하세요.",
     placeholder: "티커, 회사명, 또는 별칭…",
     searching: "검색 중…",
     noResults: "“{q}”에 해당하는 종목이 없습니다.",
     hint: "검색하려면 한 글자 이상 입력하세요.",
     eventsCount: "이벤트 {count}건",
     noEvents: "아직 이벤트 없음",
+    tickerLabel: "티커 (선택)",
+    nameLabel: "회사명",
+    namePlaceholder: "선택",
+    analyzeButton: "공시 분석",
+    analyzing: "시작 중…",
+    analyzeStarted:
+      "{ticker} 분석을 시작했습니다. 추출이 끝나면 이벤트에 표시됩니다.",
+    analyzeFailed: "분석 요청 실패",
+    loginRequired: "분석 실행은 로그인이 필요합니다.",
   },
   screener: {
     title: "급락 종목",

@@ -6,6 +6,7 @@ returns fixture data.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,6 +19,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 SUBMISSIONS_JSON = (FIXTURES / "sec_submissions.json").read_text()
 PRIMARY_DOC_HTML = (FIXTURES / "aapl_10q.html").read_text()
+COMPANY_TICKERS_JSON = json.dumps(
+    {
+        "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+        "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corporation"},
+        "2": {"cik_str": 1045810, "ticker": "NVDA", "title": "NVIDIA Corporation"},
+    }
+)
 
 CIK = "320193"
 SUBMISSIONS_URL = f"https://data.sec.gov/submissions/CIK{int(CIK):0>10}.json"
@@ -37,6 +45,19 @@ def _make_handler(submissions_body: str, doc_body: str):
             return httpx.Response(200, text=submissions_body, headers={"Content-Type": "application/json"})
         # Any primary-doc URL → return the HTML fixture.
         return httpx.Response(200, text=doc_body, headers={"Content-Type": "text/html"})
+
+    return handler
+
+
+def _make_company_handler(company_tickers_body: str):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "company_tickers.json" in str(request.url):
+            return httpx.Response(
+                200,
+                text=company_tickers_body,
+                headers={"Content-Type": "application/json"},
+            )
+        return httpx.Response(404)
 
     return handler
 
@@ -192,6 +213,37 @@ class TestListForIssuer:
         via_issuer = provider.list_for_issuer(CIK, since, primary_ticker="AAPL")
         via_cik = provider.list_for_cik(CIK, since, primary_ticker="AAPL")
         assert via_issuer == via_cik
+
+
+# ---------------------------------------------------------------------------
+# resolve_issuer
+# ---------------------------------------------------------------------------
+
+
+class TestResolveIssuer:
+    def test_resolves_by_ticker(self):
+        provider = _provider_with(_make_company_handler(COMPANY_TICKERS_JSON))
+
+        resolved = provider.resolve_issuer("aapl")
+
+        assert resolved is not None
+        assert resolved.issuer_id == "0000320193"
+        assert resolved.ticker == "AAPL"
+        assert resolved.name == "Apple Inc."
+
+    def test_resolves_by_company_name_prefix(self):
+        provider = _provider_with(_make_company_handler(COMPANY_TICKERS_JSON))
+
+        resolved = provider.resolve_issuer("Microsoft")
+
+        assert resolved is not None
+        assert resolved.issuer_id == "0000789019"
+        assert resolved.ticker == "MSFT"
+
+    def test_unknown_returns_none(self):
+        provider = _provider_with(_make_company_handler(COMPANY_TICKERS_JSON))
+
+        assert provider.resolve_issuer("not a listed company") is None
 
 
 # ---------------------------------------------------------------------------
