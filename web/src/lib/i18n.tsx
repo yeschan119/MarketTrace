@@ -173,6 +173,10 @@ const en: Dict = {
     companyEvents: "{n} events",
     noneInMarket: "No events in this market.",
     expandHint: "Select a company to see its events, latest first.",
+    searchLabel: "Search events",
+    searchPlaceholder: "Search ticker, company, event type, or direction...",
+    searchHint: "Search filters the selected market and signal view.",
+    searchCount: "{n} matching events",
     signalFilter: {
       all: "All",
       conflict: "Conflicts only",
@@ -180,6 +184,7 @@ const en: Dict = {
       validated: "Validated only",
     },
     reviewedMark: "Reviewed",
+    noneSearchResults: "No events match this search.",
     noneMatchFilter: "No events match this filter.",
   },
   stats: {
@@ -710,6 +715,10 @@ const ko: Dict = {
     companyEvents: "이벤트 {n}건",
     noneInMarket: "이 시장의 이벤트가 없습니다.",
     expandHint: "기업을 선택하면 해당 기업의 이벤트를 최신순으로 보여줍니다.",
+    searchLabel: "이벤트 검색",
+    searchPlaceholder: "티커, 회사명, 이벤트 유형, 방향 검색...",
+    searchHint: "검색은 선택한 시장과 신호 필터 안에서 적용됩니다.",
+    searchCount: "일치하는 이벤트 {n}건",
     signalFilter: {
       all: "전체",
       conflict: "충돌만",
@@ -717,6 +726,7 @@ const ko: Dict = {
       validated: "검증된 것만",
     },
     reviewedMark: "검토됨",
+    noneSearchResults: "이 검색어에 해당하는 이벤트가 없습니다.",
     noneMatchFilter: "이 필터에 해당하는 이벤트가 없습니다.",
   },
   stats: {

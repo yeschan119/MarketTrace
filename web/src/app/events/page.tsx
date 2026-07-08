@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Lang } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { DirectionBadge } from "@/components/DirectionBadge";
 import { KoreanName } from "@/components/KoreanName";
 import { WatchButton } from "@/components/WatchButton";
 import { ValidatedSignalBadge } from "@/components/ValidatedSignalBadge";
+import { koreanName } from "@/lib/instrumentNames";
 import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
 
@@ -37,6 +38,7 @@ export default function EventsPage() {
 
   const [market, setMarket] = useState<Market>("KR");
   const [signalFilter, setSignalFilter] = useState<SignalFilter>("all");
+  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const events = useMemo(() => data ?? [], [data]);
@@ -69,6 +71,7 @@ export default function EventsPage() {
   }, [events]);
 
   const groups = useMemo<CompanyGroup[]>(() => {
+    const normalizedQuery = normalizeSearch(query);
     const byTicker = new Map<string, CompanyGroup>();
     for (const event of events) {
       if (event.market !== market) continue;
@@ -81,6 +84,11 @@ export default function EventsPage() {
       )
         continue;
       if (signalFilter === "validated" && verdictFor(event) === "none")
+        continue;
+      if (
+        normalizedQuery &&
+        !eventMatchesQuery(event, normalizedQuery, lang)
+      )
         continue;
       const key = event.primary_ticker;
       let group = byTicker.get(key);
@@ -105,7 +113,12 @@ export default function EventsPage() {
     }
     result.sort((a, b) => b.events.length - a.events.length);
     return result;
-  }, [events, market, signalFilter, verdictFor]);
+  }, [events, lang, market, query, signalFilter, verdictFor]);
+
+  const visibleEventCount = useMemo(
+    () => groups.reduce((total, group) => total + group.events.length, 0),
+    [groups],
+  );
 
   if (isLoading) {
     return (
@@ -145,6 +158,12 @@ export default function EventsPage() {
     { key: "KR", label: t("events.tab.domestic"), count: counts.KR },
     { key: "US", label: t("events.tab.overseas"), count: counts.US },
   ];
+  const hasSearchQuery = query.trim() !== "";
+  const emptyMessageKey = hasSearchQuery
+    ? "events.noneSearchResults"
+    : signalFilter === "all"
+      ? "events.noneInMarket"
+      : "events.noneMatchFilter";
 
   return (
     <div>
@@ -156,57 +175,78 @@ export default function EventsPage() {
       </div>
       <p className="mb-6 text-sm text-gray-500">{t("events.expandHint")}</p>
 
-      <div className="mb-6 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setMarket(tab.key)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
-              market === tab.key
-                ? "bg-white text-indigo-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab.label}
-            <span className="ml-2 text-xs font-normal text-gray-400">
-              {tab.count}
-            </span>
-          </button>
-        ))}
+      <div className="mb-4 max-w-xl">
+        <label className="sr-only" htmlFor="event-search">
+          {t("events.searchLabel")}
+        </label>
+        <input
+          id="event-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("events.searchPlaceholder")}
+          className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+        <p className="mt-2 text-xs text-gray-400">
+          {query.trim()
+            ? t("events.searchCount", { n: visibleEventCount })
+            : t("events.searchHint")}
+        </p>
       </div>
 
-      <div className="mb-6 ml-0 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 sm:ml-3">
-        {(["all", "conflict", "needsReview", "validated"] as SignalFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setSignalFilter(f)}
-            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-              signalFilter === f
-                ? "bg-white text-indigo-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t(`events.signalFilter.${f}`)}
-          </button>
-        ))}
+      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setMarket(tab.key)}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
+                market === tab.key
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label}
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+          {(
+            ["all", "conflict", "needsReview", "validated"] as SignalFilter[]
+          ).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setSignalFilter(f)}
+              className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                signalFilter === f
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t(`events.signalFilter.${f}`)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {groups.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
-          {t(
-            signalFilter === "all"
-              ? "events.noneInMarket"
-              : "events.noneMatchFilter",
-          )}
+          {t(emptyMessageKey)}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
           {groups.map((group) => {
-            // Under an active signal filter, open groups so matches are visible.
+            // Under an active filter/search, open groups so matches are visible.
             const isOpen =
-              signalFilter !== "all" || expanded.has(group.ticker);
+              hasSearchQuery ||
+              signalFilter !== "all" ||
+              expanded.has(group.ticker);
             return (
               <div
                 key={group.ticker}
@@ -321,5 +361,29 @@ export default function EventsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function normalizeSearch(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function eventMatchesQuery(
+  event: EventSummary,
+  normalizedQuery: string,
+  lang: Lang,
+): boolean {
+  const typeInfo = describeEventType(event.event_type, lang);
+  const fields = [
+    event.primary_ticker,
+    event.instrument_name,
+    koreanName(event.primary_ticker),
+    event.event_type,
+    typeInfo.label,
+    typeInfo.desc,
+    event.direction,
+  ];
+  return fields.some((field) =>
+    field?.toLocaleLowerCase().includes(normalizedQuery),
   );
 }
