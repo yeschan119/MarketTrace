@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { KoreanName } from "@/components/KoreanName";
@@ -13,7 +13,7 @@ type Market = "KR" | "US";
 
 export default function InstrumentSearchPage() {
   const { t } = useI18n();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
@@ -52,6 +52,11 @@ export default function InstrumentSearchPage() {
       setNotice(t("search.analyzeStarted", { ticker: response.ticker }));
       queryClient.invalidateQueries({ queryKey: ["instrument-search"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
+    onError: (error) => {
+      if (isApiError(error) && error.status === 401) {
+        logout();
+      }
     },
   });
 
@@ -180,9 +185,7 @@ export default function InstrumentSearchPage() {
       )}
       {analyzeMutation.isError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {analyzeMutation.error instanceof Error
-            ? analyzeMutation.error.message
-            : t("search.analyzeFailed")}
+          {formatAnalyzeError(analyzeMutation.error, t)}
         </div>
       )}
     </div>
@@ -268,4 +271,16 @@ function inferTicker(query: string, market: Market): string {
     return /^\d{1,6}$/.test(trimmed) ? trimmed.padStart(6, "0") : "";
   }
   return /^[A-Za-z.]{1,10}$/.test(trimmed) ? trimmed.toUpperCase() : "";
+}
+
+function formatAnalyzeError(
+  error: unknown,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (isApiError(error)) {
+    if (error.status === 401) return t("search.sessionExpired");
+    if (error.status === 404) return t("search.noListedCompany");
+    if (error.status === 503) return t("search.providerUnavailable");
+  }
+  return error instanceof Error ? error.message : t("search.analyzeFailed");
 }

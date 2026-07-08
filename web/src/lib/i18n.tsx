@@ -47,6 +47,11 @@ const en: Dict = {
       "{ticker} analysis started. New events will appear after extraction finishes.",
     analyzeFailed: "Analysis request failed.",
     loginRequired: "Log in to run analysis.",
+    sessionExpired: "Session expired. Please log in again, then run analysis.",
+    noListedCompany:
+      "No matching listed KR/US company was found. Private companies such as SpaceX are not supported.",
+    providerUnavailable:
+      "The disclosure provider is not configured for this market.",
   },
   screener: {
     title: "Sharp drops",
@@ -579,6 +584,11 @@ const ko: Dict = {
       "{ticker} 분석을 시작했습니다. 추출이 끝나면 이벤트에 표시됩니다.",
     analyzeFailed: "분석 요청 실패",
     loginRequired: "분석 실행은 로그인이 필요합니다.",
+    sessionExpired: "세션이 만료되었습니다. 다시 로그인한 뒤 분석을 실행하세요.",
+    noListedCompany:
+      "일치하는 KR/US 상장사를 찾지 못했습니다. SpaceX 같은 비상장사는 지원하지 않습니다.",
+    providerUnavailable:
+      "이 시장의 공시 제공자가 설정되어 있지 않습니다.",
   },
   screener: {
     title: "급락 종목",
