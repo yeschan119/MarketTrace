@@ -26,6 +26,7 @@ const en: Dict = {
     passbook: "Passbook",
     alerts: "Alerts",
     watchlist: "Watchlist",
+    admin: "Admin",
   },
   common: { unknownError: "Unknown error" },
   search: {
@@ -573,6 +574,7 @@ const ko: Dict = {
     passbook: "통장관리",
     alerts: "알림",
     watchlist: "관심종목",
+    admin: "관리자",
   },
   common: { unknownError: "알 수 없는 오류" },
   search: {

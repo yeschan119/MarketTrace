@@ -1,6 +1,10 @@
 import type {
+  AdminUser,
+  AdminUserCreate,
+  AdminUserUpdate,
   BacktestModel,
   BacktestResult,
+  CurrentUser,
   EventContribution,
   EventSummary,
   EventDetail,
@@ -24,6 +28,9 @@ import type {
   PassbookEntry,
   PassbookStatement,
   PassbookStatementSummary,
+  RolePermission,
+  RolePermissionMatrix,
+  TabCatalog,
   MacroObservation,
   MacroSeriesBacktest,
   CalibrationReport,
@@ -122,6 +129,27 @@ async function apiPatch<T>(
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(url, {
     method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await buildApiError(res, url);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function apiPut<T>(
+  path: string,
+  body: unknown,
+  token?: string
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "PUT",
     headers,
     body: JSON.stringify(body),
   });
@@ -303,6 +331,59 @@ export const api = {
 
   login(username: string, password: string): Promise<{ token: string }> {
     return apiPost<{ token: string }>("/auth/login", { username, password });
+  },
+
+  getCurrentUser(token: string): Promise<CurrentUser> {
+    return apiFetch<CurrentUser>("/auth/me", token);
+  },
+
+  getTabCatalog(): Promise<TabCatalog> {
+    return apiFetch<TabCatalog>("/tabs");
+  },
+
+  listAdminUsers(token: string): Promise<{ users: AdminUser[] }> {
+    return apiFetch<{ users: AdminUser[] }>("/admin/users", token);
+  },
+
+  createAdminUser(
+    token: string,
+    payload: AdminUserCreate
+  ): Promise<AdminUser> {
+    return apiPost<AdminUser>("/admin/users", payload, token);
+  },
+
+  updateAdminUser(
+    token: string,
+    id: number,
+    payload: AdminUserUpdate
+  ): Promise<AdminUser> {
+    return apiPut<AdminUser>(`/admin/users/${id}`, payload, token);
+  },
+
+  deleteAdminUser(token: string, id: number): Promise<void> {
+    return apiDelete(`/admin/users/${id}`, token);
+  },
+
+  getRolePermissions(token: string): Promise<RolePermissionMatrix> {
+    return apiFetch<RolePermissionMatrix>("/admin/role-permissions", token);
+  },
+
+  updateRolePermissions(
+    token: string,
+    permissions: RolePermission[]
+  ): Promise<RolePermissionMatrix> {
+    return apiPut<RolePermissionMatrix>(
+      "/admin/role-permissions",
+      { permissions },
+      token
+    );
+  },
+
+  updateTabStatus(
+    token: string,
+    statuses: Record<string, boolean>
+  ): Promise<TabCatalog> {
+    return apiPut<TabCatalog>("/admin/tab-status", { statuses }, token);
   },
 
   ingest(token: string): Promise<{ status: string }> {

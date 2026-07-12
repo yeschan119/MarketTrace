@@ -207,6 +207,83 @@ export interface InstrumentAnalyzeResponse {
   max_filings: number;
 }
 
+export interface CurrentUser {
+  id: number | null;
+  login_id: string;
+  name: string;
+  email: string | null;
+  role: "admin" | "manager" | "viewer" | string;
+  legacy: boolean;
+  allowed_tabs: string[];
+}
+
+export interface AdminUser {
+  id: number;
+  login_id: string | null;
+  name: string;
+  email: string;
+  role: "admin" | "manager" | "viewer" | string;
+  status: boolean;
+  has_password: boolean;
+  created_at: string;
+  updated_at: string;
+  last_login_at: string | null;
+}
+
+export interface AdminUserCreate {
+  name: string;
+  email: string;
+  role: string;
+  status: boolean;
+  login_id?: string | null;
+  password?: string | null;
+}
+
+export interface AdminUserUpdate {
+  name?: string;
+  email?: string;
+  role?: string;
+  status?: boolean;
+  login_id?: string | null;
+  password?: string | null;
+  reset_password?: boolean;
+}
+
+export interface AdminRole {
+  value: string;
+  label: string;
+}
+
+export interface AdminTab {
+  id: string;
+  label: string;
+  route: string;
+  admin_only?: boolean;
+}
+
+export interface AdminTabGroup {
+  id: string;
+  label: string;
+  tabs: AdminTab[];
+}
+
+export interface RolePermission {
+  role: string;
+  tab_id: string;
+  can_view: boolean;
+}
+
+export interface RolePermissionMatrix {
+  roles: AdminRole[];
+  groups: AdminTabGroup[];
+  permissions: RolePermission[];
+}
+
+export interface TabCatalog {
+  groups: AdminTabGroup[];
+  statuses: Record<string, boolean>;
+}
+
 export interface TopFactor {
   event_type: string;
   drift: number;

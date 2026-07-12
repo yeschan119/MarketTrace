@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from markettrace.api.admin import router as admin_router
 from markettrace.api.auth import router as auth_router
 from markettrace.api.events_admin import router as events_admin_router
 from markettrace.api.ingest import router as ingest_router
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
 
     application.include_router(router)
     application.include_router(auth_router)
+    application.include_router(admin_router)
     application.include_router(events_admin_router)
     application.include_router(ingest_router)
     application.include_router(ledger_router)

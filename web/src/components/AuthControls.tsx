@@ -13,7 +13,7 @@ const POLL_INTERVAL_MS = 10_000;
 const POLL_MAX_TICKS = 15; // 15 × 10s = 2.5 min
 
 export function AuthControls() {
-  const { token, login, logout } = useAuth();
+  const { token, user, login, logout } = useAuth();
   const { t } = useI18n();
   const queryClient = useQueryClient();
 
@@ -123,6 +123,8 @@ export function AuthControls() {
   function handleRefresh() {
     void queryClient.invalidateQueries({ queryKey: ["events"] });
   }
+
+  const canIngest = user?.role === "admin";
 
   // ── Logged-out view ────────────────────────────────────────────────────────
   if (!token) {
@@ -247,17 +249,19 @@ export function AuthControls() {
         </button>
       )}
 
-      <button
-        onClick={handleIngest}
-        disabled={ingestState === "loading" || ingestState === "polling"}
-        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-      >
-        {ingestState === "loading"
-          ? t("ingest.starting")
-          : ingestState === "polling"
-            ? t("ingest.ingesting")
-            : t("ingest.button")}
-      </button>
+      {canIngest && (
+        <button
+          onClick={handleIngest}
+          disabled={ingestState === "loading" || ingestState === "polling"}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          {ingestState === "loading"
+            ? t("ingest.starting")
+            : ingestState === "polling"
+              ? t("ingest.ingesting")
+              : t("ingest.button")}
+        </button>
+      )}
 
       <button
         onClick={logout}

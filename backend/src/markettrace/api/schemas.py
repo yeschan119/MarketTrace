@@ -171,6 +171,101 @@ class InstrumentAnalyzeResponse(BaseModel):
     max_filings: int
 
 
+class CurrentUserOut(BaseModel):
+    id: int | None
+    login_id: str
+    name: str
+    email: str | None = None
+    role: str
+    legacy: bool = False
+    allowed_tabs: list[str] = Field(default_factory=list)
+
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    login_id: str | None = None
+    name: str
+    email: str
+    role: str
+    status: bool
+    has_password: bool
+    created_at: datetime
+    updated_at: datetime
+    last_login_at: datetime | None = None
+
+
+class AdminUserListOut(BaseModel):
+    users: list[AdminUserOut]
+
+
+class AdminUserCreate(BaseModel):
+    name: str
+    email: str
+    role: str = "viewer"
+    status: bool = True
+    login_id: str | None = None
+    password: str | None = None
+
+
+class AdminUserUpdate(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    role: str | None = None
+    status: bool | None = None
+    login_id: str | None = None
+    password: str | None = None
+    reset_password: bool = False
+
+
+class AdminRoleOut(BaseModel):
+    value: str
+    label: str
+
+
+class AdminTabOut(BaseModel):
+    id: str
+    label: str
+    route: str
+    admin_only: bool = False
+
+
+class AdminTabGroupOut(BaseModel):
+    id: str
+    label: str
+    tabs: list[AdminTabOut]
+
+
+class RolePermissionOut(BaseModel):
+    role: str
+    tab_id: str
+    can_view: bool
+
+
+class RolePermissionMatrixOut(BaseModel):
+    roles: list[AdminRoleOut]
+    groups: list[AdminTabGroupOut]
+    permissions: list[RolePermissionOut]
+
+
+class RolePermissionUpdateRequest(BaseModel):
+    permissions: list[RolePermissionOut]
+
+
+class TabCatalogOut(BaseModel):
+    groups: list[AdminTabGroupOut]
+    statuses: dict[str, bool]
+
+
+class TabStatusUpdateRequest(BaseModel):
+    statuses: dict[str, bool]
+
+
+class OkOut(BaseModel):
+    ok: bool = True
+
+
 class InstrumentTimeline(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -290,6 +290,56 @@ class PassbookStatementRecord(Base):
     warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
 
+class AdminUser(Base):
+    """Login-capable admin-console user.
+
+    The app still supports the legacy environment-variable admin login. This
+    table backs the new 관리자 탭 user-management workflow and stores only
+    password hashes, never plaintext passwords.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    login_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="viewer")
+    status: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class RoleTabPermission(Base):
+    """Role-based tab visibility matrix for the admin console."""
+
+    __tablename__ = "role_tab_permissions"
+    __table_args__ = (
+        UniqueConstraint("role", "tab_id", name="uq_role_tab_permission"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    tab_id: Mapped[str] = mapped_column(String, nullable=False)
+    can_view: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TabStatus(Base):
+    """Global tab on/off state controlled by 관리자 > 탭 관리."""
+
+    __tablename__ = "tab_status"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tab_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    in_use: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class WatchlistItem(Base):
     """An instrument the (single admin) user has chosen to watch.
 
