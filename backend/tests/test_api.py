@@ -172,6 +172,11 @@ def test_get_event_detail(client: TestClient, seeded: dict) -> None:
     assert data["id"] == event_id
     assert data["document"]["title"] == "Apple Reports Record Earnings"
     assert data["entities"] == ["AAPL"]
+    assert data["primary_instrument_id"] == seeded["instrument_id"]
+    assert data["primary_ticker"] == "AAPL"
+    assert data["instrument_name"] == "Apple Inc."
+    assert data["market"] == "US"
+    assert data["original_primary_instrument_id"] is None
     # 3 outcomes sorted by horizon_days ascending
     horizons = [o["horizon_days"] for o in data["outcomes"]]
     assert horizons == [1, 5, 20]
@@ -201,6 +206,42 @@ def test_instrument_timeline(client: TestClient, seeded: dict) -> None:
 def test_instrument_timeline_404(client: TestClient) -> None:
     resp = client.get("/instruments/99999/timeline")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /instruments
+# ---------------------------------------------------------------------------
+
+
+def test_list_instruments_for_review_picker(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    ts_session.add(
+        Instrument(market="KR", ticker="005930", name="Samsung Electronics")
+    )
+    ts_session.flush()
+
+    resp = client.get("/instruments")
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert [(r["market"], r["ticker"]) for r in rows] == [
+        ("KR", "005930"),
+        ("US", "AAPL"),
+    ]
+    assert rows[0]["industry"] is None
+
+
+def test_list_instruments_filters_by_market_and_query(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    ts_session.add(
+        Instrument(market="KR", ticker="005930", name="Samsung Electronics")
+    )
+    ts_session.flush()
+
+    resp = client.get("/instruments", params={"market": "US", "q": "app"})
+    assert resp.status_code == 200
+    assert [r["ticker"] for r in resp.json()] == ["AAPL"]
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ from markettrace.api.schemas import (
     InstrumentOut,
     InstrumentRankingOut,
     InstrumentSearchOut,
+    InstrumentSummary,
     InstrumentTimeline,
     MacroObservationOut,
     MacroSeriesBacktestOut,
@@ -112,6 +113,7 @@ def build_event_detail(db: Session, event: Event) -> EventDetail:
         .order_by(Outcome.horizon_days.asc())
     )
     outcomes = db.scalars(outcomes_stmt).all()
+    instrument = event.primary_instrument
 
     return EventDetail(
         id=event.id,
@@ -128,10 +130,15 @@ def build_event_detail(db: Session, event: Event) -> EventDetail:
         evidence=list(event.evidence) if event.evidence else [],
         model=event.model,
         model_version=event.model_version,
+        primary_instrument_id=instrument.id if instrument else None,
+        primary_ticker=instrument.ticker if instrument else None,
+        instrument_name=instrument.name if instrument else None,
+        market=instrument.market if instrument else None,
         reviewed_at=event.reviewed_at,
         original_direction=event.original_direction,
         original_event_type=event.original_event_type,
         original_confidence=event.original_confidence,
+        original_primary_instrument_id=event.original_primary_instrument_id,
         document=DocumentOut.model_validate(document),
         outcomes=[OutcomeOut.model_validate(o) for o in outcomes],
     )
@@ -148,6 +155,30 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
 
 # Max rows returned by the search entry point regardless of the requested limit.
 _SEARCH_MAX_LIMIT = 50
+
+
+@router.get("/instruments", response_model=list[InstrumentSummary])
+def list_instruments(
+    q: str | None = None,
+    market: str | None = None,
+    db: Session = Depends(get_db),
+) -> list[InstrumentSummary]:
+    """List instruments for admin review pickers.
+
+    Optional filters are intentionally lightweight; the seeded universe is small
+    and the public search endpoint remains the richer user-facing entry point.
+    """
+    stmt = select(Instrument)
+    if market:
+        stmt = stmt.where(func.lower(Instrument.market) == market.lower())
+    if q:
+        needle = f"%{q.lower()}%"
+        stmt = stmt.where(
+            func.lower(Instrument.ticker).like(needle)
+            | func.lower(Instrument.name).like(needle)
+        )
+    stmt = stmt.order_by(Instrument.market.asc(), Instrument.ticker.asc())
+    return [InstrumentSummary.model_validate(row) for row in db.scalars(stmt).all()]
 
 
 @router.get("/instruments/search", response_model=list[InstrumentSearchOut])

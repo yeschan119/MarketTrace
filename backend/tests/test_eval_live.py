@@ -13,6 +13,10 @@ def test_bundled_live_sample_scores_and_is_self_consistent() -> None:
     # The bundled sample is a real stratified production sample.
     assert report.n_examples >= 30
     assert report.classification.support == report.n_examples
+    # The bundled sample labels event-type families only; entity-linking labels
+    # must be added explicitly before live entity F1 is meaningful.
+    assert report.entity_linking is None
+    assert report.n_entity_examples == 0
     # Every gold label is a valid canonical family.
     # (mismatches list only contains genuine stored != gold disagreements)
     for _eid, stored, gold in report.mismatches:
@@ -28,9 +32,21 @@ def test_score_live_sample_custom_file(tmp_path) -> None:
     sample = {
         "examples": [
             # stored earnings_release canonicalises to earnings == gold -> match
-            {"event_id": 1, "stored_event_type": "earnings_release", "gold_family": "earnings"},
+            {
+                "event_id": 1,
+                "stored_event_type": "earnings_release",
+                "gold_family": "earnings",
+                "stored_ticker": "AAPL",
+                "gold_ticker": "AAPL",
+            },
             # stored product but gold investment -> mismatch
-            {"event_id": 2, "stored_event_type": "product_launch", "gold_family": "investment"},
+            {
+                "event_id": 2,
+                "stored_event_type": "product_launch",
+                "gold_family": "investment",
+                "stored_ticker": "MSFT",
+                "gold_ticker": "NVDA",
+            },
         ]
     }
     path = tmp_path / "s.json"
@@ -40,6 +56,12 @@ def test_score_live_sample_custom_file(tmp_path) -> None:
     assert report.n_examples == 2
     assert report.classification.accuracy == 0.5
     assert report.mismatches == [(2, "product", "investment")]
+    assert report.entity_linking is not None
+    assert report.entity_linking.true_positives == 1
+    assert report.entity_linking.false_positives == 1
+    assert report.entity_linking.false_negatives == 1
+    assert report.entity_linking.f1 == 0.5
+    assert report.entity_mismatches == [(2, {"MSFT"}, {"NVDA"})]
 
 
 def test_score_live_sample_accepts_bare_list(tmp_path) -> None:

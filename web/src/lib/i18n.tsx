@@ -341,14 +341,19 @@ const en: Dict = {
     review: {
       title: "Review & correct",
       subtitle:
-        "Correct the model's read. Direction or type edits update the stats and backtest immediately.",
+        "Correct the model's read. Direction/type edits update stats immediately; company edits recompute returns for the corrected instrument.",
       direction: "Direction",
       eventType: "Event type",
+      company: "Company",
       confidence: "Confidence",
+      recomputeNote:
+        "Changing the company will refetch prices and recompute outcomes for this event.",
       save: "Save",
       saving: "Saving…",
       noChanges: "No changes",
       failed: "Save failed. Try again.",
+      recomputeFailed:
+        "Company correction failed while recomputing prices. No changes were saved.",
       sessionExpired: "Session expired — please log in again.",
       reviewedAt: "Human-reviewed on {date}",
     },
@@ -881,14 +886,19 @@ const ko: Dict = {
     review: {
       title: "검토·수정",
       subtitle:
-        "모델 판단을 교정합니다. 방향·유형을 바꾸면 통계·백테스트에 즉시 반영됩니다.",
+        "모델 판단을 교정합니다. 방향·유형은 통계에 즉시 반영되고, 회사 변경은 해당 종목 수익률을 다시 계산합니다.",
       direction: "방향",
       eventType: "사건유형",
+      company: "회사",
       confidence: "신뢰도",
+      recomputeNote:
+        "회사를 바꾸면 가격을 다시 가져와 이 이벤트의 수익률을 재계산합니다.",
       save: "저장",
       saving: "저장 중…",
       noChanges: "변경 없음",
       failed: "저장 실패. 다시 시도하세요.",
+      recomputeFailed:
+        "회사 교정 중 가격 재계산에 실패했습니다. 변경 사항은 저장되지 않았습니다.",
       sessionExpired: "세션 만료 — 다시 로그인하세요.",
       reviewedAt: "{date} 사람이 검토함",
     },

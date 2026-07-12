@@ -17,7 +17,12 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from markettrace.eval.metrics import ClassificationReport, classification_metrics
+from markettrace.eval.metrics import (
+    PRF,
+    ClassificationReport,
+    classification_metrics,
+    entity_linking_metrics,
+)
 from markettrace.eval.taxonomy import canonicalize
 
 __all__ = ["LiveEvalReport", "score_live_sample", "DEFAULT_LIVE_SAMPLE_PATH", "main"]
@@ -29,12 +34,30 @@ DEFAULT_LIVE_SAMPLE_PATH = (
 
 @dataclass(frozen=True)
 class LiveEvalReport:
-    """Canonical-family classification score of stored vs. gold, plus mismatches."""
+    """Stored-output scores against human labels, plus mismatches."""
 
     classification: ClassificationReport
     n_examples: int
     # (event_id, stored_family, gold_family) for each disagreement.
     mismatches: list[tuple[int, str, str]]
+    # Optional entity-linking score when the sample carries separate entity labels.
+    entity_linking: PRF | None = None
+    n_entity_examples: int = 0
+    # (event_id, stored_entities, gold_entities) for entity-linking disagreements.
+    entity_mismatches: list[tuple[int, set[str], set[str]]] | None = None
+
+
+def _entity_values(rec: dict, keys: tuple[str, ...]) -> set[str] | None:
+    for key in keys:
+        if key not in rec:
+            continue
+        value = rec[key]
+        if value is None:
+            return set()
+        if isinstance(value, str):
+            return {value.upper()} if value else set()
+        return {str(item).upper() for item in value if str(item)}
+    return None
 
 
 def score_live_sample(path: str | Path = DEFAULT_LIVE_SAMPLE_PATH) -> LiveEvalReport:
@@ -50,19 +73,49 @@ def score_live_sample(path: str | Path = DEFAULT_LIVE_SAMPLE_PATH) -> LiveEvalRe
 
     gold: list[str] = []
     pred: list[str] = []
+    gold_links: dict[str, set[str]] = {}
+    pred_links: dict[str, set[str]] = {}
     mismatches: list[tuple[int, str, str]] = []
+    entity_mismatches: list[tuple[int, set[str], set[str]]] = []
     for rec in examples:
+        event_id = int(rec["event_id"])
         stored_family = canonicalize(str(rec["stored_event_type"]))
         gold_family = canonicalize(str(rec["gold_family"]))
         pred.append(stored_family)
         gold.append(gold_family)
         if stored_family != gold_family:
-            mismatches.append((int(rec["event_id"]), stored_family, gold_family))
+            mismatches.append((event_id, stored_family, gold_family))
+
+        gold_entities = _entity_values(rec, ("gold_entities", "gold_tickers", "gold_ticker"))
+        stored_entities = _entity_values(
+            rec,
+            (
+                "stored_entities",
+                "stored_tickers",
+                "stored_ticker",
+                "predicted_entities",
+                "predicted_tickers",
+                "predicted_ticker",
+            ),
+        )
+        if gold_entities is not None and stored_entities is not None:
+            doc_id = str(event_id)
+            gold_links[doc_id] = gold_entities
+            pred_links[doc_id] = stored_entities
+            if gold_entities != stored_entities:
+                entity_mismatches.append((event_id, stored_entities, gold_entities))
+
+    entity_report = (
+        entity_linking_metrics(gold_links, pred_links) if gold_links or pred_links else None
+    )
 
     return LiveEvalReport(
         classification=classification_metrics(gold, pred),
         n_examples=len(examples),
         mismatches=mismatches,
+        entity_linking=entity_report,
+        n_entity_examples=len(gold_links.keys() | pred_links.keys()),
+        entity_mismatches=entity_mismatches if entity_report is not None else None,
     )
 
 
@@ -87,6 +140,29 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin CLI
             {"event_id": eid, "stored": s, "gold": g} for eid, s, g in report.mismatches
         ],
     }
+    if report.entity_linking is None:
+        payload["entity_linking"] = {
+            "n_examples": 0,
+            "status": "not_scored_no_entity_labels",
+        }
+    else:
+        payload["entity_linking"] = {
+            "n_examples": report.n_entity_examples,
+            "precision": report.entity_linking.precision,
+            "recall": report.entity_linking.recall,
+            "f1": report.entity_linking.f1,
+            "true_positives": report.entity_linking.true_positives,
+            "false_positives": report.entity_linking.false_positives,
+            "false_negatives": report.entity_linking.false_negatives,
+            "mismatches": [
+                {
+                    "event_id": eid,
+                    "stored": sorted(stored),
+                    "gold": sorted(gold),
+                }
+                for eid, stored, gold in (report.entity_mismatches or [])
+            ],
+        }
     print(json.dumps(payload, indent=2))
     return 0
 

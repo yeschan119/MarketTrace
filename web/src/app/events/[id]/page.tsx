@@ -48,6 +48,8 @@ export default function EventDetailPage() {
   }
 
   const typeInfo = describeEventType(event.event_type, lang);
+  const displayTicker = event.primary_ticker ?? event.entities[0] ?? null;
+  const displayName = event.instrument_name ?? displayTicker;
 
   return (
     <div className="space-y-6">
@@ -66,8 +68,10 @@ export default function EventDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
-                {event.entities[0] ?? t("eventDetail.unknownInstrument")}
-                <KoreanName ticker={event.entities[0]} className="ml-2 text-lg" />
+                {displayName ?? t("eventDetail.unknownInstrument")}
+                {displayTicker && (
+                  <KoreanName ticker={displayTicker} className="ml-2 text-lg" />
+                )}
               </h1>
               <DirectionBadge direction={event.direction} />
             </div>

@@ -90,12 +90,15 @@ export default function EventsPage() {
         !eventMatchesQuery(event, normalizedQuery, lang)
       )
         continue;
-      const key = event.primary_ticker;
+      const key = event.primary_ticker ?? `event-${event.id}`;
       let group = byTicker.get(key);
       if (!group) {
         group = {
-          ticker: event.primary_ticker,
-          name: event.instrument_name,
+          ticker: event.primary_ticker ?? "N/A",
+          name:
+            event.instrument_name ??
+            event.primary_ticker ??
+            t("eventDetail.unknownInstrument"),
           instrumentId: event.primary_instrument_id,
           events: [],
         };
@@ -113,7 +116,7 @@ export default function EventsPage() {
     }
     result.sort((a, b) => b.events.length - a.events.length);
     return result;
-  }, [events, lang, market, query, signalFilter, verdictFor]);
+  }, [events, lang, market, query, signalFilter, t, verdictFor]);
 
   const visibleEventCount = useMemo(
     () => groups.reduce((total, group) => total + group.events.length, 0),
@@ -377,7 +380,7 @@ function eventMatchesQuery(
   const fields = [
     event.primary_ticker,
     event.instrument_name,
-    koreanName(event.primary_ticker),
+    event.primary_ticker ? koreanName(event.primary_ticker) : null,
     event.event_type,
     typeInfo.label,
     typeInfo.desc,

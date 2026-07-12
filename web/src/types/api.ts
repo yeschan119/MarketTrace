@@ -8,8 +8,8 @@ export interface EventSummary {
   confidence: number;
   published_at: string;
   primary_instrument_id: number | null;
-  primary_ticker: string;
-  instrument_name: string;
+  primary_ticker: string | null;
+  instrument_name: string | null;
   market: string | null;
   reviewed_at: string | null;
 }
@@ -144,10 +144,15 @@ export interface EventDetail {
   evidence: string[];
   model: string;
   model_version: string;
+  primary_instrument_id: number | null;
+  primary_ticker: string | null;
+  instrument_name: string | null;
+  market: string | null;
   reviewed_at: string | null;
   original_direction: string | null;
   original_event_type: string | null;
   original_confidence: number | null;
+  original_primary_instrument_id: number | null;
   document: Document;
   outcomes: Outcome[];
 }
@@ -156,6 +161,7 @@ export interface EventUpdate {
   direction?: string;
   event_type?: string;
   confidence?: number;
+  primary_instrument_id?: number;
 }
 
 export interface Instrument {
@@ -176,6 +182,14 @@ export interface InstrumentSearchResult {
   market: string;
   industry: string | null;
   event_count: number;
+}
+
+export interface InstrumentSummary {
+  id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  industry: string | null;
 }
 
 export interface InstrumentAnalyzeRequest {

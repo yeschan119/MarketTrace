@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { describeEventType, EVENT_TYPE_CODES } from "@/lib/eventTypes";
-import type { EventDetail, EventUpdate } from "@/types/api";
+import type { EventDetail, EventUpdate, InstrumentSummary } from "@/types/api";
 
 const DIRECTIONS = ["positive", "negative", "neutral"];
+
+function instrumentLabel(instrument: InstrumentSummary): string {
+  return `${instrument.ticker} · ${instrument.name} (${instrument.market})`;
+}
 
 export function EventReviewForm({ event }: { event: EventDetail }) {
   const { t, lang, locale } = useI18n();
@@ -18,7 +22,28 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
   const [direction, setDirection] = useState(event.direction);
   const [eventType, setEventType] = useState(event.event_type);
   const [confidence, setConfidence] = useState(event.confidence);
+  const [instrumentId, setInstrumentId] = useState<number | null>(
+    event.primary_instrument_id
+  );
   const [error, setError] = useState<string | null>(null);
+
+  const companyCorrected =
+    event.original_primary_instrument_id != null &&
+    event.original_primary_instrument_id !== event.primary_instrument_id;
+
+  const needsInstruments = Boolean(token) || companyCorrected;
+  const { data: instruments } = useQuery({
+    queryKey: ["instruments"],
+    queryFn: () => api.listInstruments(),
+    enabled: needsInstruments,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const instrumentById = useMemo(() => {
+    const byId = new Map<number, InstrumentSummary>();
+    (instruments ?? []).forEach((instrument) => byId.set(instrument.id, instrument));
+    return byId;
+  }, [instruments]);
 
   // Ensure the event's own code is selectable even if outside the known set.
   const typeOptions = EVENT_TYPE_CODES.includes(event.event_type)
@@ -31,9 +56,12 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
     onSuccess: (updated) => {
       setError(null);
       queryClient.setQueryData(["event", String(event.id)], updated);
-      // A direction/type edit shifts the impact aggregates the list and stats read.
+      setInstrumentId(updated.primary_instrument_id);
+      // Direction/type/company edits shift the aggregates the list and stats read.
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["significance"] });
+      queryClient.invalidateQueries({ queryKey: ["instrument-ranking"] });
+      queryClient.invalidateQueries({ queryKey: ["instrument-timeline"] });
     },
     onError: (err) => {
       if (isApiError(err) && err.status === 401) {
@@ -41,22 +69,36 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
         setError(t("eventDetail.review.sessionExpired"));
         return;
       }
+      if (isApiError(err) && err.status === 502) {
+        setError(t("eventDetail.review.recomputeFailed"));
+        return;
+      }
       setError(t("eventDetail.review.failed"));
     },
   });
 
+  const companyChanged = instrumentId !== event.primary_instrument_id;
   const dirty =
     direction !== event.direction ||
     eventType !== event.event_type ||
-    confidence !== event.confidence;
+    confidence !== event.confidence ||
+    companyChanged;
 
   function handleSave() {
     const patch: EventUpdate = {};
     if (direction !== event.direction) patch.direction = direction;
     if (eventType !== event.event_type) patch.event_type = eventType;
     if (confidence !== event.confidence) patch.confidence = confidence;
+    if (companyChanged && instrumentId != null) {
+      patch.primary_instrument_id = instrumentId;
+    }
     if (Object.keys(patch).length > 0) mutation.mutate(patch);
   }
+
+  const originalCompanyLabel = companyCorrected
+    ? instrumentById.get(event.original_primary_instrument_id as number)?.name ??
+      `#${event.original_primary_instrument_id}`
+    : null;
 
   // Public transparency: show a "corrected" note whenever the event was
   // reviewed, even for logged-out viewers.
@@ -84,6 +126,14 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
             {describeEventType(event.event_type, lang).label}
           </>
         )}
+      {companyCorrected && (
+        <>
+          {" · "}
+          {t("eventDetail.review.company")}: {originalCompanyLabel}
+          {" → "}
+          {event.instrument_name ?? event.primary_ticker}
+        </>
+      )}
     </p>
   ) : null;
 
@@ -156,6 +206,31 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
           />
         </label>
       </div>
+
+      <label className="mt-3 block">
+        <span className="mb-1 block text-xs font-medium text-gray-500">
+          {t("eventDetail.review.company")}
+        </span>
+        <select
+          value={instrumentId ?? ""}
+          onChange={(e) =>
+            setInstrumentId(e.target.value ? Number(e.target.value) : null)
+          }
+          disabled={!instruments}
+          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+        >
+          {(instruments ?? []).map((instrument) => (
+            <option key={instrument.id} value={instrument.id}>
+              {instrumentLabel(instrument)}
+            </option>
+          ))}
+        </select>
+        {companyChanged && (
+          <span className="mt-1 block text-xs text-amber-600">
+            {t("eventDetail.review.recomputeNote")}
+          </span>
+        )}
+      </label>
 
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
 

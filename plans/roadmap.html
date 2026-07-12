@@ -103,11 +103,11 @@
     <div class="pills">
       <span class="pill">🟢 배포: miffy178.com (TLS)</span>
       <span class="pill">🇺🇸 US (SEC) · 🇰🇷 KR (OpenDART)</span>
-      <span class="pill">✅ 579 tests · ruff clean</span>
+      <span class="pill">✅ 597 tests · ruff clean</span>
       <span class="pill">FastAPI + Next.js + PostgreSQL</span>
       <span class="pill">🧭 방향 A: 측정·검증 우선</span>
       <span class="pill">✅ 코퍼스 약 500건 (KR+US)</span>
-      <span class="pill">기준일: 2026-07-07</span>
+      <span class="pill">기준일: 2026-07-12</span>
     </div>
   </div>
 </header>
@@ -124,7 +124,7 @@
   <div class="strip">
     <div class="st done"><div class="ph">PHASE 0</div><div class="nm">스캐폴딩</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 1</div><div class="nm">버티컬 슬라이스</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
-    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">92%</div><div class="bar"><i style="width:92%"></i></div></div>
+    <div class="st partial"><div class="ph">PHASE 2</div><div class="nm">사건 엔진</div><div class="pct">96%</div><div class="bar"><i style="width:96%"></i></div></div>
     <div class="st done"><div class="ph">PHASE 3</div><div class="nm">영향 측정</div><div class="pct">100%</div><div class="bar"><i style="width:100%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 4</div><div class="nm">신호·검증</div><div class="pct">90%</div><div class="bar"><i style="width:90%"></i></div></div>
     <div class="st partial"><div class="ph">PHASE 5</div><div class="nm">사용자 기능</div><div class="pct">98%</div><div class="bar"><i style="width:98%"></i></div></div>
@@ -200,8 +200,8 @@
   <!-- PHASE 2 -->
   <div class="card">
     <div class="top">
-      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~92%</span></div>
-      <div class="pbar a"><i style="width:92%"></i></div><div class="pct-lbl" style="color:var(--amber)">92%</div>
+      <div class="title">Phase 2 · 사건 엔진 <span class="badge b-partial">진행 중 ~96%</span></div>
+      <div class="pbar a"><i style="width:96%"></i></div><div class="pct-lbl" style="color:var(--amber)">96%</div>
     </div>
     <div class="cols">
       <div><div class="coltitle">완료</div>
@@ -213,6 +213,7 @@
           <li class="ok"><b>F1 평가 하베스트</b> — 기업연결 micro P/R/F1 + 사건분류 macro F1 메트릭, 골드셋, markettrace-eval CLI</li>
           <li class="ok"><b>정규 택소노미 + 라이브 분류 F1 실측</b> — event_type 자유텍스트가 110개로 파편화 → <span class="commit">eval/taxonomy.py</span> 정규화(110→18계열). 골드셋 6→26 + 실이벤트 97건 <b>2인 검수(일치도 97.9%)</b>. 배포 추출기 <b>77.3%</b> → 오류패턴(macro·regulatory 과적용 등) 프롬프트 교정 → 라이브 재추출 <b>91.8% (+14.5%p)</b>. <span class="commit">markettrace-eval-live</span></li>
           <li class="ok"><b>사람 검토·수정 화면</b> — <span class="commit">PATCH /events/{id}</span>(auth) + 이벤트 상세 편집폼: 방향·유형·신뢰도 교정, 원본 LLM값 스냅샷(original_*·reviewed_at, 마이그레이션 0006), 수정시 EventImpact 재빌드로 통계 즉시 반영. 목록에 ✓검토됨·"미검토 충돌" 큐</li>
+          <li class="ok"><b>엔티티(종목 연결) 교정 UI</b> — 이벤트 리뷰폼에서 연결 종목을 수정하면 <span class="commit">original_primary_instrument_id</span> 스냅샷 후 새 종목 가격으로 outcomes·event_impacts를 재계산(마이그레이션 0009). 가격 재계산 실패시 rollback+502로 반쪽 저장 차단. <span class="commit">markettrace-eval-live</span>는 별도 엔티티 라벨 파일이 있을 때 entity-linking P/R/F1도 출력</li>
           <li class="ok"><b>event_type enum 강제 + 코퍼스 마이그레이션</b> — 자유텍스트가 재파편화되던 문제를 <b>원천 차단</b>. 정규 18계열을 추출 tool 스키마 <span class="commit">enum</span>으로 강제(Anthropic·OpenAI) + pydantic validator canonicalize. 마이그레이션 0007이 <b>기존 486건을 18계열로 결정론적 축약</b>(무LLM비용)→ 라이브 significance/backtest가 계열단위 재그룹핑(검정력↑). <span class="commit">nlp/taxonomy.py</span></li>
           <li class="ok"><b>기존 코퍼스 재추출 도구</b> — <span class="commit">markettrace-reextract</span>: 개선 프롬프트(91.8%)를 기존 이벤트에 in-place 재적용(outcomes보존·event_impacts재빌드·검수이벤트 스킵·dry-run). ⚠️<b>prod 실행은 미완</b>(크리덴셜 필요)</li>
         </ul>
@@ -220,12 +221,12 @@
       <div><div class="coltitle">남은 작업</div>
         <ul class="items">
           <li class="no">다건 배치 오케스트레이션 (Prefect)</li>
-          <li class="no">기존 486건 <b>재추출 실제 실행</b> — 도구·enum은 완료, prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행만 남음(오분류 교정·direction 갱신) + entity_linking F1 별도 측정</li>
-          <li class="no">엔티티(종목 연결) 교정 — 현재 검토는 방향/유형/신뢰도만</li>
+          <li class="no">기존 486건 <b>재추출 실제 실행</b> — 도구·enum은 완료, prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행만 남음(오분류 교정·direction 갱신)</li>
+          <li class="no">entity_linking F1 <b>실측 라벨링 운영</b> — scorer는 준비됨. live sample에 독립 gold_ticker/gold_entities 라벨 추가가 선행돼야 의미 있는 수치 산출</li>
         </ul>
       </div>
     </div>
-    <div class="crit"><b>완료 기준 🟢</b> — 분류 F1 <b>실측 91.8%(89/97)</b>·검수 97.9%. <b>enum 강제 + 마이그레이션으로 파편화 원천 차단</b>(기존 486건 18계열 축약 배포됨). <b>사람 검토·수정 루프 가동</b>. 남은 건 재추출 <b>실행</b>(도구 준비완료)·entity 교정 UI.</div>
+    <div class="crit"><b>완료 기준 🟢</b> — 분류 F1 <b>실측 91.8%(89/97)</b>·검수 97.9%. <b>enum 강제 + 마이그레이션으로 파편화 원천 차단</b>(기존 486건 18계열 축약 배포됨). <b>사람 검토·수정 루프 + 종목 연결 교정 UI 가동</b>. 남은 건 재추출 <b>실행</b>(도구 준비완료)·entity F1 독립 라벨링 운영.</div>
   </div>
 
   <!-- PHASE 3 -->
@@ -399,7 +400,7 @@
       <li class="ok"><b>반등 백테스트</b> — possible_overreaction을 신호로 주장하기 전 검증. 고정 규칙·전부 표본외·시장조정·비중첩·정직 커버리지(n_dropped_no_outcome). 가격이력 부족하면 "이력 부족"으로 관찰 유지. <span class="commit">impact/rebound_backtest.py · GET /stats/rebound-backtest</span> (커밋 087426d)</li>
     </ul>
     <p style="font-size:13px;color:var(--muted);margin-top:10px">
-      테스트 543 → <b style="color:var(--ink)">579</b> · ruff 클린 · 프론트 tsc+build 통과. 3커밋 <b>push·배포 트리거됨</b>.
+      테스트 543 → <b style="color:var(--ink)">597</b> · ruff 클린 · 프론트 tsc+build 통과.
       Phase 5 95 → <b style="color:var(--ink)">98%</b>(사용자 최종기능 2건 반영). ⚠️운영 선행: prod <span class="commit">markettrace-refresh-prices</span> 실행 후 실데이터.</p>
   </div>
 
@@ -409,14 +410,14 @@
     <ul class="items next">
       <li><b>① 가격 리프레시 <i>실행</i> (급락 스크리너 가동)</b> — Render Shell에서 <span class="commit">markettrace-refresh-prices</span> 실행 → 유니버스 최근 일봉 적재 → <span class="commit">/screener</span>가 실제 급락 종목·진단을, <span class="commit">/stats/rebound-backtest</span>가 실제 표본을 표시. 주기적으로 돌릴수록 반등 백테스트 이력 축적 → possible_overreaction 검증</li>
       <li><b>② 기존 코퍼스 재추출 <i>실행</i></b> — 도구(<span class="commit">markettrace-reextract</span>)·enum·마이그레이션 완료. prod DATABASE_URL+키로 <span class="commit">--commit</span> 실행 → 오분류 교정·direction/confidence 갱신</li>
-      <li><b>③ entity_linking F1 별도 측정</b> — entity_linker 경유 종목 연결 정확도 실측 + 엔티티 교정 UI(로컬 브랜치 feat/entity-correction-ui 미머지)</li>
+      <li><b>③ entity_linking F1 독립 라벨링 운영</b> — <span class="commit">markettrace-eval-live</span>는 gold_ticker/gold_entities 라벨이 있는 sample에서 P/R/F1을 출력. 다음 단계는 실이벤트 sample에 독립 엔티티 gold 라벨을 채워 수치 확정</li>
       <li><b>④ 데이터 수집 트랙</b> — 펀더멘털·수급을 동일 <code>SignalModel</code>로 + 상폐목록(KRX/OpenDART) 수집해 생존편향 차단. 착수비용 큰 별도 트랙</li>
       <li><b>⑤ (선택) 외부 푸시 알림</b> — 현재 앱 내·ingest 발화. Telegram 등 외부 채널·실시간 트리거는 선택 확장</li>
     </ul>
   </div>
 
   <footer>
-    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-07<br>
+    MarketTrace 로드맵 · 출처: stock-analysis-system-blueprint.md + PROJECT_STATUS.md · 갱신 2026-07-12<br>
     공식 데이터: OpenDART · SEC EDGAR · FRED · KRX · 가격: Tiingo(US) / 네이버금융(KR)
   </footer>
 

@@ -19,7 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
 
-from markettrace.db.models import Event, EventImpact, Instrument, ModelRun, Outcome
+from markettrace.db.models import Document, Event, EventImpact, Instrument, ModelRun, Outcome
 from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult, compute_event_outcomes
 from markettrace.impact.sector_index import resolve_sector_index
@@ -29,7 +29,13 @@ from markettrace.nlp.entity_linker import link_entities, resolve_instrument
 from markettrace.nlp.novelty import novelty_score
 from markettrace.providers.base import DocumentRef
 
-__all__ = ["SliceResult", "run_slice", "recompute_document_outcomes", "main"]
+__all__ = [
+    "SliceResult",
+    "run_slice",
+    "recompute_document_outcomes",
+    "recompute_event_outcomes",
+    "main",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +245,60 @@ def _compute_and_persist_outcomes(
         session.add(impact)
 
     return outcomes, sector_index_ticker
+
+
+def recompute_event_outcomes(
+    session,
+    *,
+    event: Event,
+    instrument: Instrument,
+    price_provider,
+    market_index_ticker: str = "spy",
+    sector_index_ticker: str | None = None,
+    horizons: tuple[int, ...] = (1, 5, 20, 60),
+) -> list[OutcomeResult]:
+    """Recompute one reviewed event's outcomes against a corrected instrument.
+
+    Used by the admin event-review route when a human fixes a mis-linked
+    company. Outcomes and impacts are replaced atomically inside the caller's
+    transaction; this function deliberately does not commit.
+    """
+    document = session.get(Document, event.document_id)
+    if document is None:
+        raise ValueError(f"Document {event.document_id!r} for event {event.id!r} not found")
+
+    now = datetime.now(UTC)
+    session.execute(delete(Outcome).where(Outcome.event_id == event.id))
+    session.execute(delete(EventImpact).where(EventImpact.event_id == event.id))
+    session.flush()
+
+    outcomes, resolved_sector = _compute_and_persist_outcomes(
+        session,
+        event=event,
+        instrument=instrument,
+        ticker=instrument.ticker,
+        market=instrument.market,
+        price_provider=price_provider,
+        event_date=document.published_at.date(),
+        market_index_ticker=market_index_ticker,
+        sector_index_ticker=sector_index_ticker,
+        horizons=horizons,
+        now=now,
+    )
+    session.add(
+        ModelRun(
+            kind="recompute_event_outcomes",
+            params={
+                "event_id": event.id,
+                "instrument_id": instrument.id,
+                "horizons": list(horizons),
+                "sector_index_ticker": resolved_sector,
+            },
+            data_version=None,
+            created_at=now,
+        )
+    )
+    return outcomes
 
 
 def _needs_recompute(session, event, horizons: tuple[int, ...]) -> bool:

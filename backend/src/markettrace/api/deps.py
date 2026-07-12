@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from markettrace.config import get_settings
 from markettrace.db.session import make_engine, make_session_factory
+from markettrace.providers.base import PriceProvider
+from markettrace.providers.registry import get_price_provider
 
 
 def get_db() -> Iterator[Session]:
@@ -22,3 +24,16 @@ def get_db() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+def get_price_provider_factory():
+    """Return the price-provider factory used by write routes that recompute returns.
+
+    Tests override this dependency with deterministic providers so admin review
+    can verify recomputation without network access.
+    """
+
+    def factory(market: str) -> PriceProvider:
+        return get_price_provider(market)
+
+    return factory

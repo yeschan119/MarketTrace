@@ -7,8 +7,9 @@ rebuild that keeps signed_abnormal_return consistent after a direction edit.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
+import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -16,15 +17,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from markettrace.api.auth import create_token
-from markettrace.api.deps import get_db
+from markettrace.api.deps import get_db, get_price_provider_factory
 from markettrace.api.main import create_app
 from markettrace.db.models import (
     Base,
     Document,
+    DocumentEntity,
     Event,
     EventImpact,
     Instrument,
+    ModelRun,
     Outcome,
+    Price,
 )
 from markettrace.impact.event_impacts import build_event_impacts
 from markettrace.impact.returns import OutcomeResult
@@ -221,3 +225,153 @@ def test_confidence_only_edit_snapshots_but_keeps_direction(
 
     session.expire_all()
     assert _impacts(session, eid) == before  # direction unchanged → impacts intact
+
+
+# ---------------------------------------------------------------------------
+# Instrument correction (re-link a mis-classified company)
+# ---------------------------------------------------------------------------
+
+_EVENT_DATE = date(2026, 1, 2)
+
+
+def _flat_price_frame() -> pl.DataFrame:
+    """Constant OHLCV data spanning the recompute window."""
+    start = _EVENT_DATE - timedelta(days=10)
+    dates = [start + timedelta(days=i) for i in range(160)]
+    n = len(dates)
+    return pl.DataFrame(
+        {
+            "date": dates,
+            "open": [100.0] * n,
+            "high": [100.0] * n,
+            "low": [100.0] * n,
+            "close": [100.0] * n,
+            "adj_close": [100.0] * n,
+            "volume": [1_000_000.0] * n,
+        }
+    )
+
+
+class _FlatPriceProvider:
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        return _flat_price_frame()
+
+
+class _RaisingPriceProvider:
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        raise RuntimeError("price provider unavailable")
+
+
+def _override_price_provider(client: TestClient, provider) -> None:
+    client.app.dependency_overrides[get_price_provider_factory] = lambda: (
+        lambda market: provider
+    )
+
+
+@pytest.fixture
+def other_instrument(session: Session) -> Instrument:
+    instrument = Instrument(
+        market="KR", ticker="000660", name="SK hynix", industry="Tech"
+    )
+    session.add(instrument)
+    session.flush()
+    return instrument
+
+
+def test_instrument_correction_relinks_and_recomputes(
+    client: TestClient,
+    token: str,
+    seeded: dict,
+    other_instrument: Instrument,
+    session: Session,
+) -> None:
+    eid = seeded["event_id"]
+    old_iid = seeded["instrument_id"]
+    _override_price_provider(client, _FlatPriceProvider())
+
+    resp = client.patch(
+        f"/events/{eid}",
+        json={"primary_instrument_id": other_instrument.id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["primary_instrument_id"] == other_instrument.id
+    assert body["primary_ticker"] == "000660"
+    assert body["instrument_name"] == "SK hynix"
+    assert body["original_primary_instrument_id"] == old_iid
+    assert body["entities"] == ["000660"]
+    assert body["reviewed_at"] is not None
+
+    session.expire_all()
+    event = session.get(Event, eid)
+    assert event is not None
+    assert event.primary_instrument_id == other_instrument.id
+    assert event.entities == ["000660"]
+
+    outcomes = session.scalars(select(Outcome).where(Outcome.event_id == eid)).all()
+    assert outcomes
+    assert {o.horizon_days for o in outcomes} == {1, 5, 20, 60}
+    assert all(o.instrument_id == other_instrument.id for o in outcomes)
+    assert all(o.abnormal_return == pytest.approx(0.0) for o in outcomes)
+
+    impacts = session.scalars(
+        select(EventImpact).where(EventImpact.event_id == eid)
+    ).all()
+    assert impacts
+    assert all(i.instrument_id == other_instrument.id for i in impacts)
+
+    assert session.scalars(
+        select(Price).where(Price.instrument_id == other_instrument.id)
+    ).first() is not None
+    assert session.scalar(
+        select(DocumentEntity).where(
+            DocumentEntity.document_id == event.document_id,
+            DocumentEntity.instrument_id == other_instrument.id,
+        )
+    )
+    assert session.scalar(
+        select(ModelRun).where(ModelRun.kind == "recompute_event_outcomes")
+    )
+
+
+def test_instrument_correction_unknown_instrument_422(
+    client: TestClient, token: str, seeded: dict
+) -> None:
+    _override_price_provider(client, _FlatPriceProvider())
+    resp = client.patch(
+        f"/events/{seeded['event_id']}",
+        json={"primary_instrument_id": 999999},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 422
+
+
+def test_instrument_correction_price_failure_rolls_back(
+    client: TestClient,
+    token: str,
+    seeded: dict,
+    other_instrument: Instrument,
+    session: Session,
+) -> None:
+    eid = seeded["event_id"]
+    old_iid = seeded["instrument_id"]
+    session.commit()
+    _override_price_provider(client, _RaisingPriceProvider())
+
+    resp = client.patch(
+        f"/events/{eid}",
+        json={"primary_instrument_id": other_instrument.id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 502
+
+    session.expire_all()
+    event = session.get(Event, eid)
+    assert event is not None
+    assert event.primary_instrument_id == old_iid
+    assert event.reviewed_at is None
+    assert event.original_primary_instrument_id is None
+    outcomes = session.scalars(select(Outcome).where(Outcome.event_id == eid)).all()
+    assert {o.instrument_id for o in outcomes} == {old_iid}
+    assert {o.horizon_days for o in outcomes} == {1, 5}

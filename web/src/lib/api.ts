@@ -13,6 +13,7 @@ import type {
   InstrumentAnalyzeRequest,
   InstrumentAnalyzeResponse,
   InstrumentSearchResult,
+  InstrumentSummary,
   InstrumentTimeline,
   LedgerCategory,
   LedgerEntry,
@@ -200,6 +201,14 @@ export const api = {
     return apiFetch<InstrumentSearchResult[]>(
       `/instruments/search?${query.toString()}`
     );
+  },
+
+  listInstruments(q?: string, market?: string): Promise<InstrumentSummary[]> {
+    const query = new URLSearchParams();
+    if (q) query.set("q", q);
+    if (market) query.set("market", market);
+    const qs = query.toString();
+    return apiFetch<InstrumentSummary[]>(`/instruments${qs ? `?${qs}` : ""}`);
   },
 
   getInstrumentRanking(

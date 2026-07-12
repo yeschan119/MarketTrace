@@ -59,10 +59,15 @@ class EventDetail(BaseModel):
     evidence: list[str]
     model: str
     model_version: str
+    primary_instrument_id: int | None = None
+    primary_ticker: str | None = None
+    instrument_name: str | None = None
+    market: str | None = None
     reviewed_at: datetime | None = None
     original_direction: str | None = None
     original_event_type: str | None = None
     original_confidence: float | None = None
+    original_primary_instrument_id: int | None = None
     document: DocumentOut
     outcomes: list[OutcomeOut]
 
@@ -71,12 +76,15 @@ class EventUpdate(BaseModel):
     """Human corrections to an LLM-extracted event (Phase 2 review).
 
     All fields optional — only those provided are changed. ``direction`` and
-    ``event_type`` edits trigger a rebuild of the event's impact rows.
+    ``event_type`` edits trigger a rebuild of the event's impact rows. A
+    ``primary_instrument_id`` edit re-fetches prices and recomputes outcomes
+    for the corrected instrument.
     """
 
     direction: str | None = None
     event_type: str | None = None
     confidence: float | None = None
+    primary_instrument_id: int | None = None
 
 
 class InstrumentOut(BaseModel):
@@ -98,6 +106,18 @@ class InstrumentSearchOut(BaseModel):
     market: str
     industry: str | None = None
     event_count: int
+
+
+class InstrumentSummary(BaseModel):
+    """Instrument row used by the event-review company picker."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticker: str
+    name: str
+    market: str
+    industry: str | None = None
 
 
 class InstrumentAnalyzeRequest(BaseModel):

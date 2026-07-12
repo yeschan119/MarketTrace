@@ -119,8 +119,13 @@ class Event(Base):
     original_direction: Mapped[str | None] = mapped_column(String, nullable=True)
     original_event_type: Mapped[str | None] = mapped_column(String, nullable=True)
     original_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    original_primary_instrument_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instruments.id"), nullable=True
+    )
 
-    primary_instrument: Mapped[Instrument | None] = relationship()
+    primary_instrument: Mapped[Instrument | None] = relationship(
+        foreign_keys=[primary_instrument_id]
+    )
 
 
 class Price(Base):
