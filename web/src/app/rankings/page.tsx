@@ -73,9 +73,9 @@ export default function RankingsPage() {
           {t("rankings.empty")}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3 font-medium">{t("rankings.col.rank")}</th>
                 <th className="px-4 py-3 font-medium">

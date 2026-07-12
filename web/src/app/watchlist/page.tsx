@@ -61,7 +61,7 @@ export default function WatchlistPage() {
           </Link>
         </div>
       ) : (
-        <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <ul className="max-h-[70vh] divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 bg-white">
           {items.map((w) => (
             <li key={w.instrument_id} className="flex items-center gap-3 px-4 py-3">
               <Link
