@@ -9,6 +9,7 @@ import { LanguageToggle, useI18n } from "@/lib/i18n";
 
 const NAV_ITEMS = [
   { ids: ["nav-search"], href: "/instruments", label: "nav.search" },
+  { ids: ["nav-recommendations"], href: "/recommendations", label: "nav.recommendations" },
   { ids: ["nav-events"], href: "/events", label: "nav.events" },
   { ids: ["nav-rankings"], href: "/rankings", label: "nav.rankings" },
   { ids: ["nav-screener"], href: "/screener", label: "nav.screener" },

@@ -31,6 +31,7 @@ TAB_GROUPS: list[dict[str, Any]] = [
         "id": "signals",
         "label": "신호",
         "tabs": [
+            {"id": "nav-recommendations", "label": "추천종목", "route": "/recommendations"},
             {"id": "nav-rankings", "label": "랭킹", "route": "/rankings"},
             {"id": "nav-screener", "label": "급락", "route": "/screener"},
             {"id": "nav-watchlist", "label": "관심종목", "route": "/watchlist"},

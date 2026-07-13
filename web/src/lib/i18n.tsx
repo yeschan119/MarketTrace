@@ -17,6 +17,7 @@ type Dict = { [key: string]: string | Dict };
 const en: Dict = {
   nav: {
     search: "Search",
+    recommendations: "Picks",
     events: "Events",
     rankings: "Rankings",
     screener: "Drops",
@@ -27,6 +28,50 @@ const en: Dict = {
     alerts: "Alerts",
     watchlist: "Watchlist",
     admin: "Admin",
+  },
+  recommendations: {
+    title: "Recommended Stocks",
+    subtitle:
+      "Sharp-drop stocks sorted by which deserve review first. The order combines recent price moves, recent company events, and how similar past events played out.",
+    disclaimer:
+      "This is a review list, not a promise that the stock will rise. Open each stock, read the reasons, and check fresh news before making any decision.",
+    loading: "Loading recommendations...",
+    failTitle: "Failed to load recommendations.",
+    empty:
+      "No fresh sharp-drop stocks match the rule right now. Refresh recent prices and try again.",
+    sourceNote:
+      "Rule: down at least 15% from the highest price in the last 20 trading days.",
+    viewStock: "Open stock",
+    priceLabel: "Current / recent high",
+    asOf: "price date {date}",
+    recentEvents: "{count} recent event(s)",
+    noRecentEvents: "No recent events found",
+    level: {
+      first_pick: "Review first",
+      check: "Needs checking",
+      avoid: "Low priority",
+    },
+    reasonTitle: "Why this appears here",
+    reason: {
+      deepDrop:
+        "The stock is {drop}% below its recent high, so the price has already fallen a lot.",
+      freshPrice:
+        "The price data is recent enough to use for today's review.",
+      stalePrice:
+        "The latest price is old, so this should be checked again before acting.",
+      possibleOverreaction:
+        "There is recent company news, but our records do not show a strong pattern that this type of news keeps hurting the stock.",
+      unexplained:
+        "We do not see a clear recent company event explaining the fall, so the first job is to find what caused it.",
+      persistentRisk:
+        "Recent company news looks similar to past cases where investors stayed cautious, so this is ranked lower.",
+      recentEvents:
+        "{count} recent company event(s) were found, so this is not based on price alone.",
+      factorBad:
+        "Main caution point: {label}. Similar news has often made investors careful.",
+      factorGood:
+        "Helpful point: {label}. Similar news has often been received better.",
+    },
   },
   common: { unknownError: "Unknown error" },
   search: {
@@ -565,6 +610,7 @@ const en: Dict = {
 const ko: Dict = {
   nav: {
     search: "검색",
+    recommendations: "추천종목",
     events: "이벤트",
     rankings: "랭킹",
     screener: "급락",
@@ -575,6 +621,50 @@ const ko: Dict = {
     alerts: "알림",
     watchlist: "관심종목",
     admin: "관리자",
+  },
+  recommendations: {
+    title: "추천종목",
+    subtitle:
+      "급락 종목 중에서 먼저 살펴볼 만한 순서로 정렬했습니다. 최근 가격 흐름, 최근 회사 소식, 비슷한 소식 뒤의 과거 움직임을 함께 봅니다.",
+    disclaimer:
+      "이 목록은 '반드시 오른다'는 뜻이 아닙니다. 각 종목의 이유를 읽고, 최신 뉴스와 공시를 확인한 뒤 판단해야 합니다.",
+    loading: "추천종목 불러오는 중...",
+    failTitle: "추천종목을 불러오지 못했습니다.",
+    empty:
+      "현재 기준에 맞는 최신 급락 종목이 없습니다. 최근 가격을 갱신한 뒤 다시 확인하세요.",
+    sourceNote:
+      "기준: 최근 20거래일 중 가장 높았던 가격보다 15% 이상 내려온 종목.",
+    viewStock: "종목 보기",
+    priceLabel: "현재가 / 최근 고점",
+    asOf: "가격 기준일 {date}",
+    recentEvents: "최근 사건 {count}건",
+    noRecentEvents: "최근 사건 없음",
+    level: {
+      first_pick: "우선 검토",
+      check: "추가 확인",
+      avoid: "추천 낮음",
+    },
+    reasonTitle: "추천 이유",
+    reason: {
+      deepDrop:
+        "최근 고점보다 {drop}% 내려와 있어, 이미 가격이 많이 낮아진 상태입니다.",
+      freshPrice:
+        "가격 정보가 최근 자료라서 지금 판단에 사용할 수 있습니다.",
+      stalePrice:
+        "가격 정보가 오래되어 실제 판단 전에는 다시 확인해야 합니다.",
+      possibleOverreaction:
+        "최근 회사 소식은 있지만, 이런 소식이 계속 나쁜 흐름으로 이어졌다는 표시가 강하지 않습니다.",
+      unexplained:
+        "하락을 설명할 뚜렷한 최근 회사 소식이 아직 보이지 않아, 원인 확인이 먼저 필요합니다.",
+      persistentRisk:
+        "최근 회사 소식이 과거에 투자자들이 조심했던 경우와 비슷해, 추천 순위를 낮췄습니다.",
+      recentEvents:
+        "최근 회사 소식 {count}건을 함께 확인했기 때문에, 단순히 가격만 보고 고른 종목은 아닙니다.",
+      factorBad:
+        "가장 큰 걱정거리: {label}. 비슷한 소식 뒤에는 투자자들이 조심스러워진 경우가 많았습니다.",
+      factorGood:
+        "도움이 되는 점: {label}. 비슷한 소식 뒤에는 시장이 더 좋게 받아들인 경우가 있었습니다.",
+    },
   },
   common: { unknownError: "알 수 없는 오류" },
   search: {
