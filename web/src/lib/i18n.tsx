@@ -40,7 +40,7 @@ const en: Dict = {
     empty:
       "No fresh sharp-drop stocks match the rule right now. Refresh recent prices and try again.",
     sourceNote:
-      "Rule: down at least 15% from the highest price in the last 20 trading days.",
+      "Rule: if any stock is down at least 15% from its recent high, show every such stock; otherwise show the 5 biggest relative drops.",
     viewStock: "Open stock",
     priceLabel: "Current / recent high",
     asOf: "price date {date}",
@@ -59,11 +59,16 @@ const en: Dict = {
       overseasDesc: "US and other overseas sharp-drop stocks.",
       overseasEmpty: "No overseas sharp-drop stocks match the rule right now.",
       count: "{count} stocks",
+      trueDropMode: "Showing every stock down at least 15% from its recent high.",
+      relativeMode:
+        "No stock is down 15% or more here, so this shows the 5 largest relative drops.",
     },
     reasonTitle: "Why this appears here",
     reason: {
       deepDrop:
         "The stock is {drop}% below its recent high, so the price has already fallen a lot.",
+      relativeDrop:
+        "The stock is {drop}% below its recent high. This is not necessarily a major crash, but it is one of the larger drops in the current list.",
       freshPrice:
         "The price data is recent enough to use for today's review.",
       stalePrice:
@@ -643,7 +648,7 @@ const ko: Dict = {
     empty:
       "현재 기준에 맞는 최신 급락 종목이 없습니다. 최근 가격을 갱신한 뒤 다시 확인하세요.",
     sourceNote:
-      "기준: 최근 20거래일 중 가장 높았던 가격보다 15% 이상 내려온 종목.",
+      "기준: 최근 고점보다 15% 이상 내려온 종목이 있으면 전부 보여주고, 없으면 상대적으로 가장 많이 내려온 5개만 보여줍니다.",
     viewStock: "종목 보기",
     priceLabel: "현재가 / 최근 고점",
     asOf: "가격 기준일 {date}",
@@ -662,11 +667,16 @@ const ko: Dict = {
       overseasDesc: "미국 등 해외 시장 급락 종목입니다.",
       overseasEmpty: "현재 기준에 맞는 해외 급락 종목이 없습니다.",
       count: "{count}개",
+      trueDropMode: "최근 고점 대비 15% 이상 내려온 종목을 전부 보여줍니다.",
+      relativeMode:
+        "15% 이상 급락한 종목이 없어, 현재 목록에서 상대적으로 많이 내려온 5개만 보여줍니다.",
     },
     reasonTitle: "추천 이유",
     reason: {
       deepDrop:
         "최근 고점보다 {drop}% 내려와 있어, 이미 가격이 많이 낮아진 상태입니다.",
+      relativeDrop:
+        "최근 고점보다 {drop}% 내려왔습니다. 큰 폭락이라고 단정할 정도는 아니지만, 현재 목록 안에서는 상대적으로 많이 내려온 편입니다.",
       freshPrice:
         "가격 정보가 최근 자료라서 지금 판단에 사용할 수 있습니다.",
       stalePrice:

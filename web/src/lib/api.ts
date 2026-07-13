@@ -252,10 +252,12 @@ export const api = {
 
   getDrawdownScreener(
     threshold = -0.15,
-    includeStale = false
+    includeStale = false,
+    limit?: number
   ): Promise<DrawdownScreenerRow[]> {
     const query = new URLSearchParams({ threshold: String(threshold) });
     if (includeStale) query.set("include_stale", "true");
+    if (limit != null) query.set("limit", String(limit));
     return apiFetch<DrawdownScreenerRow[]>(
       `/stats/drawdown-screener?${query.toString()}`
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -10,14 +10,17 @@ import { KoreanName } from "@/components/KoreanName";
 import { WatchButton } from "@/components/WatchButton";
 import type { DrawdownScreenerRow } from "@/types/api";
 
-const THRESHOLD = -0.15;
+const TRUE_DROP_THRESHOLD = -0.15;
+const RELATIVE_DROP_THRESHOLD = 0;
+const FETCH_LIMIT = 200;
+const MAX_RELATIVE_ROWS = 5;
 
 type RecommendationLevel = "first_pick" | "check" | "avoid";
 
 type Recommendation = DrawdownScreenerRow & {
   level: RecommendationLevel;
-  sortValue: number;
   reasons: string[];
+  isRelativeFallback: boolean;
 };
 
 type RecommendationMarket = "domestic" | "overseas";
@@ -50,33 +53,19 @@ function recommendationLevel(row: DrawdownScreenerRow): RecommendationLevel {
   return "check";
 }
 
-function sortValue(row: DrawdownScreenerRow): number {
-  const diagnosisBase =
-    row.diagnosis === "possible_overreaction"
-      ? 100
-      : row.diagnosis === "unexplained_drop"
-        ? 70
-        : 30;
-  const dropBonus = Math.min(18, Math.abs(row.drawdown) * 60);
-  const eventContext =
-    row.diagnosis === "persistent_risk"
-      ? -Math.min(12, row.recent_event_count * 2)
-      : Math.min(10, row.recent_event_count * 3);
-  const historyContext =
-    row.weighted_score == null
-      ? 0
-      : Math.max(-30, Math.min(30, row.weighted_score * 500));
-  const stalePenalty = row.is_stale ? 40 : 0;
-  return diagnosisBase + dropBonus + eventContext + historyContext - stalePenalty;
-}
-
 function buildReasons(
   row: DrawdownScreenerRow,
   lang: Lang,
-  t: (key: string, vars?: Record<string, string | number>) => string
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  isRelativeFallback: boolean
 ): string[] {
   const reasons = [
-    t("recommendations.reason.deepDrop", { drop: pct(row.drawdown) }),
+    t(
+      isRelativeFallback
+        ? "recommendations.reason.relativeDrop"
+        : "recommendations.reason.deepDrop",
+      { drop: pct(row.drawdown) }
+    ),
     row.is_stale
       ? t("recommendations.reason.stalePrice")
       : t("recommendations.reason.freshPrice"),
@@ -108,11 +97,31 @@ function buildReasons(
   return reasons;
 }
 
-function splitByMarket(rows: Recommendation[]): Record<RecommendationMarket, Recommendation[]> {
-  return {
-    domestic: rows.filter((row) => row.market === "KR"),
-    overseas: rows.filter((row) => row.market !== "KR"),
-  };
+function marketMatches(row: DrawdownScreenerRow, market: RecommendationMarket): boolean {
+  return market === "domestic" ? row.market === "KR" : row.market !== "KR";
+}
+
+function recommendForMarket(
+  sourceRows: DrawdownScreenerRow[],
+  market: RecommendationMarket,
+  lang: Lang,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Recommendation[] {
+  const marketRows = sourceRows
+    .filter((row) => marketMatches(row, market))
+    .sort((a, b) => a.drawdown - b.drawdown || a.ticker.localeCompare(b.ticker));
+  const trueDrops = marketRows.filter(
+    (row) => row.drawdown <= TRUE_DROP_THRESHOLD
+  );
+  const selected = trueDrops.length > 0 ? trueDrops : marketRows.slice(0, MAX_RELATIVE_ROWS);
+  const isRelativeFallback = trueDrops.length === 0;
+
+  return selected.map((row) => ({
+    ...row,
+    level: recommendationLevel(row),
+    reasons: buildReasons(row, lang, t, isRelativeFallback),
+    isRelativeFallback,
+  }));
 }
 
 function RecommendationCard({
@@ -199,21 +208,32 @@ function RecommendationCard({
 function RecommendationSection({
   market,
   rows,
+  isActive,
   t,
 }: {
   market: RecommendationMarket;
   rows: Recommendation[];
+  isActive: boolean;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
+  const isRelativeFallback = rows[0]?.isRelativeFallback ?? true;
+
   return (
-    <section className="space-y-3">
-      <div className="flex items-end justify-between gap-3">
+    <section className={`space-y-3 ${isActive ? "" : "hidden"}`}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
             {t(`recommendations.section.${market}`)}
           </h2>
           <p className="text-xs text-gray-500">
             {t(`recommendations.section.${market}Desc`)}
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            {t(
+              isRelativeFallback
+                ? "recommendations.section.relativeMode"
+                : "recommendations.section.trueDropMode"
+            )}
           </p>
         </div>
         <span className="text-xs text-gray-400">
@@ -243,22 +263,33 @@ function RecommendationSection({
 
 export default function RecommendationsPage() {
   const { t, lang } = useI18n();
+  const [market, setMarket] = useState<RecommendationMarket>("domestic");
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["recommendations", THRESHOLD],
-    queryFn: () => api.getDrawdownScreener(THRESHOLD, false),
+    queryKey: ["recommendations", RELATIVE_DROP_THRESHOLD, FETCH_LIMIT],
+    queryFn: () =>
+      api.getDrawdownScreener(RELATIVE_DROP_THRESHOLD, false, FETCH_LIMIT),
   });
 
-  const rows: Recommendation[] = useMemo(() => {
-    return (data ?? [])
-      .map((row) => ({
-        ...row,
-        level: recommendationLevel(row),
-        sortValue: sortValue(row),
-        reasons: buildReasons(row, lang, t),
-      }))
-      .sort((a, b) => b.sortValue - a.sortValue || a.ticker.localeCompare(b.ticker));
+  const rowsByMarket: Record<RecommendationMarket, Recommendation[]> = useMemo(() => {
+    const rows = data ?? [];
+    return {
+      domestic: recommendForMarket(rows, "domestic", lang, t),
+      overseas: recommendForMarket(rows, "overseas", lang, t),
+    };
   }, [data, lang, t]);
-  const rowsByMarket = useMemo(() => splitByMarket(rows), [rows]);
+  const totalRows = rowsByMarket.domestic.length + rowsByMarket.overseas.length;
+  const tabs: { key: RecommendationMarket; label: string; count: number }[] = [
+    {
+      key: "domestic",
+      label: t("recommendations.section.domestic"),
+      count: rowsByMarket.domestic.length,
+    },
+    {
+      key: "overseas",
+      label: t("recommendations.section.overseas"),
+      count: rowsByMarket.overseas.length,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -289,20 +320,41 @@ export default function RecommendationsPage() {
             {error instanceof Error ? error.message : t("common.unknownError")}
           </p>
         </div>
-      ) : rows.length === 0 ? (
+      ) : totalRows === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
           {t("recommendations.empty")}
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setMarket(tab.key)}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
+                  market === tab.key
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-2 text-xs font-normal text-gray-400">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
           <RecommendationSection
             market="domestic"
             rows={rowsByMarket.domestic}
+            isActive={market === "domestic"}
             t={t}
           />
           <RecommendationSection
             market="overseas"
             rows={rowsByMarket.overseas}
+            isActive={market === "overseas"}
             t={t}
           />
         </div>
