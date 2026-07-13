@@ -51,6 +51,15 @@ const en: Dict = {
       check: "Needs checking",
       avoid: "Low priority",
     },
+    section: {
+      domestic: "Domestic",
+      domesticDesc: "Korean-market sharp-drop stocks.",
+      domesticEmpty: "No domestic sharp-drop stocks match the rule right now.",
+      overseas: "Overseas",
+      overseasDesc: "US and other overseas sharp-drop stocks.",
+      overseasEmpty: "No overseas sharp-drop stocks match the rule right now.",
+      count: "{count} stocks",
+    },
     reasonTitle: "Why this appears here",
     reason: {
       deepDrop:
@@ -162,6 +171,7 @@ const en: Dict = {
     subtitle: "Notable events on your watched instruments",
     empty: "No alerts yet. Watch an instrument to be notified of its notable events.",
     markAllRead: "Mark all read",
+    groupCount: "{count} alerts",
     conflictDesc: "Model direction conflicts with the validated historical drift",
     significantDesc: "Validated significant event type",
     kindConflict: "Conflict",
@@ -644,6 +654,15 @@ const ko: Dict = {
       check: "추가 확인",
       avoid: "추천 낮음",
     },
+    section: {
+      domestic: "국내",
+      domesticDesc: "국내 시장 급락 종목입니다.",
+      domesticEmpty: "현재 기준에 맞는 국내 급락 종목이 없습니다.",
+      overseas: "해외",
+      overseasDesc: "미국 등 해외 시장 급락 종목입니다.",
+      overseasEmpty: "현재 기준에 맞는 해외 급락 종목이 없습니다.",
+      count: "{count}개",
+    },
     reasonTitle: "추천 이유",
     reason: {
       deepDrop:
@@ -755,6 +774,7 @@ const ko: Dict = {
     subtitle: "관심종목에서 주목할 만한 이벤트",
     empty: "아직 알림이 없습니다. 종목을 관심등록하면 주목할 이벤트를 알려드립니다.",
     markAllRead: "모두 읽음",
+    groupCount: "알림 {count}개",
     conflictDesc: "모델 방향이 검증된 과거 드리프트와 충돌",
     significantDesc: "검증된 유의 사건유형",
     kindConflict: "충돌",

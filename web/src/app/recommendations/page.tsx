@@ -20,6 +20,8 @@ type Recommendation = DrawdownScreenerRow & {
   reasons: string[];
 };
 
+type RecommendationMarket = "domestic" | "overseas";
+
 const levelStyles: Record<RecommendationLevel, string> = {
   first_pick: "border-emerald-200 bg-emerald-50 text-emerald-800",
   check: "border-sky-200 bg-sky-50 text-sky-800",
@@ -106,6 +108,139 @@ function buildReasons(
   return reasons;
 }
 
+function splitByMarket(rows: Recommendation[]): Record<RecommendationMarket, Recommendation[]> {
+  return {
+    domestic: rows.filter((row) => row.market === "KR"),
+    overseas: rows.filter((row) => row.market !== "KR"),
+  };
+}
+
+function RecommendationCard({
+  row,
+  rank,
+  t,
+}: {
+  row: Recommendation;
+  rank: number;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  return (
+    <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm text-gray-400">#{rank}</span>
+            <WatchButton instrumentId={row.instrument_id} compact />
+            <Link
+              href={`/instruments/${row.instrument_id}`}
+              className="font-mono text-lg font-semibold text-indigo-600 hover:underline"
+            >
+              {row.ticker}
+            </Link>
+            <span
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${levelStyles[row.level]}`}
+            >
+              {t(`recommendations.level.${row.level}`)}
+            </span>
+          </div>
+          <div className="mt-1 text-sm text-gray-600">
+            {row.name}
+            <KoreanName ticker={row.ticker} className="ml-1" />
+          </div>
+        </div>
+
+        <div className="text-right text-sm">
+          <div className="font-semibold text-amber-700">-{pct(row.drawdown)}%</div>
+          <div className="mt-1 text-xs text-gray-500">
+            {t("recommendations.priceLabel")}: {price(row.current_price)} /{" "}
+            {price(row.high_price)}
+          </div>
+          <div className="text-xs text-gray-400">
+            {t("recommendations.asOf", { date: row.latest_date })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_160px]">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            {t("recommendations.reasonTitle")}
+          </h3>
+          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-gray-700">
+            {row.reasons.map((reason) => (
+              <li key={reason} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-gray-400" />
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex flex-col items-start gap-3 md:items-end">
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-600">
+            {row.recent_event_count > 0
+              ? t("recommendations.recentEvents", {
+                  count: row.recent_event_count,
+                })
+              : t("recommendations.noRecentEvents")}
+          </span>
+          <Link
+            href={`/instruments/${row.instrument_id}`}
+            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            {t("recommendations.viewStock")}
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RecommendationSection({
+  market,
+  rows,
+  t,
+}: {
+  market: RecommendationMarket;
+  rows: Recommendation[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {t(`recommendations.section.${market}`)}
+          </h2>
+          <p className="text-xs text-gray-500">
+            {t(`recommendations.section.${market}Desc`)}
+          </p>
+        </div>
+        <span className="text-xs text-gray-400">
+          {t("recommendations.section.count", { count: rows.length })}
+        </span>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+          {t(`recommendations.section.${market}Empty`)}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((row, index) => (
+            <RecommendationCard
+              key={row.instrument_id}
+              row={row}
+              rank={index + 1}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function RecommendationsPage() {
   const { t, lang } = useI18n();
   const { data, isLoading, isError, error } = useQuery({
@@ -123,6 +258,7 @@ export default function RecommendationsPage() {
       }))
       .sort((a, b) => b.sortValue - a.sortValue || a.ticker.localeCompare(b.ticker));
   }, [data, lang, t]);
+  const rowsByMarket = useMemo(() => splitByMarket(rows), [rows]);
 
   return (
     <div className="space-y-6">
@@ -158,84 +294,17 @@ export default function RecommendationsPage() {
           {t("recommendations.empty")}
         </div>
       ) : (
-        <div className="space-y-3">
-          {rows.map((row, index) => (
-            <article
-              key={row.instrument_id}
-              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm text-gray-400">
-                      #{index + 1}
-                    </span>
-                    <WatchButton instrumentId={row.instrument_id} compact />
-                    <Link
-                      href={`/instruments/${row.instrument_id}`}
-                      className="font-mono text-lg font-semibold text-indigo-600 hover:underline"
-                    >
-                      {row.ticker}
-                    </Link>
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${levelStyles[row.level]}`}
-                    >
-                      {t(`recommendations.level.${row.level}`)}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    {row.name}
-                    <KoreanName ticker={row.ticker} className="ml-1" />
-                  </div>
-                </div>
-
-                <div className="text-right text-sm">
-                  <div className="font-semibold text-amber-700">
-                    -{pct(row.drawdown)}%
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    {t("recommendations.priceLabel")}: {price(row.current_price)} /{" "}
-                    {price(row.high_price)}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {t("recommendations.asOf", { date: row.latest_date })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-[1fr_160px]">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    {t("recommendations.reasonTitle")}
-                  </h2>
-                  <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-gray-700">
-                    {row.reasons.map((reason) => (
-                      <li key={reason} className="flex gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-gray-400" />
-                        <span>{reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="flex flex-col items-start gap-3 md:items-end">
-                  <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-600">
-                    {row.recent_event_count > 0
-                      ? t("recommendations.recentEvents", {
-                          count: row.recent_event_count,
-                        })
-                      : t("recommendations.noRecentEvents")}
-                  </span>
-                  <Link
-                    href={`/instruments/${row.instrument_id}`}
-                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                  >
-                    {t("recommendations.viewStock")}
-                  </Link>
-                </div>
-              </div>
-            </article>
-          ))}
+        <div className="grid gap-6 xl:grid-cols-2">
+          <RecommendationSection
+            market="domestic"
+            rows={rowsByMarket.domestic}
+            t={t}
+          />
+          <RecommendationSection
+            market="overseas"
+            rows={rowsByMarket.overseas}
+            t={t}
+          />
         </div>
       )}
     </div>
