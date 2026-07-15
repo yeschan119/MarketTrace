@@ -1,0 +1,79 @@
+name: nightly-ingest
+
+# 매일 밤 12시(한국시간, KST)에 데이터수집을 자동 실행한다.
+# Render 무료 플랜 웹 서비스는 유휴 시 슬립되므로, GitHub Actions가 외부에서
+# /auth/login 으로 토큰을 받아 POST /ingest 를 호출해 슬립된 서버를 깨우고
+# 수집을 트리거한다. /ingest 는 멱등적이고 중단 시 다음 실행에서 이어받도록
+# 설계돼 있어, 매일 밤 실행하면 누락분을 계속 채워 나간다.
+
+on:
+  schedule:
+    # GitHub Actions cron 은 UTC 기준. 00:00 KST == 15:00 UTC.
+    - cron: "0 15 * * *"
+  # 대시보드에서 수동 실행("Run workflow")도 가능하게 한다.
+  workflow_dispatch:
+
+# 동시에 두 번 돌지 않도록 (수동 실행이 예약 실행과 겹칠 때 하나만).
+concurrency:
+  group: nightly-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://api.miffy178.com' }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Log in and get token
+        id: login
+        run: |
+          set -euo pipefail
+          if [ -z "${ADMIN_USERNAME:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+            echo "::error::ADMIN_USERNAME / ADMIN_PASSWORD 시크릿이 설정되지 않았습니다."
+            exit 1
+          fi
+
+          # 슬립된 Render 무료 dyno 는 첫 요청에 콜드스타트로 수십 초가 걸릴 수
+          # 있으므로 로그인은 최대 5회까지 재시도한다.
+          token=""
+          for attempt in 1 2 3 4 5; do
+            echo "login attempt ${attempt}..."
+            body="$(curl -sS --max-time 90 \
+              -X POST "${API_BASE_URL}/auth/login" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -nc --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" \
+                    '{username: $u, password: $p}')" || true)"
+            token="$(printf '%s' "$body" | jq -r '.token // empty' 2>/dev/null || true)"
+            if [ -n "$token" ]; then
+              echo "login ok"
+              break
+            fi
+            echo "login not ready yet: ${body:-<empty>}"
+            sleep 20
+          done
+
+          if [ -z "$token" ]; then
+            echo "::error::로그인에 실패했습니다 (토큰을 받지 못함)."
+            exit 1
+          fi
+          # 토큰은 로그에 남기지 않고 마스킹 후 다음 스텝으로 전달한다.
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger ingest
+        env:
+          TOKEN: ${{ steps.login.outputs.token }}
+        run: |
+          set -euo pipefail
+          status="$(curl -sS --max-time 120 -o /tmp/ingest_body.txt -w '%{http_code}' \
+            -X POST "${API_BASE_URL}/ingest" \
+            -H "Authorization: Bearer ${TOKEN}" || true)"
+          echo "HTTP ${status}"
+          echo "response: $(cat /tmp/ingest_body.txt)"
+          case "$status" in
+            2*) echo "데이터수집이 백그라운드로 시작되었습니다." ;;
+            *)  echo "::error::/ingest 트리거 실패 (HTTP ${status})."; exit 1 ;;
+          esac
