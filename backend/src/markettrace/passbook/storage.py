@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from markettrace.db.models import PassbookStatementRecord
+from markettrace.ledger.customization import (
+    PASSBOOK_DOMAIN,
+    CategoryResolver,
+    load_resolver,
+)
 from markettrace.passbook.statements import (
     PassbookCategory,
     PassbookEntry,
@@ -80,6 +86,7 @@ def _entries_for_window(
 ) -> list[PassbookEntry]:
     """Return entries for a single month or a trailing 12 months."""
     start = _shift_months(month, 11) if window == "year" else month
+    resolver = load_resolver(session, PASSBOOK_DOMAIN)
     rows = session.scalars(
         select(PassbookStatementRecord)
         .where(
@@ -88,7 +95,11 @@ def _entries_for_window(
         )
         .order_by(PassbookStatementRecord.statement_month)
     )
-    return [_entry_from_payload(entry) for row in rows for entry in row.entries]
+    return [
+        _entry_from_payload(entry, resolver)
+        for row in rows
+        for entry in row.entries
+    ]
 
 
 def aggregate_passbook_categories(
@@ -124,10 +135,10 @@ def get_passbook_statement(
 
 
 def build_passbook_statement_from_record(
-    row: PassbookStatementRecord,
+    row: PassbookStatementRecord, resolver: CategoryResolver | None = None
 ) -> PassbookStatement:
     """Return a display statement from a saved row using current category rules."""
-    entries = [_entry_from_payload(entry) for entry in row.entries]
+    entries = [_entry_from_payload(entry, resolver) for entry in row.entries]
     return PassbookStatement(
         statement_month=row.statement_month,
         uploaded_at=row.uploaded_at,
@@ -173,13 +184,15 @@ def _category_payload(category: PassbookCategory) -> dict:
     }
 
 
-def _entry_from_payload(value: dict) -> PassbookEntry:
+def _entry_from_payload(
+    value: dict, resolver: CategoryResolver | None = None
+) -> PassbookEntry:
     summary = str(value.get("summary") or "")
     description = str(value.get("description") or "")
     withdrawal = int(value.get("withdrawal") or 0)
     deposit = int(value.get("deposit") or 0)
     balance_raw = value.get("balance")
-    return PassbookEntry(
+    entry = PassbookEntry(
         date=date.fromisoformat(str(value["date"])),
         time=str(value.get("time") or ""),
         summary=summary,
@@ -192,3 +205,11 @@ def _entry_from_payload(value: dict) -> PassbookEntry:
         branch=str(value.get("branch") or ""),
         category=categorize(summary, description),
     )
+    if resolver is None:
+        return entry
+    resolved = resolver.category_for(
+        entry_key=entry.entry_key,
+        text=f"{summary} {description}",
+        base_category=entry.category,
+    )
+    return entry if resolved == entry.category else replace(entry, category=resolved)

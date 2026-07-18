@@ -5,7 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { useCategoryCustomization } from "@/lib/useCategoryCustomization";
 import { PassbookCategoryChart } from "@/components/PassbookCategoryChart";
+import { CategoryEditControl } from "@/components/CategoryEditControl";
+import { CategoryManager } from "@/components/CategoryManager";
 import type {
   PassbookEntry,
   PassbookStatement,
@@ -104,6 +107,7 @@ export default function PassbookPage() {
   const { token, logout } = useAuth();
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
+  const customization = useCategoryCustomization(token, "/passbook");
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -220,6 +224,10 @@ export default function PassbookPage() {
   const categorySections = useMemo(
     () => buildCategorySections(statement),
     [statement]
+  );
+  const statementCategoryNames = useMemo(
+    () => categorySections.map((section) => section.category),
+    [categorySections]
   );
   const isFetching =
     selectedStatement.isFetching || statementSummaries.isFetching;
@@ -428,6 +436,8 @@ export default function PassbookPage() {
               <PassbookCategoryChart token={token} month={selectedMonth} />
             )}
 
+            <CategoryManager controller={customization} />
+
             {statement.entries.length === 0 ? (
               <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
                 {t("passbook.empty")}
@@ -505,6 +515,9 @@ export default function PassbookPage() {
                                 <th className="px-4 py-3 text-right">
                                   {t("passbook.th.balance")}
                                 </th>
+                                <th className="px-4 py-3 text-right">
+                                  {t("customize.th.category")}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -536,6 +549,20 @@ export default function PassbookPage() {
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-gray-500">
                                     {formatWon(entry.balance, locale)}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                                    <CategoryEditControl
+                                      controller={customization}
+                                      entryKey={entry.entry_key}
+                                      keywordSuggestion={
+                                        entry.description &&
+                                        entry.description !== "내용 없음"
+                                          ? entry.description
+                                          : entry.summary
+                                      }
+                                      currentCategory={entry.category}
+                                      extraCategories={statementCategoryNames}
+                                    />
                                   </td>
                                 </tr>
                               ))}

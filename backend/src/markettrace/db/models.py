@@ -265,6 +265,71 @@ class LedgerStatementRecord(Base):
     warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
 
 
+class LedgerCategoryRule(Base):
+    """A user keyword→category rule shared by the card and passbook views.
+
+    ``domain`` separates the two ledgers ("card" vs "passbook") so a merchant
+    keyword rule never bleeds into 적요-based passbook matching. ``keyword_norm``
+    is the normalized (upper-cased, punctuation-stripped) form used for
+    substring matching; ``keyword`` keeps the original text for display. Rules
+    take precedence over the built-in category rules and apply retroactively to
+    every stored statement as well as future ones.
+    """
+
+    __tablename__ = "ledger_category_rules"
+    __table_args__ = (
+        UniqueConstraint("domain", "keyword_norm", name="uq_ledger_rule_domain_keyword"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    domain: Mapped[str] = mapped_column(String, nullable=False)
+    keyword: Mapped[str] = mapped_column(String, nullable=False)
+    keyword_norm: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LedgerEntryOverride(Base):
+    """A single-transaction category correction keyed by its stable fingerprint.
+
+    ``entry_key`` is the ``make_entry_key`` hash of the transaction's immutable
+    fields, so the override re-binds to the same row every time the statement is
+    re-parsed. Highest precedence: it beats both user keyword rules and the
+    built-in rules.
+    """
+
+    __tablename__ = "ledger_entry_overrides"
+    __table_args__ = (
+        UniqueConstraint("domain", "entry_key", name="uq_ledger_override_domain_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    domain: Mapped[str] = mapped_column(String, nullable=False)
+    entry_key: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LedgerCustomCategory(Base):
+    """A user-created category name for a ledger domain.
+
+    Lets a category exist (and be managed) before any transaction or rule
+    references it, so the reassignment dropdown can offer it immediately.
+    """
+
+    __tablename__ = "ledger_custom_categories"
+    __table_args__ = (
+        UniqueConstraint("domain", "name", name="uq_ledger_custom_category"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    domain: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class PassbookStatementRecord(Base):
     __tablename__ = "passbook_statements"
     __table_args__ = (
