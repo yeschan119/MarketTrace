@@ -474,6 +474,7 @@ class LedgerEntryOut(BaseModel):
     description: str
     amount: int
     category: str
+    entry_key: str
 
 
 class LedgerCategoryOut(BaseModel):
@@ -537,6 +538,7 @@ class PassbookEntryOut(BaseModel):
     balance: int | None
     branch: str
     category: str
+    entry_key: str
 
 
 class PassbookCategoryOut(BaseModel):
@@ -619,3 +621,53 @@ class UnreadCountOut(BaseModel):
     """Unread-alert count for the header bell badge."""
 
     count: int
+
+
+# --- ledger / passbook category customization ---------------------------------
+
+
+class AvailableCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    source: str  # "builtin" | "custom"
+
+
+class CategoryRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    keyword: str
+    category: str
+
+
+class CategoryOverrideOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    entry_key: str
+    category: str
+    description: str | None
+
+
+class CategoryCustomizationOut(BaseModel):
+    """The full customization state for one ledger domain."""
+
+    available_categories: list[AvailableCategoryOut]
+    rules: list[CategoryRuleOut]
+    overrides: list[CategoryOverrideOut]
+
+
+class CategoryOverrideRequest(BaseModel):
+    entry_key: str
+    # None clears the override, reverting the entry to rule-based categorization.
+    category: str | None = None
+    description: str | None = None
+
+
+class CategoryRuleRequest(BaseModel):
+    keyword: str
+    category: str
+
+
+class CustomCategoryRequest(BaseModel):
+    name: str

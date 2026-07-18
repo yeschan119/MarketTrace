@@ -19,6 +19,8 @@ import type {
   InstrumentSearchResult,
   InstrumentSummary,
   InstrumentTimeline,
+  CategoryCustomization,
+  CustomizationBase,
   LedgerCategory,
   LedgerEntry,
   LedgerStatement,
@@ -167,6 +169,18 @@ async function apiDelete(path: string, token?: string): Promise<void> {
   if (!res.ok) {
     throw await buildApiError(res, url);
   }
+}
+
+// DELETE that returns a JSON body (e.g. the refreshed customization state).
+async function apiDelete2<T>(path: string, token?: string): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, { method: "DELETE", headers });
+  if (!res.ok) {
+    throw await buildApiError(res, url);
+  }
+  return res.json() as Promise<T>;
 }
 
 // POST that expects a 204 No Content (does not parse a JSON body).
@@ -524,6 +538,76 @@ export const api = {
     return apiPostForm<PassbookStatement>(
       "/passbook/statement/upload",
       form,
+      token
+    );
+  },
+
+  // --- category customization (shared by card ledger and passbook) ----------
+
+  getCategoryCustomization(
+    token: string,
+    base: CustomizationBase
+  ): Promise<CategoryCustomization> {
+    return apiFetch<CategoryCustomization>(`${base}/customization`, token);
+  },
+
+  setCategoryOverride(
+    token: string,
+    base: CustomizationBase,
+    entryKey: string,
+    category: string | null,
+    description?: string
+  ): Promise<CategoryCustomization> {
+    return apiPut<CategoryCustomization>(
+      `${base}/customization/override`,
+      { entry_key: entryKey, category, description },
+      token
+    );
+  },
+
+  createCategoryRule(
+    token: string,
+    base: CustomizationBase,
+    keyword: string,
+    category: string
+  ): Promise<CategoryCustomization> {
+    return apiPost<CategoryCustomization>(
+      `${base}/customization/rule`,
+      { keyword, category },
+      token
+    );
+  },
+
+  deleteCategoryRule(
+    token: string,
+    base: CustomizationBase,
+    ruleId: number
+  ): Promise<CategoryCustomization> {
+    return apiDelete2<CategoryCustomization>(
+      `${base}/customization/rule/${ruleId}`,
+      token
+    );
+  },
+
+  createCustomCategory(
+    token: string,
+    base: CustomizationBase,
+    name: string
+  ): Promise<CategoryCustomization> {
+    return apiPost<CategoryCustomization>(
+      `${base}/customization/category`,
+      { name },
+      token
+    );
+  },
+
+  deleteCustomCategory(
+    token: string,
+    base: CustomizationBase,
+    name: string
+  ): Promise<CategoryCustomization> {
+    return apiDelete2<CategoryCustomization>(
+      `${base}/customization/category/${encodeURIComponent(name)}`,
       token
     );
   },

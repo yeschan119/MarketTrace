@@ -378,6 +378,7 @@ export interface LedgerEntry {
   description: string;
   amount: number;
   category: string;
+  entry_key: string;
 }
 
 export interface LedgerCategory {
@@ -431,6 +432,7 @@ export interface PassbookEntry {
   balance: number | null;
   branch: string;
   category: string;
+  entry_key: string;
 }
 
 export interface PassbookCategory {
@@ -472,3 +474,31 @@ export interface PassbookStatementSummary {
   deposit_total: number;
   entry_count: number;
 }
+
+// --- ledger / passbook category customization -------------------------------
+
+export interface AvailableCategory {
+  name: string;
+  source: "builtin" | "custom";
+}
+
+export interface CategoryRule {
+  id: number;
+  keyword: string;
+  category: string;
+}
+
+export interface CategoryOverride {
+  entry_key: string;
+  category: string;
+  description: string | null;
+}
+
+export interface CategoryCustomization {
+  available_categories: AvailableCategory[];
+  rules: CategoryRule[];
+  overrides: CategoryOverride[];
+}
+
+// The URL base that selects which ledger's customization to hit.
+export type CustomizationBase = "/ledger" | "/passbook";

@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime
 from io import BytesIO
 from pathlib import Path
 
+from markettrace.ledger.fingerprint import make_entry_key
+
 _DATE_LINE_RE = re.compile(r"^(?P<yy>\d{2})\.(?P<mm>\d{2})\.(?P<dd>\d{2})\s+(?P<rest>.+)$")
 _MONEY_RE = re.compile(r"(?<![\d.])-?\d{1,3}(?:,\d{3})+(?![\d.])")
 _FULL_DATE_RE = re.compile(r"20\d{2}\.\s*\d{2}\.\s*\d{2}")
@@ -58,6 +60,13 @@ class LedgerEntry:
     description: str
     amount: int
     category: str
+
+    @property
+    def entry_key(self) -> str:
+        """Stable identity used to pin a manual category override to this row."""
+        return make_entry_key(
+            [self.date.isoformat(), self.card_tail or "", self.description, self.amount]
+        )
 
 
 @dataclass(frozen=True)

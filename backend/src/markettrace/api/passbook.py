@@ -19,6 +19,7 @@ from markettrace.api.schemas import (
     PassbookStatementSummaryOut,
 )
 from markettrace.config import get_settings
+from markettrace.ledger.customization import PASSBOOK_DOMAIN, load_resolver
 from markettrace.passbook.statements import (
     PassbookDependencyError,
     PassbookError,
@@ -61,7 +62,10 @@ def get_passbook_statement(
         raise _passbook_http_exception(exc) from exc
 
     saved = save_passbook_statement(db, statement)
-    return PassbookStatementOut.model_validate(build_passbook_statement_from_record(saved))
+    resolver = load_resolver(db, PASSBOOK_DOMAIN)
+    return PassbookStatementOut.model_validate(
+        build_passbook_statement_from_record(saved, resolver)
+    )
 
 
 @router.post("/passbook/statement/upload", response_model=PassbookStatementOut)
@@ -96,7 +100,10 @@ async def upload_passbook_statement(
         raise _passbook_http_exception(exc) from exc
 
     saved = save_passbook_statement(db, statement)
-    return PassbookStatementOut.model_validate(build_passbook_statement_from_record(saved))
+    resolver = load_resolver(db, PASSBOOK_DOMAIN)
+    return PassbookStatementOut.model_validate(
+        build_passbook_statement_from_record(saved, resolver)
+    )
 
 
 @router.get("/passbook/statements", response_model=list[PassbookStatementSummaryOut])
@@ -155,7 +162,10 @@ def get_saved_statement(
     row = get_saved_passbook_statement(db, _parse_statement_month(statement_month))
     if row is None:
         raise HTTPException(status_code=404, detail="statement not found")
-    return PassbookStatementOut.model_validate(build_passbook_statement_from_record(row))
+    resolver = load_resolver(db, PASSBOOK_DOMAIN)
+    return PassbookStatementOut.model_validate(
+        build_passbook_statement_from_record(row, resolver)
+    )
 
 
 def _resolve_passbook_password(

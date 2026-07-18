@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from markettrace.db.models import LedgerStatementRecord
+from markettrace.ledger.customization import (
+    CARD_DOMAIN,
+    CategoryResolver,
+    load_resolver,
+)
 from markettrace.ledger.statements import (
     LedgerCategory,
     LedgerEntry,
@@ -84,6 +90,7 @@ def _entries_for_window(
 ) -> list[LedgerEntry]:
     """Return ledger entries for a single month or a trailing 12 months."""
     start = _shift_months(month, 11) if window == "year" else month
+    resolver = load_resolver(session, CARD_DOMAIN)
     rows = session.scalars(
         select(LedgerStatementRecord)
         .where(
@@ -92,7 +99,11 @@ def _entries_for_window(
         )
         .order_by(LedgerStatementRecord.statement_month)
     )
-    return [_entry_from_payload(entry) for row in rows for entry in row.entries]
+    return [
+        _entry_from_payload(entry, resolver)
+        for row in rows
+        for entry in row.entries
+    ]
 
 
 def aggregate_ledger_categories(
@@ -122,9 +133,11 @@ def get_ledger_statement(
     )
 
 
-def build_ledger_statement_from_record(row: LedgerStatementRecord) -> LedgerStatement:
+def build_ledger_statement_from_record(
+    row: LedgerStatementRecord, resolver: CategoryResolver | None = None
+) -> LedgerStatement:
     """Return a display statement from a saved row using current category rules."""
-    entries = [_entry_from_payload(entry) for entry in row.entries]
+    entries = [_entry_from_payload(entry, resolver) for entry in row.entries]
     return LedgerStatement(
         statement_month=row.statement_month,
         uploaded_at=row.uploaded_at,
@@ -163,12 +176,22 @@ def _category_payload(category: LedgerCategory) -> dict:
     }
 
 
-def _entry_from_payload(value: dict) -> LedgerEntry:
+def _entry_from_payload(
+    value: dict, resolver: CategoryResolver | None = None
+) -> LedgerEntry:
     description = str(value.get("description") or "")
-    return LedgerEntry(
+    entry = LedgerEntry(
         date=date.fromisoformat(str(value["date"])),
         card_tail=value.get("card_tail"),
         description=description,
         amount=int(value.get("amount") or 0),
         category=categorize_description(description),
     )
+    if resolver is None:
+        return entry
+    resolved = resolver.category_for(
+        entry_key=entry.entry_key,
+        text=description,
+        base_category=entry.category,
+    )
+    return entry if resolved == entry.category else replace(entry, category=resolved)

@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime
 from io import BytesIO
 from pathlib import Path
 
+from markettrace.ledger.fingerprint import make_entry_key
+
 _RECORD_START_RE = re.compile(r"^(?P<date>\d{8})\s+(?P<time>\d{1,2}:\d{2}:\d{2})\s+(?P<body>.+)$")
 _AMOUNT_TOKEN_RE = re.compile(r"^(?:0|\d{1,3}(?:,\d{3})*)$")
 _COMMA_AMOUNT_RE = re.compile(r"^\d{1,3}(?:,\d{3})+$")
@@ -73,6 +75,20 @@ class PassbookEntry:
     balance: int | None
     branch: str
     category: str
+
+    @property
+    def entry_key(self) -> str:
+        """Stable identity used to pin a manual category override to this row."""
+        return make_entry_key(
+            [
+                self.date.isoformat(),
+                self.time,
+                self.summary,
+                self.description,
+                self.amount,
+                self.direction,
+            ]
+        )
 
 
 @dataclass(frozen=True)

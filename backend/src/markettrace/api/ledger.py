@@ -19,6 +19,7 @@ from markettrace.api.schemas import (
     LedgerStatementSummaryOut,
 )
 from markettrace.config import get_settings
+from markettrace.ledger.customization import CARD_DOMAIN, load_resolver
 from markettrace.ledger.statements import (
     StatementDependencyError,
     StatementError,
@@ -61,7 +62,10 @@ def get_ledger_statement(
         raise _statement_http_exception(exc) from exc
 
     saved = save_ledger_statement(db, statement)
-    return LedgerStatementOut.model_validate(build_ledger_statement_from_record(saved))
+    resolver = load_resolver(db, CARD_DOMAIN)
+    return LedgerStatementOut.model_validate(
+        build_ledger_statement_from_record(saved, resolver)
+    )
 
 
 @router.post("/ledger/statement/upload", response_model=LedgerStatementOut)
@@ -96,7 +100,10 @@ async def upload_ledger_statement(
         raise _statement_http_exception(exc) from exc
 
     saved = save_ledger_statement(db, statement)
-    return LedgerStatementOut.model_validate(build_ledger_statement_from_record(saved))
+    resolver = load_resolver(db, CARD_DOMAIN)
+    return LedgerStatementOut.model_validate(
+        build_ledger_statement_from_record(saved, resolver)
+    )
 
 
 @router.get("/ledger/statements", response_model=list[LedgerStatementSummaryOut])
@@ -152,7 +159,10 @@ def get_saved_statement(
     row = get_saved_ledger_statement(db, _parse_statement_month(statement_month))
     if row is None:
         raise HTTPException(status_code=404, detail="statement not found")
-    return LedgerStatementOut.model_validate(build_ledger_statement_from_record(row))
+    resolver = load_resolver(db, CARD_DOMAIN)
+    return LedgerStatementOut.model_validate(
+        build_ledger_statement_from_record(row, resolver)
+    )
 
 
 def _resolve_statement_password(

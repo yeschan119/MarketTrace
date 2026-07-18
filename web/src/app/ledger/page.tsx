@@ -5,7 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { useCategoryCustomization } from "@/lib/useCategoryCustomization";
 import { LedgerCategoryChart } from "@/components/LedgerCategoryChart";
+import { CategoryEditControl } from "@/components/CategoryEditControl";
+import { CategoryManager } from "@/components/CategoryManager";
 import type {
   LedgerEntry,
   LedgerStatement,
@@ -99,6 +102,7 @@ export default function LedgerPage() {
   const { token, logout } = useAuth();
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
+  const customization = useCategoryCustomization(token, "/ledger");
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -215,6 +219,10 @@ export default function LedgerPage() {
   const categorySections = useMemo(
     () => buildCategorySections(statement),
     [statement]
+  );
+  const statementCategoryNames = useMemo(
+    () => categorySections.map((section) => section.category),
+    [categorySections]
   );
   const isFetching = selectedStatement.isFetching || statementSummaries.isFetching;
   const isParsing = uploadStatement.isPending;
@@ -422,6 +430,8 @@ export default function LedgerPage() {
               <LedgerCategoryChart token={token} month={selectedMonth} />
             )}
 
+            <CategoryManager controller={customization} />
+
             {statement.entries.length === 0 ? (
               <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
                 {t("ledger.empty")}
@@ -484,6 +494,9 @@ export default function LedgerPage() {
                                 <th className="px-4 py-3 text-right">
                                   {t("ledger.th.amount")}
                                 </th>
+                                <th className="px-4 py-3 text-right">
+                                  {t("customize.th.category")}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -507,6 +520,15 @@ export default function LedgerPage() {
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-semibold text-gray-900">
                                     {formatWon(entry.amount, locale)}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                                    <CategoryEditControl
+                                      controller={customization}
+                                      entryKey={entry.entry_key}
+                                      keywordSuggestion={entry.description}
+                                      currentCategory={entry.category}
+                                      extraCategories={statementCategoryNames}
+                                    />
                                   </td>
                                 </tr>
                               ))}
