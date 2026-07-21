@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { CatMascot } from "@/components/CatMascot";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
@@ -19,6 +20,16 @@ export default function RootLayout({
         <Providers>
           <SiteHeader />
           <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+          <CatMascot
+            name="냉이"
+            src="/assets/cat-mascot-sprite.png"
+            variant="naengi"
+          />
+          <CatMascot
+            name="꿍이"
+            src="/assets/koongi-mascot-sprite.png"
+            variant="koongi"
+          />
         </Providers>
       </body>
     </html>

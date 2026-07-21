@@ -19,3 +19,86 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.cat-mascot {
+  --cat-size: clamp(52px, 6vw, 76px);
+  --cat-bottom: clamp(18px, 4vh, 44px);
+  --cat-frame-duration: 9s;
+
+  position: fixed;
+  bottom: var(--cat-bottom);
+  z-index: 40;
+  width: var(--cat-size);
+  height: var(--cat-size);
+  pointer-events: none;
+}
+
+.cat-mascot--naengi {
+  --cat-size: clamp(104px, 12vw, 152px);
+  --cat-bottom: clamp(16px, 4vh, 40px);
+  --cat-frame-duration: 10.8s;
+
+  left: clamp(12px, 2vw, 28px);
+}
+
+.cat-mascot--koongi {
+  --cat-size: clamp(62px, 7.2vw, 91px);
+  --cat-bottom: clamp(122px, 15vh, 176px);
+  --cat-frame-duration: 6.6s;
+
+  right: clamp(12px, 2vw, 28px);
+}
+
+.cat-mascot__direction {
+  width: 100%;
+  height: 100%;
+  transform-origin: center bottom;
+}
+
+.cat-mascot__viewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  filter: drop-shadow(0 8px 12px rgb(15 23 42 / 0.16));
+}
+
+.cat-mascot__sheet {
+  display: block;
+  width: 600%;
+  height: 100%;
+  max-width: none;
+  object-fit: fill;
+  user-select: none;
+  animation: cat-mascot-frames var(--cat-frame-duration) steps(6) infinite;
+}
+
+@keyframes cat-mascot-frames {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (max-width: 640px) {
+  .cat-mascot--naengi {
+    --cat-size: 100px;
+    --cat-bottom: 10px;
+  }
+
+  .cat-mascot--koongi {
+    --cat-size: 60px;
+    --cat-bottom: 116px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-mascot {
+    transform: none;
+  }
+
+  .cat-mascot__sheet {
+    animation: none;
+  }
+}
