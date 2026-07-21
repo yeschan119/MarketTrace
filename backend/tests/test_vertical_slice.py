@@ -46,9 +46,8 @@ _DISCLOSURE_TEXT = (
 )
 
 
-def _build_price_frame(overrides: dict[int, float]) -> pl.DataFrame:
+def _build_price_frame(overrides: dict[int, float], *, n: int = 30) -> pl.DataFrame:
     """30-row OHLCV frame; ``overrides`` sets adj_close at given row indices."""
-    n = 30
     closes = [50.0] * n
     for idx, value in overrides.items():
         closes[idx] = value
@@ -88,6 +87,23 @@ class _FakePriceProvider:
         if ticker.lower() == "spy":
             return _MARKET_FRAME.clone()
         return _STOCK_FRAME.clone()
+
+
+class _LongFakePriceProvider:
+    """Returns enough future rows for the 60-trading-day horizon."""
+
+    market = "US"
+
+    def get_ohlcv(self, ticker: str, start: date, end: date) -> pl.DataFrame:
+        if ticker.lower() == "spy":
+            return _build_price_frame(
+                {5: 200.0, 6: 202.0, 10: 210.0, 25: 220.0, 65: 260.0},
+                n=80,
+            )
+        return _build_price_frame(
+            {5: 100.0, 6: 103.0, 10: 115.0, 25: 140.0, 65: 180.0},
+            n=80,
+        )
 
 
 class _FakeExtractor:
@@ -318,7 +334,7 @@ def test_recompute_backfills_missing_horizon_and_impacts(db_session, tmp_object_
     recomputed = recompute_document_outcomes(
         db_session,
         document=document,
-        price_provider=_FakePriceProvider(),
+        price_provider=_LongFakePriceProvider(),
         ticker="AAPL",
         market="US",
         market_index_ticker="spy",
@@ -335,7 +351,7 @@ def test_recompute_backfills_missing_horizon_and_impacts(db_session, tmp_object_
         recompute_document_outcomes(
             db_session,
             document=document,
-            price_provider=_FakePriceProvider(),
+            price_provider=_LongFakePriceProvider(),
             ticker="AAPL",
             market="US",
             market_index_ticker="spy",
@@ -376,6 +392,61 @@ def test_recompute_backfills_when_impacts_missing(db_session, tmp_object_store) 
     )
     assert recomputed == 1
     assert {i.horizon_days for i in db_session.query(EventImpact).all()} == {1, 5, 20, 60}
+
+
+def test_recompute_refills_null_outcomes_when_future_prices_arrive(
+    db_session, tmp_object_store
+) -> None:
+    """Rows written before a horizon matures must be recomputed, not treated fresh."""
+    _seed_instrument(db_session)
+    result = run_slice(
+        db_session,
+        tmp_object_store,
+        ref=_make_ref(),
+        disclosure_provider=_FakeDisclosureProvider(),
+        price_provider=_FakePriceProvider(),
+        extractor=_FakeExtractor(),
+        ticker="AAPL",
+        market_index_ticker="spy",
+    )
+    document = db_session.get(Document, result.document_id)
+
+    outcome_60 = (
+        db_session.query(Outcome).filter(Outcome.horizon_days == 60).one()
+    )
+    impact_60 = (
+        db_session.query(EventImpact).filter(EventImpact.horizon_days == 60).one()
+    )
+    assert outcome_60.abnormal_return is None
+    assert impact_60.abnormal_return is None
+
+    recomputed = recompute_document_outcomes(
+        db_session,
+        document=document,
+        price_provider=_LongFakePriceProvider(),
+        ticker="AAPL",
+        market="US",
+        market_index_ticker="spy",
+    )
+
+    assert recomputed == 1
+    refreshed_60 = (
+        db_session.query(Outcome).filter(Outcome.horizon_days == 60).one()
+    )
+    assert refreshed_60.raw_return == pytest.approx(0.80)
+    assert refreshed_60.market_return == pytest.approx(0.30)
+    assert refreshed_60.abnormal_return == pytest.approx(0.50)
+    assert (
+        recompute_document_outcomes(
+            db_session,
+            document=document,
+            price_provider=_LongFakePriceProvider(),
+            ticker="AAPL",
+            market="US",
+            market_index_ticker="spy",
+        )
+        == 0
+    )
 
 
 # ---------------------------------------------------------------------------

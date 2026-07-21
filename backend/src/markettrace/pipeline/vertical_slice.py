@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 
 from markettrace.db.models import Document, Event, EventImpact, Instrument, ModelRun, Outcome
 from markettrace.impact.event_impacts import build_event_impacts
@@ -302,26 +302,35 @@ def recompute_event_outcomes(
 
 
 def _needs_recompute(session, event, horizons: tuple[int, ...]) -> bool:
-    """True when *event* is missing outcomes for the longest horizon or any impact row.
+    """True when *event* has incomplete outcomes or impact rows.
 
     Detects rows produced by an older engine (e.g. only the 1/5/20-day horizons,
-    or outcomes without the paired ``event_impacts`` that ``/stats`` reads).
+    outcomes without paired ``event_impacts``), and rows computed before enough
+    future prices existed. The latter arrive as present horizon rows with NULL
+    abnormal returns, so horizon existence alone is not fresh enough.
     """
-    existing_horizons = set(
-        session.scalars(
-            select(Outcome.horizon_days).where(Outcome.event_id == event.id)
-        ).all()
-    )
-    if not existing_horizons:
+    outcome_rows = session.execute(
+        select(Outcome.horizon_days, Outcome.abnormal_return).where(
+            Outcome.event_id == event.id
+        )
+    ).all()
+    existing = {h: ar for h, ar in outcome_rows}
+    if not existing:
         return True
-    if max(horizons) not in existing_horizons:
+    if any(h not in existing for h in horizons):
         return True
-    impact_count = session.scalar(
-        select(func.count())
-        .select_from(EventImpact)
-        .where(EventImpact.event_id == event.id)
-    )
-    return not impact_count
+    if any(existing[h] is None for h in horizons):
+        return True
+
+    impact_rows = session.execute(
+        select(EventImpact.horizon_days, EventImpact.abnormal_return).where(
+            EventImpact.event_id == event.id
+        )
+    ).all()
+    impacts = {h: ar for h, ar in impact_rows}
+    if any(h not in impacts for h in horizons):
+        return True
+    return any(impacts[h] is None and existing[h] is not None for h in horizons)
 
 
 def recompute_document_outcomes(

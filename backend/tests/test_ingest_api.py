@@ -52,6 +52,7 @@ def fake_settings() -> _Settings:
 def ingest_client(monkeypatch, fake_settings: _Settings) -> TestClient:
     monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: fake_settings)
     monkeypatch.setattr("markettrace.api.main.get_settings", lambda: fake_settings)
+    monkeypatch.setattr("markettrace.api.ingest.get_settings", lambda: fake_settings)
     app = create_app()
     with TestClient(app) as c:
         yield c
@@ -91,6 +92,30 @@ def test_ingest_valid_token_returns_202(
     assert resp.status_code == 202
     assert resp.json() == {"status": "started"}
     assert called, "background ingest task was not scheduled/invoked"
+
+
+def test_ingest_wait_runs_foreground_and_returns_summary(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    called: list[bool] = []
+
+    monkeypatch.setattr("markettrace.api.ingest.run_demo_ingest", lambda: called.append(True))
+    monkeypatch.setattr(
+        "markettrace.api.ingest._load_ingest_summary",
+        lambda: {"documents": 2, "events": 3, "events_by_ticker": {"AAPL": 3}},
+    )
+
+    resp = ingest_client.post(
+        "/ingest?wait=true",
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "status": "completed",
+        "summary": {"documents": 2, "events": 3, "events_by_ticker": {"AAPL": 3}},
+    }
+    assert called == [True]
 
 
 def test_analyze_instrument_no_auth_header(ingest_client: TestClient) -> None:
@@ -400,11 +425,18 @@ def test_corpus_skips_already_ingested_documents(
     monkeypatch.setattr(
         ingest_mod, "run_slice", lambda *a, **kw: sliced.append(kw["ref"].external_id)
     )
+    recomputed: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod,
+        "recompute_document_outcomes",
+        lambda *a, **kw: recomputed.append(kw["document"].external_id) or 1,
+    )
 
     _ingest_corpus_us(mem_session, None, fake_settings)
 
-    # acc-0 already exists -> no re-extraction; only acc-1 (still within the cap) runs.
+    # acc-0 already exists -> no re-extraction, but stale/null outcomes are refreshed.
     assert sliced == ["acc-1"]
+    assert recomputed == ["acc-0"]
 
 
 def test_corpus_one_filing_failure_does_not_abort_issuer(

@@ -15,14 +15,15 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import func, select
 
 from markettrace.api.auth import require_auth
 from markettrace.api.schemas import InstrumentAnalyzeRequest, InstrumentAnalyzeResponse
 from markettrace.config import get_settings
-from markettrace.db.models import Document
+from markettrace.db.models import Document, Instrument
 from markettrace.db.session import make_engine, make_session_factory
+from markettrace.pipeline.price_refresh import DEFAULT_LOOKBACK_DAYS, refresh_recent_prices
 from markettrace.pipeline.seed import (
     DEFAULT_WATCHLIST,
     KR_WATCHLIST,
@@ -257,6 +258,21 @@ def _ingest_issuer_filings(
             )
         ).first()
         if existing is not None:
+            recomputed = recompute_document_outcomes(
+                session,
+                document=existing,
+                price_provider=price,
+                ticker=ticker,
+                market=market,
+                market_index_ticker=market_index_ticker,
+            )
+            if recomputed:
+                logger.info(
+                    "corpus: recomputed outcomes for %d event(s) on existing %s/%s",
+                    recomputed,
+                    ref.source,
+                    ref.external_id,
+                )
             continue  # already ingested (idempotent) — cheap skip, no LLM call
         try:
             run_slice(
@@ -515,6 +531,54 @@ def _ingest_macro(session, settings) -> None:
     logger.info("ingest: macro inserted %s", inserted)
 
 
+def _refresh_recent_prices(
+    session,
+    *,
+    now: datetime,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+) -> dict[int, int]:
+    """Refresh recent price bars for all tracked instruments.
+
+    Recommendation and screener tabs read the ``prices`` table directly, while
+    event/stat tabs read ``events`` and ``event_impacts``. Running this as part
+    of the same daily ingest keeps the price freshness contract explicit instead
+    of relying on whichever new filing happened to fetch a price window.
+    """
+    instruments = list(
+        session.scalars(
+            select(Instrument)
+            .where(Instrument.delisted_at.is_(None))
+            .order_by(Instrument.market.asc(), Instrument.ticker.asc())
+        )
+    )
+    if not instruments:
+        logger.info("ingest: no instruments found for recent price refresh")
+        return {}
+
+    provider_cache = {}
+
+    def provider_for(market: str):
+        provider = provider_cache.get(market)
+        if provider is None:
+            provider = get_price_provider(market)
+            provider_cache[market] = provider
+        return provider
+
+    inserted = refresh_recent_prices(
+        session,
+        instruments,
+        provider_for,
+        now=now,
+        lookback_days=lookback_days,
+    )
+    logger.info(
+        "ingest: recent price refresh inserted %d row(s) across %d instrument(s)",
+        sum(inserted.values()),
+        len(inserted),
+    )
+    return inserted
+
+
 def run_demo_ingest() -> None:
     """Background worker: seed watchlists then ingest the demo filing set.
 
@@ -551,6 +615,12 @@ def run_demo_ingest() -> None:
             logger.exception("ingest: macro ingest failed")
 
         try:
+            _refresh_recent_prices(session, now=datetime.now(UTC))
+        except Exception:  # noqa: BLE001 - price freshness must not abort the ingest
+            session.rollback()
+            logger.exception("ingest: recent price refresh failed")
+
+        try:
             from markettrace.impact.alerting import generate_watchlist_alerts
 
             created = generate_watchlist_alerts(session)
@@ -566,9 +636,22 @@ def run_demo_ingest() -> None:
 @router.post("/ingest", status_code=202)
 def ingest(
     background_tasks: BackgroundTasks,
+    response: Response,
+    wait: bool = False,
     _: None = Depends(require_auth),
-) -> dict[str, str]:
-    """Start the demo ingestion in the background; return immediately."""
+) -> dict[str, object]:
+    """Start the demo ingestion.
+
+    Default mode preserves the web UI contract: schedule a background task and
+    return immediately. ``?wait=true`` runs the same idempotent ingest in the
+    request process and returns a summary after completion; this is intended for
+    scheduled automation that must fail visibly when collection does not finish.
+    """
+    if wait:
+        run_demo_ingest()
+        response.status_code = 200
+        return {"status": "completed", "summary": _load_ingest_summary()}
+
     background_tasks.add_task(run_demo_ingest)
     return {"status": "started"}
 
@@ -633,6 +716,17 @@ def _ingest_summary(session) -> dict[str, object]:
     }
 
 
+def _load_ingest_summary() -> dict[str, object]:
+    """Open a short-lived session and return current ingest counts."""
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    session = make_session_factory(engine)()
+    try:
+        return _ingest_summary(session)
+    finally:
+        session.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI: run the full ingest (demo + corpus + macro) synchronously to completion.
 
@@ -661,13 +755,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.summary_only:
         run_demo_ingest()
 
-    settings = get_settings()
-    engine = make_engine(settings.database_url)
-    session = make_session_factory(engine)()
-    try:
-        summary = _ingest_summary(session)
-    finally:
-        session.close()
+    summary = _load_ingest_summary()
 
     logger.info(
         "ingest summary: %d document(s), %d event(s)",

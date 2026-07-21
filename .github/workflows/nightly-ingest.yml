@@ -2,9 +2,9 @@ name: nightly-ingest
 
 # 매일 밤 12시(한국시간, KST)에 데이터수집을 자동 실행한다.
 # Render 무료 플랜 웹 서비스는 유휴 시 슬립되므로, GitHub Actions가 외부에서
-# /auth/login 으로 토큰을 받아 POST /ingest 를 호출해 슬립된 서버를 깨우고
-# 수집을 트리거한다. /ingest 는 멱등적이고 중단 시 다음 실행에서 이어받도록
-# 설계돼 있어, 매일 밤 실행하면 누락분을 계속 채워 나간다.
+# /auth/login 으로 토큰을 받아 POST /ingest?wait=true 를 호출해 슬립된 서버를
+# 깨우고 수집 완료까지 기다린다. 이 엔드포인트는 멱등적이고 중단 시 다음
+# 실행에서 이어받도록 설계돼 있어, 매일 밤 실행하면 누락분을 계속 채워 나간다.
 
 on:
   schedule:
@@ -63,17 +63,24 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger ingest
+      - name: Run ingest to completion
         env:
           TOKEN: ${{ steps.login.outputs.token }}
         run: |
           set -euo pipefail
-          status="$(curl -sS --max-time 120 -o /tmp/ingest_body.txt -w '%{http_code}' \
-            -X POST "${API_BASE_URL}/ingest" \
+          status="$(curl -sS --max-time 3600 -o /tmp/ingest_body.txt -w '%{http_code}' \
+            -X POST "${API_BASE_URL}/ingest?wait=true" \
             -H "Authorization: Bearer ${TOKEN}" || true)"
           echo "HTTP ${status}"
           echo "response: $(cat /tmp/ingest_body.txt)"
-          case "$status" in
-            2*) echo "데이터수집이 백그라운드로 시작되었습니다." ;;
-            *)  echo "::error::/ingest 트리거 실패 (HTTP ${status})."; exit 1 ;;
-          esac
+          if [ "$status" != "200" ]; then
+            echo "::error::/ingest?wait=true 완료 실패 (HTTP ${status})."
+            exit 1
+          fi
+
+          run_status="$(jq -r '.status // empty' /tmp/ingest_body.txt)"
+          if [ "$run_status" != "completed" ]; then
+            echo "::error::수집 완료 응답이 아닙니다: ${run_status:-<empty>}"
+            exit 1
+          fi
+          echo "데이터수집이 완료되었습니다."
