@@ -34,7 +34,7 @@ body {
 }
 
 .cat-mascot--naengi {
-  --cat-size: clamp(104px, 12vw, 152px);
+  --cat-size: clamp(156px, 18vw, 228px);
   --cat-bottom: clamp(16px, 4vh, 40px);
   --cat-frame-duration: 10.8s;
 
@@ -42,7 +42,7 @@ body {
 }
 
 .cat-mascot--koongi {
-  --cat-size: clamp(62px, 7.2vw, 91px);
+  --cat-size: clamp(93px, 10.8vw, 136.5px);
   --cat-bottom: clamp(122px, 15vh, 176px);
   --cat-frame-duration: 6.6s;
 
@@ -83,12 +83,12 @@ body {
 
 @media (max-width: 640px) {
   .cat-mascot--naengi {
-    --cat-size: 100px;
+    --cat-size: 150px;
     --cat-bottom: 10px;
   }
 
   .cat-mascot--koongi {
-    --cat-size: 60px;
+    --cat-size: 90px;
     --cat-bottom: 116px;
   }
 }
