@@ -36,6 +36,7 @@ __all__ = [
     "create_token",
     "create_user_token",
     "verify_token",
+    "require_login",
     "require_auth",
     "require_admin",
 ]
@@ -153,6 +154,13 @@ def require_auth(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     if payload.get("kind") == "user" and payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
+
+
+def require_login(authorization: str | None = Header(default=None)) -> None:
+    """FastAPI dependency: require any valid logged-in user token."""
+    token = _bearer_token(authorization)
+    if decode_token(token) is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 def get_current_principal(

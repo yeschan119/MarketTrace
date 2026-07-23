@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import func, select
 
-from markettrace.api.auth import require_auth
+from markettrace.api.auth import require_auth, require_login
 from markettrace.api.schemas import InstrumentAnalyzeRequest, InstrumentAnalyzeResponse
 from markettrace.config import get_settings
 from markettrace.db.models import Document, Instrument
@@ -664,7 +664,7 @@ def ingest(
 def analyze_instrument(
     request: InstrumentAnalyzeRequest,
     background_tasks: BackgroundTasks,
-    _: None = Depends(require_auth),
+    _: None = Depends(require_login),
 ) -> InstrumentAnalyzeResponse:
     """Start ad hoc disclosure ingestion for one searched ticker.
 

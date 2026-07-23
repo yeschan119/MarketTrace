@@ -8,7 +8,12 @@ import { useAuth } from "@/lib/auth";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 
 const NAV_ITEMS = [
-  { ids: ["nav-search"], href: "/instruments", label: "nav.search" },
+  {
+    ids: ["nav-search"],
+    href: "/instruments",
+    label: "nav.search",
+    permissionRequired: false,
+  },
   { ids: ["nav-recommendations"], href: "/recommendations", label: "nav.recommendations" },
   { ids: ["nav-events"], href: "/events", label: "nav.events" },
   { ids: ["nav-rankings"], href: "/rankings", label: "nav.rankings" },
@@ -16,8 +21,18 @@ const NAV_ITEMS = [
   { ids: ["nav-watchlist"], href: "/watchlist", label: "nav.watchlist" },
   { ids: ["nav-stats"], href: "/stats", label: "nav.stats" },
   { ids: ["nav-macro"], href: "/macro", label: "nav.macro" },
-  { ids: ["nav-ledger"], href: "/ledger", label: "nav.ledger" },
-  { ids: ["nav-passbook"], href: "/passbook", label: "nav.passbook" },
+  {
+    ids: ["nav-ledger"],
+    href: "/ledger",
+    label: "nav.ledger",
+    authRequired: true,
+  },
+  {
+    ids: ["nav-passbook"],
+    href: "/passbook",
+    label: "nav.passbook",
+    authRequired: true,
+  },
   {
     ids: ["admin-users", "admin-tabs"],
     href: "/admin",
@@ -28,7 +43,7 @@ const NAV_ITEMS = [
 
 export function SiteHeader() {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { token, user } = useAuth();
   const { data: tabCatalog } = useQuery({
     queryKey: ["tab-catalog"],
     queryFn: () => api.getTabCatalog(),
@@ -43,11 +58,17 @@ export function SiteHeader() {
       allowedTabs.has("nav-alerts"));
 
   function isVisible(item: (typeof NAV_ITEMS)[number]): boolean {
+    if (item.authRequired && !token) return false;
     if (item.adminOnly && user?.role !== "admin") return false;
     if (tabCatalog && !item.ids.some((id) => tabCatalog.statuses[id] !== false)) {
       return false;
     }
-    if (user && user.role !== "admin" && allowedTabs.size > 0) {
+    if (
+      item.permissionRequired !== false &&
+      user &&
+      user.role !== "admin" &&
+      allowedTabs.size > 0
+    ) {
       return item.ids.some((id) => allowedTabs.has(id));
     }
     return true;

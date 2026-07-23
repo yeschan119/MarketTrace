@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import markettrace.api.ingest as ingest_mod
-from markettrace.api.auth import create_token
+from markettrace.api.auth import create_token, create_user_token
 from markettrace.api.ingest import (
     _DEMO_FILINGS,
     _ingest_corpus_kr,
@@ -25,7 +25,7 @@ from markettrace.api.ingest import (
 )
 from markettrace.api.main import create_app
 from markettrace.api.schemas import InstrumentAnalyzeRequest
-from markettrace.db.models import Base, Document, Event, Instrument
+from markettrace.db.models import AdminUser, Base, Document, Event, Instrument
 from markettrace.providers.base import IssuerResolution
 
 
@@ -62,6 +62,24 @@ def ingest_client(monkeypatch, fake_settings: _Settings) -> TestClient:
 def valid_token(monkeypatch, fake_settings: _Settings) -> str:
     monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: fake_settings)
     return create_token()
+
+
+@pytest.fixture
+def manager_token(monkeypatch, fake_settings: _Settings) -> str:
+    monkeypatch.setattr("markettrace.api.auth.get_settings", lambda: fake_settings)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    return create_user_token(
+        AdminUser(
+            id=42,
+            login_id="manager1",
+            name="Manager",
+            email="manager@example.com",
+            role="manager",
+            status=True,
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +173,30 @@ def test_analyze_instrument_valid_token_schedules_background_task(
     assert len(requests) == 1
     assert requests[0].market == "US"
     assert requests[0].ticker == "AAPL"
+
+
+def test_analyze_instrument_non_admin_user_token_schedules_background_task(
+    monkeypatch, ingest_client: TestClient, manager_token: str
+) -> None:
+    requests: list[InstrumentAnalyzeRequest] = []
+    monkeypatch.setattr(ingest_mod, "run_instrument_ingest", requests.append)
+
+    class _Disclosure:
+        def resolve_issuer(self, query):
+            assert query == "AAPL"
+            return IssuerResolution("0000320193", "AAPL", "Apple Inc.")
+
+    monkeypatch.setattr(ingest_mod, "get_disclosure_provider", lambda *a, **kw: _Disclosure())
+
+    resp = ingest_client.post(
+        "/instruments/analyze",
+        json={"market": "US", "ticker": "AAPL"},
+        headers={"Authorization": f"Bearer {manager_token}"},
+    )
+
+    assert resp.status_code == 202
+    assert resp.json()["ticker"] == "AAPL"
+    assert len(requests) == 1
 
 
 def test_analyze_instrument_normalizes_short_kr_ticker(
