@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { Outcome } from "@/types/api";
 import { useI18n } from "@/lib/i18n";
+import { InfoTip } from "@/components/InfoTip";
 
 interface Props {
   outcomes: Outcome[];
@@ -22,8 +23,11 @@ export function AbnormalReturnChart({ outcomes }: Props) {
 
   if (!outcomes || outcomes.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
-        {t("chart.noData")}
+      <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-6 text-center">
+        <p className="text-sm font-medium text-gray-500">{t("chart.noData")}</p>
+        <p className="max-w-md text-xs leading-relaxed text-gray-400">
+          {t("chart.noDataWhy")}
+        </p>
       </div>
     );
   }
@@ -49,8 +53,9 @@ export function AbnormalReturnChart({ outcomes }: Props) {
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">
+      <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         {t("chart.title")}
+        <InfoTip text={t("chart.titleTip")} />
       </h3>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>

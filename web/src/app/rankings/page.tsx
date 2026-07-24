@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { describeEventType } from "@/lib/eventTypes";
 import { KoreanName } from "@/components/KoreanName";
 import { WatchButton } from "@/components/WatchButton";
+import { InfoTip } from "@/components/InfoTip";
 import type { InstrumentRanking } from "@/types/api";
 
 const HALF_LIFE_DAYS = 180;
@@ -81,21 +82,41 @@ export default function RankingsPage() {
                 <th className="px-4 py-3 font-medium">
                   {t("rankings.col.instrument")}
                 </th>
-                <th className="px-4 py-3 font-medium">{t("rankings.col.lean")}</th>
-                <th className="px-4 py-3 text-right font-medium">
-                  {t("rankings.col.score")}
+                <th className="px-4 py-3 font-medium">
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.lean")}
+                    <InfoTip text={t("rankings.tip.lean")} />
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-right font-medium">
-                  {t("rankings.col.simpleMean")}
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.score")}
+                    <InfoTip text={t("rankings.tip.score")} />
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-right font-medium">
-                  {t("rankings.col.validated")}
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.simpleMean")}
+                    <InfoTip text={t("rankings.tip.simpleMean")} />
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-right font-medium">
-                  {t("rankings.col.conflicts")}
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.validated")}
+                    <InfoTip text={t("rankings.tip.validated")} />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right font-medium">
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.conflicts")}
+                    <InfoTip text={t("rankings.tip.conflicts")} />
+                  </span>
                 </th>
                 <th className="px-4 py-3 font-medium">
-                  {t("rankings.col.topFactor")}
+                  <span className="inline-flex items-center gap-1">
+                    {t("rankings.col.topFactor")}
+                    <InfoTip text={t("rankings.tip.topFactor")} />
+                  </span>
                 </th>
               </tr>
             </thead>

@@ -247,6 +247,12 @@ const en: Dict = {
     reviewedMark: "Reviewed",
     noneSearchResults: "No events match this search.",
     noneMatchFilter: "No events match this filter.",
+    tip: {
+      confidence:
+        "Confidence — how sure the model is about its read (direction/type) of this event. Closer to 100% means higher self-assessed conviction; it is not a guarantee of the actual return.",
+      signal:
+        "Signal — how this event type has actually moved the market historically, from validated statistics (n≥5, p<0.05). It compares the model's read against that history. No badge means there is no validated signal for this type yet.",
+    },
   },
   stats: {
     loading: "Loading statistics...",
@@ -398,6 +404,14 @@ const en: Dict = {
         info: "Signal",
         infoTitle: "Validated signal exists; model is neutral",
       },
+      badge: {
+        conflict:
+          "Conflict — the model's direction is the opposite of this event type's validated history (a statistically significant move, n≥5, p<0.05). Worth a second look.",
+        agree:
+          "Confirmed — the model's direction matches this event type's validated historical drift.",
+        info:
+          "Signal — this event type has a statistically significant historical direction (n≥5, p<0.05), but the model read it as neutral. Lean on the historical direction.",
+      },
     },
     review: {
       title: "Review & correct",
@@ -475,11 +489,29 @@ const en: Dict = {
     lean: { bearish: "Caution", bullish: "Favorable", neutral: "Mixed" },
     factor: "{label} {drift} ({count}×)",
     conflictsCell: "{total} ({unreviewed} unreviewed)",
+    tip: {
+      lean:
+        "Lean — this instrument's overall direction from its validated history: Caution (downside), Favorable (upside), or Mixed (no clear direction).",
+      score:
+        "Weighted drift — the post-event average return (drift) of this instrument's validated events, summed with each event weighted by the model's confidence and by recency (recent events count more). This is what the ranking is sorted by.",
+      simpleMean:
+        "Simple mean — the same validated events' drift averaged with no weighting. Compare it against the weighted drift to see how much the confidence/recency weighting changed the picture.",
+      validated:
+        "Validated — the number of this instrument's events that carry a statistically significant signal (n≥5, p<0.05).",
+      conflicts:
+        "Conflicts — events where the model's direction is the opposite of validated history. The number in parentheses is how many of those a human has not reviewed yet.",
+      topFactor:
+        "Top factor — the event type contributing most to the weighted drift, with its post-event average return.",
+    },
   },
   direction: { positive: "positive", negative: "negative", neutral: "neutral" },
   chart: {
     title: "Abnormal Returns (%)",
     noData: "No outcome data available",
+    noDataWhy:
+      "Returns are only computed once a fixed number of trading days (e.g. 1 / 5 / 20 / 60) have elapsed after the filing. This chart stays empty when the event is too recent for those windows to have passed, or when price data for the instrument has not been collected yet.",
+    titleTip:
+      "Abnormal return — the instrument's actual return minus the market (index) return over the same window. It strips out the overall market move so you see the effect attributable to this event alone.",
     abnormalReturn: "Abnormal Return",
     rawReturn: "Raw Return",
     sectorAdjusted: "Sector-Adjusted",
@@ -494,6 +526,8 @@ const en: Dict = {
     surprise: "Surprise",
     novelty: "Novelty",
     sourceReliability: "Source Reliability",
+    titleTip:
+      "Each score is shown as 0–100%.\n• Confidence: how sure the model is about its read of this event.\n• Surprise: how far the news diverged from what the market expected — higher means more unexpected.\n• Novelty: how genuinely new the information is — repeated / routine filings score lower.\n• Source Reliability: how trustworthy the disclosure source is.",
   },
   macro: {
     title: "Macro Surprises",
@@ -501,7 +535,7 @@ const en: Dict = {
     loading: "Loading macro data...",
     failTitle: "Failed to load macro data",
     subtitle:
-      "Latest economic release per series with its standardized surprise vs the expected value (consensus when available, else a baseline forecast).",
+      "This tab tracks how far economic releases (inflation, jobs, rates…) landed from what the market expected. What moves the overall market mood — the backdrop against which every stock and event trades — is not the raw number but how it differs from expectations (the surprise). Collecting those surprises in one standardized view gives you the regime context for reading sharp drops and events.",
     empty: "No macro data yet — run the macro ingest first.",
     th: {
       series: "Series",
@@ -509,6 +543,13 @@ const en: Dict = {
       released: "Released",
       expected: "Expected",
       surprise: "Surprise (σ)",
+    },
+    tip: {
+      released: "Released — the actual figure that was published for this indicator.",
+      expected:
+        "Expected — what the market anticipated before the release. Uses consensus (experts' pooled forecast) when available, otherwise a trend baseline forecast.",
+      surprise:
+        "Surprise (σ) — (released − expected) divided by the indicator's historical volatility (standard deviation). Positive means it came in better/higher than expected, negative means worse/lower; a bigger number means a bigger shock. The σ (sigma) unit means \"how many times the usual wobble\", so different indicators can be compared on one scale.",
     },
     baseline: "baseline",
     consensus: "consensus",
@@ -882,6 +923,12 @@ const ko: Dict = {
     reviewedMark: "검토됨",
     noneSearchResults: "이 검색어에 해당하는 이벤트가 없습니다.",
     noneMatchFilter: "이 필터에 해당하는 이벤트가 없습니다.",
+    tip: {
+      confidence:
+        "신뢰도 — 모델이 이 이벤트의 방향·유형 판단을 얼마나 확신하는지입니다. 100%에 가까울수록 확신이 크다는 뜻이며, 실제 수익률을 보장하지는 않습니다.",
+      signal:
+        "신호 — 이 사건유형이 과거 실제로 시장을 어떻게 움직였는지(검증된 통계, n≥5·p<0.05)를 모델의 판단과 비교한 것입니다. 배지가 없으면 아직 이 유형의 검증된 신호가 없다는 뜻입니다.",
+    },
   },
   stats: {
     loading: "통계 불러오는 중...",
@@ -1031,6 +1078,14 @@ const ko: Dict = {
         info: "신호",
         infoTitle: "검증신호 있음, 모델은 중립",
       },
+      badge: {
+        conflict:
+          "충돌 — 모델이 읽은 방향이 이 사건유형의 검증된 과거 실측(통계적으로 유의한 방향, n≥5·p<0.05)과 반대입니다. 한 번 더 확인해 볼 필요가 있습니다.",
+        agree:
+          "검증됨 — 모델이 읽은 방향이 이 사건유형의 검증된 과거 드리프트와 일치합니다.",
+        info:
+          "신호 — 이 사건유형은 통계적으로 유의한(n≥5·p<0.05) 과거 방향성이 있지만, 모델은 중립으로 봤습니다. 과거 실측 방향을 참고하세요.",
+      },
     },
     review: {
       title: "검토·수정",
@@ -1108,11 +1163,29 @@ const ko: Dict = {
     lean: { bearish: "주의", bullish: "우호", neutral: "혼조" },
     factor: "{label} {drift} ({count}건)",
     conflictsCell: "{total} (미검토 {unreviewed})",
+    tip: {
+      lean:
+        "판정 — 검증된 과거 실측을 종합한 이 종목의 방향 성향입니다. 주의(하락 우위)·우호(상승 우위)·혼조(뚜렷한 방향 없음).",
+      score:
+        "가중 드리프트 — 이 종목의 검증된 사건들의 사건후 평균 수익률(드리프트)을, 각 사건의 모델 확신도와 최근성(최근일수록 크게)으로 가중해 합산한 값입니다. 랭킹은 이 값으로 정렬됩니다.",
+      simpleMean:
+        "단순 평균 — 같은 검증 사건들의 드리프트를 가중 없이 단순 평균한 값입니다. 가중 드리프트와 비교하면 확신도·최근성 보정이 얼마나 영향을 줬는지 알 수 있습니다.",
+      validated:
+        "검증 — 통계적으로 유의한(n≥5·p<0.05) 검증 신호를 가진 이 종목의 사건 수입니다.",
+      conflicts:
+        "충돌 — 모델이 읽은 방향이 검증된 과거 실측과 반대인 사건 수입니다. 괄호 안은 그중 아직 사람이 검토하지 않은 건수입니다.",
+      topFactor:
+        "주요 요인 — 가중 드리프트에 가장 크게 기여한 사건유형과 그 사건후 평균 수익률입니다.",
+    },
   },
   direction: { positive: "긍정", negative: "부정", neutral: "중립" },
   chart: {
     title: "초과수익률 (%)",
     noData: "수익률 데이터가 없습니다",
+    noDataWhy:
+      "수익률은 공시 시점 이후 정해진 거래일(예: 1·5·20·60거래일)이 지나야 계산됩니다. 이벤트가 너무 최근이라 그 기간이 아직 지나지 않았거나, 해당 종목의 가격 데이터가 아직 수집되지 않은 경우 그래프가 비어 있습니다.",
+    titleTip:
+      "초과수익률 — 종목의 실제 수익률에서 같은 기간 시장(지수) 수익률을 뺀 값입니다. 시장 전체 흐름을 제거해, 이 이벤트가 종목에 준 영향만 따로 볼 수 있게 한 지표입니다.",
     abnormalReturn: "초과수익률",
     rawReturn: "원수익률",
     sectorAdjusted: "섹터조정",
@@ -1127,6 +1200,8 @@ const ko: Dict = {
     surprise: "서프라이즈",
     novelty: "신규성",
     sourceReliability: "출처 신뢰도",
+    titleTip:
+      "각 점수는 0~100%로 표시됩니다.\n• 신뢰도: 모델이 이 이벤트 판단을 얼마나 확신하는지.\n• 서프라이즈: 소식이 시장 예상과 얼마나 달랐는지 — 높을수록 예상 밖입니다.\n• 신규성: 정보가 얼마나 새로운지 — 반복·정례 공시일수록 낮습니다.\n• 출처 신뢰도: 공시·자료 출처가 얼마나 믿을 만한지.",
   },
   macro: {
     title: "거시 서프라이즈",
@@ -1134,7 +1209,7 @@ const ko: Dict = {
     loading: "거시 지표 불러오는 중...",
     failTitle: "거시 지표를 불러오지 못했습니다",
     subtitle:
-      "시리즈별 최신 경제지표 발표값과 예상 대비 표준화 서프라이즈(컨센서스가 있으면 컨센서스, 없으면 기준선 예측).",
+      "경제지표(물가·고용·금리 등)가 시장의 사전 예상과 얼마나 다르게 나왔는지를 모아 봅니다. 모든 종목과 이벤트가 거래되는 배경, 즉 시장 전체 분위기를 좌우하는 것은 '발표값 자체'가 아니라 '예상과의 차이(서프라이즈)'입니다. 이 서프라이즈를 하나의 표준화된 화면에 모아, 급락·이벤트를 해석할 때 배경 국면으로 활용하기 위한 탭입니다.",
     empty: "아직 거시 데이터가 없습니다 — 먼저 거시 수집을 실행하세요.",
     th: {
       series: "시리즈",
@@ -1142,6 +1217,13 @@ const ko: Dict = {
       released: "발표값",
       expected: "예상값",
       surprise: "서프라이즈 (σ)",
+    },
+    tip: {
+      released: "발표값 — 이 지표에 대해 실제로 발표된 수치입니다.",
+      expected:
+        "예상값 — 발표 전 시장이 기대한 값입니다. 컨센서스(전문가 예측 합의)가 있으면 그것을, 없으면 과거 추세 기준선 예측을 씁니다.",
+      surprise:
+        "서프라이즈(σ) — (발표값 − 예상값)을 그 지표의 과거 변동성(표준편차)으로 나눈 값입니다. +면 예상보다 좋게/높게, −면 예상보다 나쁘게/낮게 나왔다는 뜻이고, 숫자가 클수록 예상 밖 정도가 큽니다. 단위 σ(시그마)는 '평소 오차의 몇 배냐'를 뜻해, 서로 다른 지표를 같은 잣대로 비교할 수 있게 합니다.",
     },
     baseline: "기준선",
     consensus: "컨센서스",

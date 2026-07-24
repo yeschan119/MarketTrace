@@ -11,6 +11,7 @@ import {
   Cell,
 } from "recharts";
 import { useI18n } from "@/lib/i18n";
+import { InfoTip } from "@/components/InfoTip";
 
 interface ScoreEntry {
   label: string;
@@ -50,7 +51,10 @@ export function ScoreBars({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">{t("scores.title")}</h3>
+      <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+        {t("scores.title")}
+        <InfoTip text={t("scores.titleTip")} />
+      </h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart
           data={data}

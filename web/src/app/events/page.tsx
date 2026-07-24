@@ -10,6 +10,7 @@ import { DirectionBadge } from "@/components/DirectionBadge";
 import { KoreanName } from "@/components/KoreanName";
 import { WatchButton } from "@/components/WatchButton";
 import { ValidatedSignalBadge } from "@/components/ValidatedSignalBadge";
+import { InfoTip } from "@/components/InfoTip";
 import { koreanName } from "@/lib/instrumentNames";
 import { assessSignal, type SignalVerdict } from "@/lib/validatedSignal";
 import type { EventSummary } from "@/types/api";
@@ -338,9 +339,11 @@ export default function EventsPage() {
                           )}
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-4 text-sm text-gray-500">
-                          <span className="text-gray-600">
-                            {(event.confidence * 100).toFixed(1)}%
-                          </span>
+                          <InfoTip text={t("events.tip.confidence")}>
+                            <span className="text-gray-600">
+                              {(event.confidence * 100).toFixed(1)}%
+                            </span>
+                          </InfoTip>
                           <span>
                             {new Date(event.published_at).toLocaleDateString(
                               locale,

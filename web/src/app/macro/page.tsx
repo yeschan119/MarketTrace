@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { InfoTip } from "@/components/InfoTip";
 import type { MacroObservation } from "@/types/api";
 
 function formatNum(v: number | null, locale: string): string {
@@ -64,9 +65,24 @@ export default function MacroPage() {
               <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">{t("macro.th.series")}</th>
                 <th className="px-4 py-3">{t("macro.th.reference")}</th>
-                <th className="px-4 py-3 text-right">{t("macro.th.released")}</th>
-                <th className="px-4 py-3 text-right">{t("macro.th.expected")}</th>
-                <th className="px-4 py-3 text-right">{t("macro.th.surprise")}</th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1">
+                    {t("macro.th.released")}
+                    <InfoTip text={t("macro.tip.released")} />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1">
+                    {t("macro.th.expected")}
+                    <InfoTip text={t("macro.tip.expected")} />
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center gap-1">
+                    {t("macro.th.surprise")}
+                    <InfoTip text={t("macro.tip.surprise")} />
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>

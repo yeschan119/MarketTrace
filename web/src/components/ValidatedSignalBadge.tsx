@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/lib/i18n";
+import { InfoTip } from "@/components/InfoTip";
 import type { SignalVerdict } from "@/lib/validatedSignal";
 
 const styles: Record<SignalVerdict, string> = {
@@ -12,15 +13,17 @@ const styles: Record<SignalVerdict, string> = {
 
 // Compact chip form of a signal verdict, for dense lists.
 // `none` (no validated signal) renders nothing to avoid noise.
+// Hovering the chip explains what the verdict means.
 export function ValidatedSignalBadge({ verdict }: { verdict: SignalVerdict }) {
   const { t } = useI18n();
   if (verdict === "none") return null;
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${styles[verdict]}`}
-      title={t(`eventDetail.signal.short.${verdict}Title`)}
-    >
-      {t(`eventDetail.signal.short.${verdict}`)}
-    </span>
+    <InfoTip text={t(`eventDetail.signal.badge.${verdict}`)}>
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${styles[verdict]}`}
+      >
+        {t(`eventDetail.signal.short.${verdict}`)}
+      </span>
+    </InfoTip>
   );
 }
