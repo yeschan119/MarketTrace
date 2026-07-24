@@ -27,6 +27,7 @@ const en: Dict = {
     passbook: "Passbook",
     alerts: "Alerts",
     watchlist: "Watchlist",
+    guide: "Guide",
     admin: "Admin",
   },
   recommendations: {
@@ -703,6 +704,7 @@ const ko: Dict = {
     passbook: "통장관리",
     alerts: "알림",
     watchlist: "관심종목",
+    guide: "사용법",
     admin: "관리자",
   },
   recommendations: {

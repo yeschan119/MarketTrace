@@ -34,6 +34,12 @@ const NAV_ITEMS = [
     authRequired: true,
   },
   {
+    ids: ["nav-guide"],
+    href: "/guide",
+    label: "nav.guide",
+    permissionRequired: false,
+  },
+  {
     ids: ["admin-users", "admin-tabs"],
     href: "/admin",
     label: "nav.admin",
