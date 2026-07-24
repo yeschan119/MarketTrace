@@ -243,3 +243,87 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Dark mode: give 꿍이 (koongi) its own spotlight so it stays visible against
+ * the dark page. All light-only in the dark theme — the light theme is
+ * unchanged. Layers sit behind the cat (z-index: -1) within the mascot's own
+ * stacking context, so the beam lights the cat without washing it out.
+ */
+html.dark .cat-mascot--koongi {
+  isolation: isolate;
+}
+
+/* Beam of light — a cone widening downward over the cat. */
+html.dark .cat-mascot--koongi::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  width: 190%;
+  height: 285%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      58% 20% at 50% 100%,
+      rgba(255, 240, 202, 0.3),
+      rgba(255, 240, 202, 0) 72%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 246, 220, 0) 0%,
+      rgba(255, 246, 220, 0.34) 14%,
+      rgba(255, 246, 220, 0.1) 62%,
+      rgba(255, 246, 220, 0) 100%
+    );
+  clip-path: polygon(41% 0, 59% 0, 100% 100%, 0 100%);
+  filter: blur(3px);
+}
+
+/* The lamp glow at the apex of the beam. */
+html.dark .cat-mascot--koongi::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 250%;
+  transform: translateX(-50%);
+  width: 30%;
+  height: 22%;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 239, 198, 0.9),
+    rgba(255, 239, 198, 0) 70%
+  );
+  filter: blur(1.5px);
+}
+
+/* Brighten 꿍이 itself and give it a warm rim glow so it reads on dark. */
+html.dark .cat-mascot--koongi .cat-mascot__viewport {
+  filter: drop-shadow(0 0 9px rgba(255, 236, 190, 0.45))
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5)) brightness(1.1) contrast(1.03);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Gentle flicker so the lamp feels lit, not painted on. */
+  html.dark .cat-mascot--koongi::before {
+    animation: koongi-lamp-flicker 5.4s ease-in-out infinite;
+  }
+}
+
+@keyframes koongi-lamp-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.92;
+  }
+  70% {
+    opacity: 0.97;
+  }
+}
