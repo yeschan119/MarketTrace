@@ -285,7 +285,7 @@ export default function AdminPage() {
 
   if (!token) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-600 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-surface p-8 text-sm text-gray-600 shadow-sm">
         로그인 후 관리자 탭을 사용할 수 있습니다.
       </div>
     );
@@ -310,7 +310,7 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-gray-900">관리자</h1>
           <p className="text-sm text-gray-500">{user.name} · {roleLabel(user.role)}</p>
         </div>
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-surface p-1 shadow-sm">
           <button
             type="button"
             onClick={() => setPanel("users")}
@@ -350,7 +350,7 @@ export default function AdminPage() {
 
       {panel === "users" ? (
         <div className="space-y-6">
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-gray-200 bg-surface p-5 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900">사용자 등록</h2>
             <form onSubmit={submitCreate} className="mt-4 grid gap-3 lg:grid-cols-6">
               <input
@@ -427,7 +427,7 @@ export default function AdminPage() {
             </form>
           </section>
 
-          <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm">
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-base font-semibold text-gray-900">사용자 목록</h2>
             </div>
@@ -445,7 +445,7 @@ export default function AdminPage() {
                     <th className="px-4 py-3 text-right">작업</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-surface">
                   {usersQuery.isLoading ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
@@ -525,14 +525,14 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm">
             <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">
               <h2 className="text-base font-semibold text-gray-900">역할별 탭 권한</h2>
               <button
                 type="button"
                 onClick={savePermissions}
                 disabled={!hasPermissionChanges || updatePermissions.isPending}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-40"
+                className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-40"
               >
                 {updatePermissions.isPending ? "저장 중" : "권한 저장"}
               </button>
@@ -549,7 +549,7 @@ export default function AdminPage() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-surface">
                   {rolePermissionsQuery.isLoading || !matrix ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
@@ -600,14 +600,14 @@ export default function AdminPage() {
           </section>
         </div>
       ) : (
-        <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <section className="rounded-lg border border-gray-200 bg-surface shadow-sm">
           <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">
             <h2 className="text-base font-semibold text-gray-900">탭 관리</h2>
             <button
               type="button"
               onClick={() => updateTabs.mutate(tabDraft)}
               disabled={!hasTabChanges || updateTabs.isPending}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-40"
+              className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-40"
             >
               {updateTabs.isPending ? "저장 중" : "변경사항 적용"}
             </button>
@@ -653,7 +653,7 @@ export default function AdminPage() {
                                 }`}
                               >
                                 <span
-                                  className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                                  className={`absolute top-1 h-5 w-5 rounded-full bg-surface transition ${
                                     enabled ? "left-6" : "left-1"
                                   }`}
                                 />
@@ -684,7 +684,7 @@ export default function AdminPage() {
           />
           <form
             onSubmit={submitEdit}
-            className="relative z-10 w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-md space-y-4 rounded-xl bg-surface p-6 shadow-2xl"
           >
             <h2 className="text-lg font-semibold text-gray-900">사용자 편집</h2>
             <input

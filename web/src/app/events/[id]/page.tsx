@@ -63,7 +63,7 @@ export default function EventDetailPage() {
       </nav>
 
       {/* Header */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-3">
@@ -153,7 +153,7 @@ export default function EventDetailPage() {
 
       {/* Evidence */}
       {event.evidence.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
           <h3 className="mb-3 text-sm font-semibold text-gray-700">
             {t("eventDetail.evidence")}
           </h3>
@@ -171,7 +171,7 @@ export default function EventDetailPage() {
       {(event.industries.length > 0 || event.channels.length > 0) && (
         <div className="grid grid-cols-2 gap-4">
           {event.industries.length > 0 && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="rounded-lg border border-gray-200 bg-surface p-4">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 {t("eventDetail.industries")}
               </h3>
@@ -188,7 +188,7 @@ export default function EventDetailPage() {
             </div>
           )}
           {event.channels.length > 0 && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="rounded-lg border border-gray-200 bg-surface p-4">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 {t("eventDetail.channels")}
               </h3>

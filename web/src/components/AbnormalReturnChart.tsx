@@ -52,20 +52,32 @@ export function AbnormalReturnChart({ outcomes }: Props) {
   const hasSector = data.some((d) => d.sector_abnormal_return != null);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         {t("chart.title")}
         <InfoTip text={t("chart.titleTip")} />
       </h3>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+          <XAxis
+            dataKey="day"
+            tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
+            stroke="var(--chart-axis)"
+          />
           <YAxis
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
+            stroke="var(--chart-axis)"
             tickFormatter={(v: number) => `${v.toFixed(1)}%`}
           />
           <Tooltip
+            contentStyle={{
+              backgroundColor: "rgb(var(--c-surface))",
+              border: "1px solid rgb(var(--c-gray-200))",
+              borderRadius: 8,
+              color: "rgb(var(--c-gray-900))",
+            }}
+            labelStyle={{ color: "rgb(var(--c-gray-900))" }}
             formatter={(value, name) => {
               const num = typeof value === "number" ? value : Array.isArray(value) ? (value[0] as number) : NaN;
               const pct = isNaN(num) ? "-" : `${num.toFixed(3)}%`;
@@ -80,7 +92,7 @@ export function AbnormalReturnChart({ outcomes }: Props) {
               return [pct, label];
             }}
           />
-          <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 2" />
+          <ReferenceLine y={0} stroke="var(--chart-ref)" strokeDasharray="4 2" />
           <Line
             type="monotone"
             dataKey="abnormal_return"

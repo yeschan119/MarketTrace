@@ -50,7 +50,7 @@ export function InfoTip({ text, children, className }: Props) {
       {pos &&
         createPortal(
           <span
-            className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full whitespace-pre-line rounded-md bg-gray-900 px-3 py-2 text-xs font-normal leading-relaxed text-white shadow-lg"
+            className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full whitespace-pre-line rounded-md bg-ink px-3 py-2 text-xs font-normal leading-relaxed text-white shadow-lg"
             style={{ left: pos.x, top: pos.y - 8, maxWidth: 300, width: "max-content" }}
           >
             {text}

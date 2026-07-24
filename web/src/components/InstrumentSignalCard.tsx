@@ -67,7 +67,7 @@ export function InstrumentSignalCard({ events }: { events: EventSummary[] }) {
   if (!agg) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold text-gray-900">
           {t("instrument.signal.title")}

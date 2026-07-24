@@ -133,7 +133,7 @@ export default function InstrumentSearchPage() {
           />
         </div>
       ) : (
-        <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm">
           {results.map((r) => (
             <li key={r.id}>
               <div className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50">
@@ -216,7 +216,7 @@ function AnalyzePanel({
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   return (
-    <div className="max-w-xl rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="max-w-xl rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
       <div className="mb-3 flex rounded-lg border border-gray-200 bg-gray-50 p-1">
         {(["KR", "US"] as Market[]).map((m) => (
           <button
@@ -225,7 +225,7 @@ function AnalyzePanel({
             onClick={() => setMarket(m)}
             className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold ${
               market === m
-                ? "bg-white text-indigo-600 shadow-sm"
+                ? "bg-surface text-indigo-600 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >

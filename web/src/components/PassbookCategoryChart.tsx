@@ -93,7 +93,7 @@ export function PassbookCategoryChart({ token, month }: Props) {
   const compact = new Intl.NumberFormat(locale, { notation: "compact" });
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">
@@ -116,8 +116,8 @@ export function PassbookCategoryChart({ token, month }: Props) {
                 onClick={() => setDirection(value)}
                 className={
                   direction === value
-                    ? "bg-gray-900 px-3 py-1.5 font-medium text-white"
-                    : "bg-white px-3 py-1.5 text-gray-600 hover:bg-gray-50"
+                    ? "bg-ink px-3 py-1.5 font-medium text-white"
+                    : "bg-surface px-3 py-1.5 text-gray-600 hover:bg-gray-50"
                 }
               >
                 {value === "out"
@@ -139,7 +139,7 @@ export function PassbookCategoryChart({ token, month }: Props) {
                 className={
                   window === value
                     ? "bg-indigo-600 px-3 py-1.5 font-medium text-white"
-                    : "bg-white px-3 py-1.5 text-gray-600 hover:bg-gray-50"
+                    : "bg-surface px-3 py-1.5 text-gray-600 hover:bg-gray-50"
                 }
               >
                 {value === "month"
@@ -169,17 +169,26 @@ export function PassbookCategoryChart({ token, month }: Props) {
             >
               <XAxis
                 type="number"
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
+                stroke="var(--chart-axis)"
                 tickFormatter={(v: number) => compact.format(v)}
               />
               <YAxis
                 type="category"
                 dataKey="category"
                 width={92}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
+                stroke="var(--chart-axis)"
               />
               <Tooltip
-                cursor={{ fill: "#f3f4f6" }}
+                cursor={{ fill: "rgb(var(--c-gray-100))" }}
+                contentStyle={{
+                  backgroundColor: "rgb(var(--c-surface))",
+                  border: "1px solid rgb(var(--c-gray-200))",
+                  borderRadius: 8,
+                  color: "rgb(var(--c-gray-900))",
+                }}
+                labelStyle={{ color: "rgb(var(--c-gray-900))" }}
                 formatter={(value, _name, item) => {
                   const raw = Array.isArray(value) ? value[0] : value;
                   const num = typeof raw === "number" ? raw : Number(raw);

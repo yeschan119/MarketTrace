@@ -62,7 +62,7 @@ export default function InstrumentTimelinePage() {
       </nav>
 
       {/* Instrument Header */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-surface p-6 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 font-mono text-sm font-bold text-indigo-700">
             {instrument.ticker.slice(0, 4)}
@@ -121,7 +121,7 @@ export default function InstrumentTimelinePage() {
 
                 <Link
                   href={`/events/${event.id}`}
-                  className="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                  className="block rounded-lg border border-gray-200 bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>

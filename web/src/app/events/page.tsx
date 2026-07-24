@@ -207,7 +207,7 @@ export default function EventsPage() {
               onClick={() => setMarket(tab.key)}
               className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
                 market === tab.key
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-surface text-indigo-600 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -229,7 +229,7 @@ export default function EventsPage() {
               onClick={() => setSignalFilter(f)}
               className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
                 signalFilter === f
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-surface text-indigo-600 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -254,7 +254,7 @@ export default function EventsPage() {
             return (
               <div
                 key={group.ticker}
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm"
               >
                 <div className="flex items-center">
                   <button

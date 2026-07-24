@@ -112,14 +112,14 @@ export function CategoryEditControl({
         className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
           isOverridden
             ? "border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            : "border-gray-300 bg-surface text-gray-600 hover:bg-gray-50"
         }`}
       >
         {isOverridden ? t("customize.edited") : t("customize.edit")}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-gray-200 bg-surface p-3 shadow-lg">
           <div className="mb-2 text-xs font-semibold text-gray-700">
             {t("customize.reassignTitle")}
           </div>

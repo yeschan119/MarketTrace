@@ -127,7 +127,7 @@ export default function AlertsPage() {
             type="button"
             onClick={() => markAll.mutate()}
             disabled={markAll.isPending}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md border border-gray-300 bg-surface px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
             {t("alerts.markAllRead")}
           </button>
@@ -139,7 +139,7 @@ export default function AlertsPage() {
           {t("alerts.empty")}
         </div>
       ) : (
-        <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-gray-200 bg-white">
+        <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-gray-200 bg-surface">
           {groupedAlerts.map((group) => (
             <section key={group.key} aria-label={group.label}>
               <button

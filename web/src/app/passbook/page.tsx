@@ -45,7 +45,7 @@ function SummaryItem({
   value: string;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface px-4 py-3 shadow-sm">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </div>
@@ -260,7 +260,7 @@ export default function PassbookPage() {
 
   if (!token) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-600 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-surface p-8 text-sm text-gray-600 shadow-sm">
         {authNotice || t("passbook.loginRequired")}
       </div>
     );
@@ -294,7 +294,7 @@ export default function PassbookPage() {
               setValidationError("");
               setSelectedMonth(e.target.value || null);
             }}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           >
             {summaries.map((summary) => {
               const monthValue = toMonthValue(summary.statement_month);
@@ -311,7 +311,7 @@ export default function PassbookPage() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)_auto] md:items-end"
+        className="grid gap-3 rounded-lg border border-gray-200 bg-surface p-4 shadow-sm md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)_auto] md:items-end"
       >
         <label>
           <span className="mb-1 block text-sm font-medium text-gray-700">
@@ -450,7 +450,7 @@ export default function PassbookPage() {
                   return (
                     <section
                       key={section.category}
-                      className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                      className="overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm"
                     >
                       <button
                         type="button"
@@ -591,7 +591,7 @@ export default function PassbookPage() {
       )}
 
       {!isFetching && !isParsing && !errorMessage && !statement && (
-        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-sm text-gray-500">
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-surface text-sm text-gray-500">
           {t("passbook.noSavedStatements")}
         </div>
       )}

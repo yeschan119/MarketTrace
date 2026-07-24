@@ -1451,7 +1451,7 @@ export function LanguageToggle() {
           aria-pressed={lang === opt.value}
           className={`rounded px-2.5 py-1 transition-colors ${
             lang === opt.value
-              ? "bg-white text-indigo-600 shadow-sm"
+              ? "bg-surface text-indigo-600 shadow-sm"
               : "text-gray-500 hover:text-gray-700"
           }`}
         >

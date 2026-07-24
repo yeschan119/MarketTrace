@@ -152,7 +152,7 @@ export function AuthControls() {
             />
 
             {/* Card */}
-            <div className="relative z-10 w-full max-w-sm rounded-xl bg-white p-8 shadow-2xl">
+            <div className="relative z-10 w-full max-w-sm rounded-xl bg-surface p-8 shadow-2xl">
               <h2
                 id="login-title"
                 className="mb-6 text-xl font-bold text-gray-900"

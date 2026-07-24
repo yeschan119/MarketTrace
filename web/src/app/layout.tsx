@@ -15,8 +15,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen bg-gray-50 text-gray-900">
+        {/* Apply the stored theme before paint. Default is dark (the class the
+            server already rendered), so only users who chose light switch here. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('markettrace_theme');document.documentElement.classList.toggle('dark',t!=='light');}catch(e){}})();",
+          }}
+        />
         <Providers>
           <SiteHeader />
           <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>

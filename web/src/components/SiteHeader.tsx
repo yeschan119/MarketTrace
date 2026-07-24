@@ -6,6 +6,7 @@ import { AlertBell } from "@/components/AlertBell";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 
 const NAV_ITEMS = [
   {
@@ -81,7 +82,7 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="border-b border-gray-200 bg-white px-6 py-4">
+    <header className="border-b border-gray-200 bg-surface px-6 py-4">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 sm:gap-6">
         <a href="/" className="text-xl font-bold tracking-tight text-indigo-600">
           MarketTrace
@@ -98,6 +99,7 @@ export function SiteHeader() {
         {/* Language toggle sits immediately left of the auth / Ingest controls. */}
         <div className="ml-auto flex items-center gap-3">
           {alertsVisible && <AlertBell />}
+          <ThemeToggle />
           <LanguageToggle />
           <AuthControls />
         </div>

@@ -147,7 +147,7 @@ export function EventReviewForm({ event }: { event: EventDetail }) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-700">
         {t("eventDetail.review.title")}
       </h3>

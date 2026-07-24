@@ -189,9 +189,9 @@ export default function StatsPage() {
               {t("stats.howToReadBody")}
             </p>
           </div>
-          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-white">
+              <thead className="sticky top-0 z-10 bg-surface">
                 <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
                     {t("stats.th.eventType")}
@@ -349,7 +349,7 @@ export default function StatsPage() {
                         <li key={c.event_id} className="py-2">
                           <Link
                             href={`/events/${c.event_id}`}
-                            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1 hover:bg-white"
+                            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded px-2 py-1 hover:bg-surface"
                           >
                             <span className="font-mono text-sm font-semibold text-gray-900">
                               {c.primary_ticker}
@@ -419,10 +419,10 @@ function SignalsSection({ rows }: { rows: EventTypeSignificance[] }) {
         </div>
       ) : (
         <>
-          <div className="max-h-96 overflow-auto rounded-md border border-indigo-100 bg-white">
+          <div className="max-h-96 overflow-auto rounded-md border border-indigo-100 bg-surface">
             <table className="w-full text-sm">
               <thead>
-                <tr className="sticky top-0 z-10 border-b border-gray-200 bg-white text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <tr className="sticky top-0 z-10 border-b border-gray-200 bg-surface text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-2.5">
                     {t("stats.signals.th.eventType")}
                   </th>
@@ -562,7 +562,7 @@ function BacktestSection({
                 aria-pressed={model === opt.value}
                 className={`rounded px-2.5 py-1 transition-colors ${
                   model === opt.value
-                    ? "bg-white text-indigo-600 shadow-sm"
+                    ? "bg-surface text-indigo-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -586,10 +586,10 @@ function BacktestSection({
           {t("stats.backtest.empty")}
         </div>
       ) : (
-        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="sticky top-0 z-10 border-b border-gray-200 bg-white text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <tr className="sticky top-0 z-10 border-b border-gray-200 bg-surface text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">{t("stats.backtest.th.horizon")}</th>
                 <th className="px-4 py-3 text-right">
                   {t("stats.backtest.th.predictions")}
@@ -722,7 +722,7 @@ function CalibrationSection() {
                 aria-pressed={horizon === h}
                 className={`rounded px-2.5 py-1 font-mono transition-colors ${
                   horizon === h
-                    ? "bg-white text-indigo-600 shadow-sm"
+                    ? "bg-surface text-indigo-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -774,9 +774,9 @@ function CalibrationSection() {
             <p className="text-xs font-medium text-indigo-700">{verdict}</p>
           )}
 
-          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-white">
+              <thead className="sticky top-0 z-10 bg-surface">
                 <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-3">
                     {t("stats.calibration.th.band")}
@@ -881,9 +881,9 @@ function MacroDecompositionSection() {
           {t("stats.macro.empty")}
         </div>
       ) : (
-        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-white">
+            <thead className="sticky top-0 z-10 bg-surface">
               <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th rowSpan={2} className="px-4 py-3 text-left align-bottom">
                   {t("stats.macro.th.series")}

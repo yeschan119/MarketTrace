@@ -59,9 +59,9 @@ export default function MacroPage() {
           {t("macro.empty")}
         </div>
       ) : (
-        <div className="max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
           <table className="w-full min-w-[680px] text-sm">
-            <thead className="sticky top-0 z-10 bg-white">
+            <thead className="sticky top-0 z-10 bg-surface">
               <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3">{t("macro.th.series")}</th>
                 <th className="px-4 py-3">{t("macro.th.reference")}</th>

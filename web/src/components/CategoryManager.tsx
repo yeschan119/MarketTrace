@@ -39,7 +39,7 @@ export function CategoryManager({ controller }: CategoryManagerProps) {
   }
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <section className="rounded-lg border border-gray-200 bg-surface shadow-sm">
       <button
         type="button"
         aria-expanded={open}

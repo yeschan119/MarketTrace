@@ -103,7 +103,7 @@ export function WatchButton({
       className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
         watching
           ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+          : "border-gray-300 bg-surface text-gray-600 hover:bg-gray-50"
       }`}
     >
       <span aria-hidden>{watching ? "★" : "☆"}</span>

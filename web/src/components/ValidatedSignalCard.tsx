@@ -66,7 +66,7 @@ export function ValidatedSignalCard({ eventType, direction, horizonDays }: Props
       : t(`eventDetail.signal.${verdict}`, { llm: llmLabel, hist: histLabel });
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-700">
           {t("eventDetail.signal.title")}

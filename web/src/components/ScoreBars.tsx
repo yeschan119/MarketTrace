@@ -50,7 +50,7 @@ export function ScoreBars({
   }));
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         {t("scores.title")}
         <InfoTip text={t("scores.titleTip")} />
@@ -61,20 +61,30 @@ export function ScoreBars({
           layout="vertical"
           margin={{ top: 0, right: 32, left: 80, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--chart-grid)" />
           <XAxis
             type="number"
             domain={[0, 100]}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
+            stroke="var(--chart-axis)"
             tickFormatter={(v: number) => `${v}%`}
           />
           <YAxis
             type="category"
             dataKey="label"
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
+            stroke="var(--chart-axis)"
             width={80}
           />
           <Tooltip
+            cursor={{ fill: "rgb(var(--c-gray-100))" }}
+            contentStyle={{
+              backgroundColor: "rgb(var(--c-surface))",
+              border: "1px solid rgb(var(--c-gray-200))",
+              borderRadius: 8,
+              color: "rgb(var(--c-gray-900))",
+            }}
+            labelStyle={{ color: "rgb(var(--c-gray-900))" }}
             formatter={(value) => {
               const num = typeof value === "number" ? value : Array.isArray(value) ? (value[0] as number) : NaN;
               const pct = isNaN(num) ? "-" : `${num.toFixed(1)}%`;

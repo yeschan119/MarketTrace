@@ -118,7 +118,7 @@ export function InstrumentFactorsCard({ events }: { events: EventSummary[] }) {
   );
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-bold text-gray-900">
         {t("instrument.factors.title")}
       </h2>

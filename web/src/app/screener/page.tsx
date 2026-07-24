@@ -28,7 +28,7 @@ function ReboundBacktestPanel() {
   const marketAdjusted = rows.some((r) => r.market_adjusted);
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-gray-200 bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-gray-900">
           {t("screener.rebound.title")}
@@ -173,9 +173,9 @@ export default function ScreenerPage() {
           {t("screener.empty")}
         </div>
       ) : (
-        <div className="max-h-[68vh] overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="max-h-[68vh] overflow-auto rounded-lg border border-gray-200 bg-surface shadow-sm">
           <table className="w-full min-w-[820px] text-sm">
-            <thead className="sticky top-0 z-10 bg-white">
+            <thead className="sticky top-0 z-10 bg-surface">
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-3 font-medium">{t("screener.col.instrument")}</th>
                 <th className="px-4 py-3 text-right font-medium">
