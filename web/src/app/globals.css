@@ -259,27 +259,27 @@ html.dark .cat-mascot--koongi::before {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 6%;
+  bottom: 8%;
   transform: translateX(-50%);
-  width: 190%;
-  height: 285%;
+  width: 175%;
+  height: 100%;
   z-index: -1;
   pointer-events: none;
   background:
     radial-gradient(
-      58% 20% at 50% 100%,
-      rgba(255, 240, 202, 0.3),
-      rgba(255, 240, 202, 0) 72%
+      58% 24% at 50% 100%,
+      rgba(255, 241, 205, 0.5),
+      rgba(255, 241, 205, 0) 72%
     ),
     linear-gradient(
       to bottom,
-      rgba(255, 246, 220, 0) 0%,
-      rgba(255, 246, 220, 0.34) 14%,
-      rgba(255, 246, 220, 0.1) 62%,
-      rgba(255, 246, 220, 0) 100%
+      rgba(255, 247, 222, 0) 0%,
+      rgba(255, 247, 222, 0.52) 20%,
+      rgba(255, 247, 222, 0.18) 66%,
+      rgba(255, 247, 222, 0) 100%
     );
-  clip-path: polygon(41% 0, 59% 0, 100% 100%, 0 100%);
-  filter: blur(3px);
+  clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%);
+  filter: blur(2.5px);
 }
 
 /* The lamp glow at the apex of the beam. */
@@ -287,25 +287,28 @@ html.dark .cat-mascot--koongi::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 250%;
+  bottom: 96%;
   transform: translateX(-50%);
-  width: 30%;
-  height: 22%;
+  width: 26%;
+  height: 16%;
   z-index: -1;
   pointer-events: none;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(255, 239, 198, 0.9),
-    rgba(255, 239, 198, 0) 70%
+    rgba(255, 240, 200, 0.95),
+    rgba(255, 240, 200, 0) 70%
   );
   filter: blur(1.5px);
 }
 
-/* Brighten 꿍이 itself and give it a warm rim glow so it reads on dark. */
+/* Brighten 꿍이 and neutralise the sprite's baked-in purple rim: desaturate +
+   warm sepia tint push the violet outline to a neutral warm edge, then a warm
+   glow is layered on top (drop-shadows come last so they stay warm). */
 html.dark .cat-mascot--koongi .cat-mascot__viewport {
-  filter: drop-shadow(0 0 9px rgba(255, 236, 190, 0.45))
-    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5)) brightness(1.1) contrast(1.03);
+  filter: brightness(1.32) saturate(0.16) sepia(0.18)
+    drop-shadow(0 0 8px rgba(255, 238, 195, 0.6))
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
 }
 
 @media (prefers-reduced-motion: no-preference) {
