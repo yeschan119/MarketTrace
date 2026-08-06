@@ -305,6 +305,53 @@ def test_search_instruments_marks_corpus_rows_collected(
     assert resp.json()[0]["collected"] is True
 
 
+def test_search_instruments_flags_the_market_benchmark(
+    client: TestClient, seeded: dict, ts_session: Session
+) -> None:
+    """SPY is seeded to market-adjust returns, not to be analyzed."""
+    ts_session.add(
+        Instrument(market="US", ticker="SPY", name="SPDR S&P 500 ETF Trust")
+    )
+    ts_session.flush()
+
+    resp = client.get("/instruments/search", params={"q": "SPY"})
+
+    assert resp.status_code == 200
+    row = resp.json()[0]
+    assert row["ticker"] == "SPY"
+    assert row["benchmark"] is True
+
+
+def test_search_instruments_does_not_flag_ordinary_issuers(
+    client: TestClient, seeded: dict
+) -> None:
+    resp = client.get("/instruments/search", params={"q": "aapl"})
+    assert resp.json()[0]["benchmark"] is False
+
+
+def test_instrument_timeline_flags_the_market_benchmark(
+    client: TestClient, ts_session: Session
+) -> None:
+    """An empty benchmark timeline is by design, so the UI must be able to say so."""
+    benchmark = Instrument(market="US", ticker="SPY", name="SPDR S&P 500 ETF Trust")
+    ts_session.add(benchmark)
+    ts_session.flush()
+
+    resp = client.get(f"/instruments/{benchmark.id}/timeline")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["instrument"]["benchmark"] is True
+    assert body["events"] == []
+
+
+def test_instrument_timeline_ordinary_issuer_is_not_a_benchmark(
+    client: TestClient, seeded: dict
+) -> None:
+    resp = client.get(f"/instruments/{seeded['instrument_id']}/timeline")
+    assert resp.json()["instrument"]["benchmark"] is False
+
+
 def _patch_registry(monkeypatch: pytest.MonkeyPatch, rows: list[tuple[str, str, str]]):
     """Make the search endpoint's registry fallback return ``(market, ticker, name)``."""
     from markettrace.api import routes
@@ -344,6 +391,7 @@ def test_search_instruments_falls_back_to_listed_registry(
             "industry": None,
             "event_count": 0,
             "collected": False,
+            "benchmark": False,
         }
     ]
 

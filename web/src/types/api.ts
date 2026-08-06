@@ -168,6 +168,8 @@ export interface Instrument {
   id: string;
   ticker: string;
   name: string;
+  /** A market index (e.g. SPY) used to market-adjust returns — it has no events. */
+  benchmark: boolean;
 }
 
 export interface InstrumentTimeline {
@@ -184,6 +186,8 @@ export interface InstrumentSearchResult {
   industry: string | null;
   event_count: number;
   collected: boolean;
+  /** See Instrument.benchmark. */
+  benchmark: boolean;
 }
 
 export interface InstrumentSummary {

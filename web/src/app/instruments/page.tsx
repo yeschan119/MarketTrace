@@ -168,6 +168,14 @@ export default function InstrumentSearchPage() {
                       {t("search.uncollectedBadge")}
                     </span>
                   )}
+                  {r.benchmark && (
+                    <span
+                      className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs text-sky-700"
+                      title={t("search.benchmarkHint")}
+                    >
+                      {t("search.benchmarkBadge")}
+                    </span>
+                  )}
                 </div>
                 <div className="truncate text-xs text-gray-500">
                   {r.name}
@@ -198,17 +206,20 @@ export default function InstrumentSearchPage() {
                           : t("search.noEvents")}
                       </span>
                     )}
-                    <button
-                      type="button"
-                      disabled={!token || analyzeMutation.isPending}
-                      onClick={() => startAnalyzeForResult(r)}
-                      className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
-                      title={!token ? t("search.loginRequired") : undefined}
-                    >
-                      {analyzeMutation.isPending
-                        ? t("search.analyzing")
-                        : t("search.analyzeButton")}
-                    </button>
+                    {/* An index files no disclosures — there is nothing to analyze. */}
+                    {!r.benchmark && (
+                      <button
+                        type="button"
+                        disabled={!token || analyzeMutation.isPending}
+                        onClick={() => startAnalyzeForResult(r)}
+                        className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
+                        title={!token ? t("search.loginRequired") : undefined}
+                      >
+                        {analyzeMutation.isPending
+                          ? t("search.analyzing")
+                          : t("search.analyzeButton")}
+                      </button>
+                    )}
                   </div>
                 </div>
               </li>

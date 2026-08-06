@@ -164,6 +164,22 @@ _SEARCH_MAX_LIMIT = 50
 _REGISTRY_MARKETS = ("US", "KR")
 
 
+def _benchmark_tickers() -> dict[str, str]:
+    """Per-market index ticker used to market-adjust returns."""
+    return {"US": "SPY", "KR": get_settings().kr_market_index_ticker}
+
+
+def _is_benchmark(market: str | None, ticker: str) -> bool:
+    """True when this instrument is a market index, not an analyzable issuer.
+
+    Benchmarks are seeded so returns can be market-adjusted; they file no
+    corporate disclosures, so they will never accumulate events. The UI needs to
+    say that rather than showing an unexplained empty timeline.
+    """
+    benchmark = _benchmark_tickers().get((market or "").upper())
+    return benchmark is not None and benchmark.upper() == ticker.upper()
+
+
 @router.get("/instruments", response_model=list[InstrumentSummary])
 def list_instruments(
     q: str | None = None,
@@ -271,6 +287,7 @@ def search_instruments(
             industry=inst.industry,
             event_count=count,
             collected=True,
+            benchmark=_is_benchmark(inst.market, inst.ticker),
         )
         for inst, count in rows
     ]
@@ -308,7 +325,12 @@ def get_instrument_timeline(
     rows = db.execute(stmt).all()
 
     return InstrumentTimeline(
-        instrument=InstrumentOut.model_validate(instrument),
+        instrument=InstrumentOut(
+            id=instrument.id,
+            ticker=instrument.ticker,
+            name=instrument.name,
+            benchmark=_is_benchmark(instrument.market, instrument.ticker),
+        ),
         events=[_event_summary(event, doc) for event, doc in rows],
     )
 
@@ -568,11 +590,10 @@ def get_rebound_backtest(
         raise HTTPException(status_code=400, detail="threshold must be <= 0")
 
     settings = get_settings()
-    benchmark_tickers = {"US": "SPY", "KR": settings.kr_market_index_ticker}
     results = run_rebound_backtest(
         db,
         horizons=_BACKTEST_HORIZONS,
-        benchmark_tickers=benchmark_tickers,
+        benchmark_tickers=_benchmark_tickers(),
         threshold=threshold,
         commission_per_trade=settings.backtest_commission_per_trade,
         slippage_per_trade=settings.backtest_slippage_per_trade,

@@ -71,6 +71,11 @@ export default function InstrumentTimelinePage() {
             <h1 className="text-2xl font-bold text-gray-900">
               {instrument.name}
               <KoreanName ticker={instrument.ticker} className="ml-2 text-lg" />
+              {instrument.benchmark && (
+                <span className="ml-2 align-middle rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                  {t("instrument.benchmarkBadge")}
+                </span>
+              )}
             </h1>
             <p className="font-mono text-sm text-gray-500">{instrument.ticker}</p>
           </div>
@@ -96,9 +101,15 @@ export default function InstrumentTimelinePage() {
         </h2>
 
         {events.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
-            {t("instrument.empty")}
-          </div>
+          instrument.benchmark ? (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-8 text-center text-sm leading-relaxed text-sky-800">
+              {t("instrument.benchmarkEmpty")}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
+              {t("instrument.empty")}
+            </div>
+          )
         ) : (
           <div className="relative space-y-4 pl-6">
             {/* Timeline line */}

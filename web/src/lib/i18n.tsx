@@ -102,6 +102,9 @@ const en: Dict = {
     uncollectedBadge: "not collected",
     uncollectedHint:
       "Listed on SEC/DART but no filings collected yet — run analysis to add it.",
+    benchmarkBadge: "benchmark",
+    benchmarkHint:
+      "A market index used to market-adjust returns, not a company under analysis.",
     unsupportedHint:
       "Only KR/US listed companies are searchable. Private companies (e.g. SpaceX) and ETFs (e.g. QQQM) are not covered, since this system analyzes corporate filings.",
     tickerLabel: "Ticker (optional)",
@@ -445,6 +448,9 @@ const en: Dict = {
     timeline: "Event Timeline",
     eventsCount: "({n} events)",
     empty: "No events recorded for this instrument.",
+    benchmarkBadge: "benchmark",
+    benchmarkEmpty:
+      "This is the market index returns are adjusted against, not a company under analysis. Index funds file no corporate disclosures, so it has no events by design.",
     conf: "conf",
     signal: {
       title: "Signal summary",
@@ -784,6 +790,9 @@ const ko: Dict = {
     uncollectedBadge: "미수집",
     uncollectedHint:
       "SEC/DART에 상장되어 있지만 아직 공시를 수집하지 않았습니다. 분석을 실행하면 추가됩니다.",
+    benchmarkBadge: "벤치마크",
+    benchmarkHint:
+      "수익률을 시장조정하는 기준 지수입니다. 분석 대상 기업이 아닙니다.",
     unsupportedHint:
       "한국·미국 상장사만 검색됩니다. 이 시스템은 기업 공시를 분석하므로 비상장사(예: SpaceX)와 ETF(예: QQQM)는 다루지 않습니다.",
     tickerLabel: "티커 (선택)",
@@ -1125,6 +1134,9 @@ const ko: Dict = {
     timeline: "이벤트 타임라인",
     eventsCount: "(이벤트 {n}건)",
     empty: "이 종목에 기록된 이벤트가 없습니다.",
+    benchmarkBadge: "벤치마크",
+    benchmarkEmpty:
+      "수익률을 시장조정할 때 기준으로 쓰는 지수이며, 분석 대상 기업이 아닙니다. 지수 펀드는 기업 공시를 하지 않으므로 이벤트가 없는 것이 정상입니다.",
     conf: "신뢰도",
     signal: {
       title: "종목 판정",

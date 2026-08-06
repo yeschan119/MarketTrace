@@ -93,6 +93,9 @@ class InstrumentOut(BaseModel):
     id: int
     ticker: str
     name: str
+    # A market index (e.g. SPY) seeded to market-adjust returns. It files no
+    # disclosures, so its timeline is empty by design rather than unpopulated.
+    benchmark: bool = False
 
 
 class InstrumentSearchOut(BaseModel):
@@ -113,6 +116,8 @@ class InstrumentSearchOut(BaseModel):
     industry: str | None = None
     event_count: int
     collected: bool = True
+    # See InstrumentOut.benchmark.
+    benchmark: bool = False
 
 
 class InstrumentSummary(BaseModel):
