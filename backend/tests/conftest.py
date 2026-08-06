@@ -44,6 +44,38 @@ def db_session(engine: Engine) -> Iterator[Session]:
         session.close()
 
 
+@pytest.fixture(autouse=True)
+def clear_issuer_registry_caches() -> Iterator[None]:
+    """Drop the providers' cached SEC/DART issuer registries around each test.
+
+    Both providers cache the parsed registry process-wide (the search box would
+    otherwise re-download it per keystroke). Tests build providers with their own
+    mock transports, so a cache surviving between them would serve one test's
+    fixture rows to another.
+    """
+    from markettrace.providers.opendart import reset_corp_row_cache
+    from markettrace.providers.sec_edgar import reset_company_row_cache
+
+    reset_company_row_cache()
+    reset_corp_row_cache()
+    yield
+    reset_company_row_cache()
+    reset_corp_row_cache()
+
+
+@pytest.fixture(autouse=True)
+def offline_issuer_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep ``/instruments/search`` offline unless a test opts in.
+
+    The endpoint falls back to the live SEC/DART registries for issuers the
+    corpus has not collected yet. Tests that exercise that fallback re-patch
+    ``_registry_matches`` themselves; every other test must stay network-free.
+    """
+    from markettrace.api import routes
+
+    monkeypatch.setattr(routes, "_registry_matches", lambda query, limit: [])
+
+
 @pytest.fixture
 def tmp_object_store(tmp_path: Path) -> ObjectStore:
     """An ``ObjectStore`` rooted in a temporary directory."""

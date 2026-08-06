@@ -247,6 +247,60 @@ class TestResolveIssuer:
 
 
 # ---------------------------------------------------------------------------
+# search_issuers
+# ---------------------------------------------------------------------------
+
+_MANY_COMPANIES_JSON = json.dumps(
+    {
+        "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+        "1": {"cik_str": 1000001, "ticker": "APLE", "title": "Apple Hospitality REIT"},
+        "2": {"cik_str": 1000002, "ticker": "PNPL", "title": "Pineapple Holdings"},
+        "3": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corporation"},
+    }
+)
+
+
+class TestSearchIssuers:
+    def test_returns_all_matches_best_first(self):
+        provider = _provider_with(_make_company_handler(_MANY_COMPANIES_JSON))
+
+        matches = provider.search_issuers("apple")
+
+        # Exact ticker beats name-prefix, which beats a mid-name substring.
+        assert [m.ticker for m in matches] == ["AAPL", "APLE", "PNPL"]
+
+    def test_respects_limit(self):
+        provider = _provider_with(_make_company_handler(_MANY_COMPANIES_JSON))
+
+        assert len(provider.search_issuers("apple", limit=2)) == 2
+
+    def test_blank_or_unmatched_query_returns_empty(self):
+        provider = _provider_with(_make_company_handler(_MANY_COMPANIES_JSON))
+
+        assert provider.search_issuers("   ") == []
+        assert provider.search_issuers("not a listed company") == []
+
+    def test_ticker_map_is_fetched_once_across_calls(self):
+        """The search box hits this per keystroke; SEC must not be re-fetched."""
+        calls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(str(request.url))
+            return httpx.Response(
+                200,
+                text=_MANY_COMPANIES_JSON,
+                headers={"Content-Type": "application/json"},
+            )
+
+        provider = _provider_with(handler)
+        provider.search_issuers("apple")
+        provider.search_issuers("micro")
+        provider.resolve_issuer("nvidia")
+
+        assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting + retry on SEC throttling (429/503)
 # ---------------------------------------------------------------------------
 

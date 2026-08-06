@@ -176,12 +176,14 @@ export interface InstrumentTimeline {
 }
 
 export interface InstrumentSearchResult {
-  id: number;
+  /** null for registry matches that have not been collected into the corpus yet. */
+  id: number | null;
   ticker: string;
   name: string;
   market: string;
   industry: string | null;
   event_count: number;
+  collected: boolean;
 }
 
 export interface InstrumentSummary {

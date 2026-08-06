@@ -99,6 +99,11 @@ const en: Dict = {
     hint: "Type at least one character to search.",
     eventsCount: "{count} events",
     noEvents: "no events yet",
+    uncollectedBadge: "not collected",
+    uncollectedHint:
+      "Listed on SEC/DART but no filings collected yet — run analysis to add it.",
+    unsupportedHint:
+      "Only KR/US listed companies are searchable. Private companies (e.g. SpaceX) and ETFs (e.g. QQQM) are not covered, since this system analyzes corporate filings.",
     tickerLabel: "Ticker (optional)",
     nameLabel: "Company name",
     namePlaceholder: "Optional",
@@ -776,6 +781,11 @@ const ko: Dict = {
     hint: "검색하려면 한 글자 이상 입력하세요.",
     eventsCount: "이벤트 {count}건",
     noEvents: "아직 이벤트 없음",
+    uncollectedBadge: "미수집",
+    uncollectedHint:
+      "SEC/DART에 상장되어 있지만 아직 공시를 수집하지 않았습니다. 분석을 실행하면 추가됩니다.",
+    unsupportedHint:
+      "한국·미국 상장사만 검색됩니다. 이 시스템은 기업 공시를 분석하므로 비상장사(예: SpaceX)와 ETF(예: QQQM)는 다루지 않습니다.",
     tickerLabel: "티커 (선택)",
     nameLabel: "회사명",
     namePlaceholder: "선택",

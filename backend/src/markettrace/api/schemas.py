@@ -96,16 +96,23 @@ class InstrumentOut(BaseModel):
 
 
 class InstrumentSearchOut(BaseModel):
-    """Lightweight instrument row for the search entry point."""
+    """Lightweight instrument row for the search entry point.
+
+    Rows come from two places: instruments already in the corpus (``collected``,
+    with an ``id`` that opens the analysis view) and listed issuers matched
+    straight from the market registry (SEC / DART) that nothing has been
+    collected for yet (``collected=False``, ``id=None``, only analyzable).
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: int | None = None
     ticker: str
     name: str
     market: str
     industry: str | None = None
     event_count: int
+    collected: bool = True
 
 
 class InstrumentSummary(BaseModel):

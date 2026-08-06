@@ -297,6 +297,105 @@ def test_search_instruments_no_match(client: TestClient, seeded: dict) -> None:
     assert resp.json() == []
 
 
+def test_search_instruments_marks_corpus_rows_collected(
+    client: TestClient, seeded: dict
+) -> None:
+    resp = client.get("/instruments/search", params={"q": "aapl"})
+    assert resp.status_code == 200
+    assert resp.json()[0]["collected"] is True
+
+
+def _patch_registry(monkeypatch: pytest.MonkeyPatch, rows: list[tuple[str, str, str]]):
+    """Make the search endpoint's registry fallback return ``(market, ticker, name)``."""
+    from markettrace.api import routes
+    from markettrace.api.schemas import InstrumentSearchOut
+
+    def fake(query: str, limit: int) -> list[InstrumentSearchOut]:
+        return [
+            InstrumentSearchOut(
+                id=None,
+                ticker=ticker,
+                name=name,
+                market=market,
+                event_count=0,
+                collected=False,
+            )
+            for market, ticker, name in rows
+        ][:limit]
+
+    monkeypatch.setattr(routes, "_registry_matches", fake)
+
+
+def test_search_instruments_falls_back_to_listed_registry(
+    client: TestClient, seeded: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A listed company absent from the corpus is still findable."""
+    _patch_registry(monkeypatch, [("US", "INTC", "Intel Corporation")])
+
+    resp = client.get("/instruments/search", params={"q": "intel"})
+
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {
+            "id": None,
+            "ticker": "INTC",
+            "name": "Intel Corporation",
+            "market": "US",
+            "industry": None,
+            "event_count": 0,
+            "collected": False,
+        }
+    ]
+
+
+def test_search_instruments_registry_does_not_duplicate_corpus_rows(
+    client: TestClient, seeded: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_registry(monkeypatch, [("US", "AAPL", "Apple Inc.")])
+
+    resp = client.get("/instruments/search", params={"q": "aapl"})
+
+    data = resp.json()
+    assert [r["ticker"] for r in data] == ["AAPL"]
+    assert data[0]["collected"] is True
+
+
+def test_search_instruments_registry_respects_limit(
+    client: TestClient, seeded: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The corpus row consumes one slot; the registry fills only what is left."""
+    _patch_registry(
+        monkeypatch,
+        [("US", f"AP{n}", f"Apple rival {n}") for n in range(5)],
+    )
+
+    resp = client.get("/instruments/search", params={"q": "apple", "limit": 3})
+
+    data = resp.json()
+    assert len(data) == 3
+    assert data[0]["ticker"] == "AAPL"
+    assert all(r["collected"] is False for r in data[1:])
+
+
+def test_registry_matches_survives_provider_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider outage degrades to no registry rows, never an exception.
+
+    The endpoint has no other error handling for this path, so search staying up
+    during an SEC/DART outage rests on this.
+    """
+    from markettrace.api.routes import _registry_matches
+    from markettrace.providers import registry
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("SEC is down")
+
+    monkeypatch.setattr(registry, "get_disclosure_provider", boom)
+
+    assert _registry_matches("apple", 5) == []
+
+
 # ---------------------------------------------------------------------------
 # GET /stats/drawdown-screener
 # ---------------------------------------------------------------------------

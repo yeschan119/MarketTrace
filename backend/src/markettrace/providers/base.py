@@ -55,6 +55,8 @@ class DisclosureProvider(Protocol):
 
     def resolve_issuer(self, query: str) -> IssuerResolution | None: ...
 
+    def search_issuers(self, query: str, limit: int = 10) -> list[IssuerResolution]: ...
+
 
 @runtime_checkable
 class PriceProvider(Protocol):

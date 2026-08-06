@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import io
 import re
+import time
 import zipfile
 from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from xml.etree import ElementTree as ET
 
@@ -33,6 +35,28 @@ _VIEWER_URL = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
 
 # DART timestamps are Korea Standard Time (UTC+9).
 _KST = timezone(timedelta(hours=9))
+
+# corpCode.xml is a multi-megabyte ZIP that DART refreshes daily; see _corp_rows.
+_CORPCODE_CACHE_TTL_SECONDS = 12 * 60 * 60
+
+
+@dataclass(frozen=True)
+class _CorpRow:
+    """One listed company from DART's corpCode registry."""
+
+    corp_code: str
+    stock_code: str
+    corp_name: str
+
+
+# (fetched_at_monotonic, rows) — see _CORPCODE_CACHE_TTL_SECONDS.
+_corp_rows_cache: tuple[float, tuple[_CorpRow, ...]] | None = None
+
+
+def reset_corp_row_cache() -> None:
+    """Drop the cached corpCode registry. Exposed for tests."""
+    global _corp_rows_cache
+    _corp_rows_cache = None
 
 
 def _normalize_company_query(value: str) -> str:
@@ -179,35 +203,21 @@ class OpenDartProvider:
         """
         return self.list_for_corp(issuer_id, since, primary_ticker=primary_ticker)
 
-    def resolve_corp_codes(self, stock_codes: Collection[str]) -> dict[str, str]:
-        """Map each 6-digit KRX stock code to its 8-digit DART ``corp_code``.
+    def _corp_rows(self) -> tuple[_CorpRow, ...]:
+        """Return listed companies from ``corpCode.xml``, cached for the TTL.
 
         OpenDART offers no ticker->corp_code lookup, so this downloads the
         ``corpCode.xml`` archive (a ZIP wrapping ``CORPCODE.xml``) and indexes the
-        listed companies by ``stock_code``. Lets callers drive KR ingestion by
-        ticker instead of hand-curating corp_codes. Codes not present (e.g. a
-        delisted or non-listed entity) are omitted from the result.
+        listed companies by ``stock_code``. The archive is multi-megabyte and the
+        search box hits it per keystroke, so parsed rows are cached process-wide
+        (providers are constructed per request). Entries without a stock code
+        (non-listed entities) are dropped.
         """
-        wanted = {s.strip() for s in stock_codes}
-        resp = self._client.get(_CORPCODE_URL, params={"crtfc_key": self._api_key})
-        resp.raise_for_status()
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
-            xml_bytes = archive.read(archive.namelist()[0])
-        root = ET.fromstring(xml_bytes)
-
-        out: dict[str, str] = {}
-        for item in root.iter("list"):
-            stock_code = (item.findtext("stock_code") or "").strip()
-            corp_code = (item.findtext("corp_code") or "").strip()
-            if stock_code and stock_code in wanted and corp_code:
-                out[stock_code] = corp_code
-        return out
-
-    def resolve_issuer(self, query: str) -> IssuerResolution | None:
-        """Resolve a KRX ticker or Korean company-name query via corpCode.xml."""
-        normalized_query = query.strip()
-        if not normalized_query:
-            return None
+        global _corp_rows_cache
+        now = time.monotonic()
+        cached = _corp_rows_cache
+        if cached is not None and now - cached[0] < _CORPCODE_CACHE_TTL_SECONDS:
+            return cached[1]
 
         resp = self._client.get(_CORPCODE_URL, params={"crtfc_key": self._api_key})
         resp.raise_for_status()
@@ -215,28 +225,68 @@ class OpenDartProvider:
             xml_bytes = archive.read(archive.namelist()[0])
         root = ET.fromstring(xml_bytes)
 
-        best: tuple[tuple[int, int], IssuerResolution] | None = None
+        rows: list[_CorpRow] = []
         for item in root.iter("list"):
             stock_code = (item.findtext("stock_code") or "").strip()
             corp_code = (item.findtext("corp_code") or "").strip()
             corp_name = (item.findtext("corp_name") or "").strip()
             if not stock_code or not corp_code or not corp_name:
                 continue
-            rank = _company_match_rank(normalized_query, stock_code, corp_name)
+            rows.append(
+                _CorpRow(corp_code=corp_code, stock_code=stock_code, corp_name=corp_name)
+            )
+        parsed = tuple(rows)
+        _corp_rows_cache = (now, parsed)
+        return parsed
+
+    def resolve_corp_codes(self, stock_codes: Collection[str]) -> dict[str, str]:
+        """Map each 6-digit KRX stock code to its 8-digit DART ``corp_code``.
+
+        Lets callers drive KR ingestion by ticker instead of hand-curating
+        corp_codes. Codes not present (e.g. a delisted or non-listed entity) are
+        omitted from the result.
+        """
+        wanted = {s.strip() for s in stock_codes}
+        return {
+            row.stock_code: row.corp_code
+            for row in self._corp_rows()
+            if row.stock_code in wanted
+        }
+
+    def search_issuers(self, query: str, limit: int = 10) -> list[IssuerResolution]:
+        """Return up to ``limit`` KR issuers matching a ticker or name query.
+
+        Ordered best match first using the same ranking as
+        :meth:`resolve_issuer`, which returns this list's head.
+        """
+        normalized_query = query.strip()
+        if not normalized_query or limit < 1:
+            return []
+
+        ranked: list[tuple[tuple[int, int], IssuerResolution]] = []
+        for row in self._corp_rows():
+            rank = _company_match_rank(normalized_query, row.stock_code, row.corp_name)
             if rank is None:
                 continue
-            candidate = (
-                rank,
-                IssuerResolution(
-                    issuer_id=corp_code,
-                    ticker=stock_code,
-                    name=corp_name,
-                ),
+            ranked.append(
+                (
+                    rank,
+                    IssuerResolution(
+                        issuer_id=row.corp_code,
+                        ticker=row.stock_code,
+                        name=row.corp_name,
+                    ),
+                )
             )
-            if best is None or candidate[0] < best[0]:
-                best = candidate
+        # Stable sort on rank alone, so equally-ranked issuers keep registry
+        # order and resolve_issuer picks the same one it always has.
+        ranked.sort(key=lambda item: item[0])
+        return [resolution for _, resolution in ranked[:limit]]
 
-        return best[1] if best is not None else None
+    def resolve_issuer(self, query: str) -> IssuerResolution | None:
+        """Resolve a KRX ticker or Korean company-name query via corpCode.xml."""
+        matches = self.search_issuers(query, limit=1)
+        return matches[0] if matches else None
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all corps in the configured watchlist since ``since``.

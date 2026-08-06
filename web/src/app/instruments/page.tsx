@@ -28,6 +28,14 @@ export default function InstrumentSearchPage() {
     return () => clearTimeout(handle);
   }, [input]);
 
+  // Follow the query's own market so a US ticker is not sent to OpenDART just
+  // because KR is the default tab. An explicit tab click wins from then on.
+  const [marketTouched, setMarketTouched] = useState(false);
+  useEffect(() => {
+    if (!q || marketTouched) return;
+    setMarket(inferMarket(q));
+  }, [q, marketTouched]);
+
   useEffect(() => {
     if (!q) return;
     const inferred = inferTicker(q, market);
@@ -110,10 +118,18 @@ export default function InstrumentSearchPage() {
         <p className="text-sm text-gray-500">{t("search.searching")}</p>
       ) : results.length === 0 ? (
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">{t("search.noResults", { q })}</p>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500">{t("search.noResults", { q })}</p>
+            <p className="max-w-xl text-xs leading-relaxed text-gray-400">
+              {t("search.unsupportedHint")}
+            </p>
+          </div>
           <AnalyzePanel
             market={market}
-            setMarket={setMarket}
+            setMarket={(next) => {
+              setMarketTouched(true);
+              setMarket(next);
+            }}
             ticker={ticker}
             setTicker={setTicker}
             name={name}
@@ -134,47 +150,70 @@ export default function InstrumentSearchPage() {
         </div>
       ) : (
         <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-sm">
-          {results.map((r) => (
-            <li key={r.id}>
-              <div className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50">
-                <Link href={`/instruments/${r.id}`} className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium text-indigo-600">
-                      {r.ticker}
-                    </span>
-                    <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-500">
-                      {r.market}
-                    </span>
-                  </div>
-                  <div className="truncate text-xs text-gray-500">
-                    {r.name}
-                    <KoreanName ticker={r.ticker} className="ml-1" />
-                    {r.industry ? (
-                      <span className="ml-2 text-gray-400">· {r.industry}</span>
-                    ) : null}
-                  </div>
-                </Link>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs text-gray-400">
-                    {r.event_count > 0
-                      ? t("search.eventsCount", { count: r.event_count })
-                      : t("search.noEvents")}
+          {results.map((r) => {
+            const summary = (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium text-indigo-600">
+                    {r.ticker}
                   </span>
-                  <button
-                    type="button"
-                    disabled={!token || analyzeMutation.isPending}
-                    onClick={() => startAnalyzeForResult(r)}
-                    className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
-                    title={!token ? t("search.loginRequired") : undefined}
-                  >
-                    {analyzeMutation.isPending
-                      ? t("search.analyzing")
-                      : t("search.analyzeButton")}
-                  </button>
+                  <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-500">
+                    {r.market}
+                  </span>
+                  {!r.collected && (
+                    <span
+                      className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700"
+                      title={t("search.uncollectedHint")}
+                    >
+                      {t("search.uncollectedBadge")}
+                    </span>
+                  )}
                 </div>
-              </div>
-            </li>
-          ))}
+                <div className="truncate text-xs text-gray-500">
+                  {r.name}
+                  <KoreanName ticker={r.ticker} className="ml-1" />
+                  {r.industry ? (
+                    <span className="ml-2 text-gray-400">· {r.industry}</span>
+                  ) : null}
+                </div>
+              </>
+            );
+            return (
+              <li key={`${r.market}-${r.ticker}`}>
+                <div className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50">
+                  {/* Uncollected rows have no analysis view to open yet. */}
+                  {r.collected && r.id !== null ? (
+                    <Link href={`/instruments/${r.id}`} className="min-w-0 flex-1">
+                      {summary}
+                    </Link>
+                  ) : (
+                    <div className="min-w-0 flex-1">{summary}</div>
+                  )}
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* The "not collected" badge already says there is nothing yet. */}
+                    {r.collected && (
+                      <span className="text-xs text-gray-400">
+                        {r.event_count > 0
+                          ? t("search.eventsCount", { count: r.event_count })
+                          : t("search.noEvents")}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!token || analyzeMutation.isPending}
+                      onClick={() => startAnalyzeForResult(r)}
+                      className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
+                      title={!token ? t("search.loginRequired") : undefined}
+                    >
+                      {analyzeMutation.isPending
+                        ? t("search.analyzing")
+                        : t("search.analyzeButton")}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -263,6 +302,12 @@ function AnalyzePanel({
       </button>
     </div>
   );
+}
+
+/** KR tickers are 6-digit codes and KR names are Hangul; everything else is US. */
+function inferMarket(query: string): Market {
+  const trimmed = query.trim();
+  return /^\d{1,6}$/.test(trimmed) || /[가-힣]/.test(trimmed) ? "KR" : "US";
 }
 
 function inferTicker(query: string, market: Market): string {

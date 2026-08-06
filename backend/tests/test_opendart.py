@@ -265,3 +265,43 @@ class TestResolveIssuer:
         provider = OpenDartProvider(api_key="testkey", client=client)
 
         assert provider.resolve_issuer("없는회사") is None
+
+
+class TestSearchIssuers:
+    def test_returns_every_partial_name_match(self):
+        transport = httpx.MockTransport(_make_corp_code_handler(_CORP_CODE_ZIP_BYTES))
+        client = httpx.Client(transport=transport)
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        matches = provider.search_issuers("자동차")
+
+        assert [m.ticker for m in matches] == ["005380"]
+
+    def test_respects_limit_and_empty_query(self):
+        transport = httpx.MockTransport(_make_corp_code_handler(_CORP_CODE_ZIP_BYTES))
+        client = httpx.Client(transport=transport)
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        assert len(provider.search_issuers("00", limit=1)) <= 1
+        assert provider.search_issuers("  ") == []
+
+    def test_corp_registry_is_fetched_once_across_calls(self):
+        """The search box hits this per keystroke; the ZIP must not be re-downloaded."""
+        calls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(str(request.url))
+            return httpx.Response(
+                200,
+                content=_CORP_CODE_ZIP_BYTES,
+                headers={"Content-Type": "application/zip"},
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        provider = OpenDartProvider(api_key="testkey", client=client)
+
+        provider.search_issuers("삼성")
+        provider.search_issuers("현대")
+        provider.resolve_issuer("005930")
+
+        assert len(calls) == 1

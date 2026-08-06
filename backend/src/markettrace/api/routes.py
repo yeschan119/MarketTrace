@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -67,6 +68,8 @@ from markettrace.impact.statistics import (
 
 # Standard event-study horizons (trading days) reported by the backtest.
 _BACKTEST_HORIZONS = (1, 5, 20, 60)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -155,6 +158,10 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
 
 # Max rows returned by the search entry point regardless of the requested limit.
 _SEARCH_MAX_LIMIT = 50
+# Markets whose registry is consulted for issuers absent from the corpus. KR is
+# only reachable when an OpenDART key is configured; _registry_matches skips it
+# otherwise.
+_REGISTRY_MARKETS = ("US", "KR")
 
 
 @router.get("/instruments", response_model=list[InstrumentSummary])
@@ -181,6 +188,45 @@ def list_instruments(
     return [InstrumentSummary.model_validate(row) for row in db.scalars(stmt).all()]
 
 
+def _registry_matches(query: str, limit: int) -> list[InstrumentSearchOut]:
+    """Return listed issuers matching ``query`` from the SEC/DART registries.
+
+    These are companies the corpus has not collected yet, so they carry no id
+    and no events — the UI offers them as "analyze this" targets. Registry
+    lookups are best effort: a missing API key or a provider/network failure
+    degrades to fewer results rather than failing the whole search.
+    """
+    from markettrace.providers.registry import get_disclosure_provider
+
+    settings = get_settings()
+    out: list[InstrumentSearchOut] = []
+    for market in _REGISTRY_MARKETS:
+        if market == "KR" and settings.opendart_api_key is None:
+            continue
+        try:
+            provider = get_disclosure_provider(
+                market,
+                **({"user_agent": settings.sec_user_agent} if market == "US" else {}),
+            )
+            matches = provider.search_issuers(query, limit=limit)
+        except Exception:  # noqa: BLE001 - one registry must not break the search
+            logger.exception("search: registry lookup failed for %s", market)
+            continue
+        out.extend(
+            InstrumentSearchOut(
+                id=None,
+                ticker=match.ticker,
+                name=match.name or match.ticker,
+                market=market,
+                industry=None,
+                event_count=0,
+                collected=False,
+            )
+            for match in matches
+        )
+    return out
+
+
 @router.get("/instruments/search", response_model=list[InstrumentSearchOut])
 def search_instruments(
     q: str, limit: int = 20, db: Session = Depends(get_db)
@@ -188,8 +234,11 @@ def search_instruments(
     """Case-insensitive instrument search over ticker, name, and aliases.
 
     Powers the search-box entry point into the per-instrument analysis view.
-    Results are ordered by how many events reference the instrument (most
-    covered first) so the richest analyses surface at the top.
+    Instruments already in the corpus come first, ordered by how many events
+    reference them (richest analyses at the top). Any remaining room is filled
+    with listed issuers matched from the SEC/DART registries so a company the
+    corpus has not collected yet is still findable — those rows are marked
+    ``collected=False`` and can only be sent to the analyze action.
     """
     query = q.strip()
     if not query:
@@ -213,7 +262,7 @@ def search_instruments(
         .limit(capped)
     )
     rows = db.execute(stmt).all()
-    return [
+    results = [
         InstrumentSearchOut(
             id=inst.id,
             ticker=inst.ticker,
@@ -221,9 +270,24 @@ def search_instruments(
             market=inst.market,
             industry=inst.industry,
             event_count=count,
+            collected=True,
         )
         for inst, count in rows
     ]
+
+    room = capped - len(results)
+    if room <= 0:
+        return results
+    seen = {(row.market, row.ticker.upper()) for row in results}
+    for candidate in _registry_matches(query, room):
+        key = (candidate.market, candidate.ticker.upper())
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(candidate)
+        if len(results) >= capped:
+            break
+    return results
 
 
 @router.get("/instruments/{instrument_id}/timeline", response_model=InstrumentTimeline)

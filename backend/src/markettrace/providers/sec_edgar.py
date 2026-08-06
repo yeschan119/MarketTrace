@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable, Collection
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -39,6 +40,29 @@ _ARCHIVE_URL = (
 _DEFAULT_MAX_RETRIES = 5
 _DEFAULT_BACKOFF_BASE = 1.0
 _RETRY_STATUS = frozenset({429, 503})
+# SEC refreshes company_tickers.json nightly and it is ~1MB / ~10k rows. The
+# search box queries it per keystroke, so parsed rows are cached process-wide
+# (providers are constructed per request) and only re-fetched twice a day.
+_TICKER_CACHE_TTL_SECONDS = 12 * 60 * 60
+
+
+@dataclass(frozen=True)
+class _CompanyRow:
+    """One usable row of SEC's ticker->CIK map."""
+
+    cik: str
+    ticker: str
+    name: str
+
+
+# (fetched_at_monotonic, rows) — see _TICKER_CACHE_TTL_SECONDS.
+_ticker_rows_cache: tuple[float, tuple[_CompanyRow, ...]] | None = None
+
+
+def reset_company_row_cache() -> None:
+    """Drop the cached ticker map. Exposed for tests."""
+    global _ticker_rows_cache
+    _ticker_rows_cache = None
 
 
 def _normalize_company_query(value: str) -> str:
@@ -257,6 +281,35 @@ class SecEdgarProvider:
             issuer_id, since, primary_ticker=primary_ticker, forms=forms
         )
 
+    def _company_rows(self) -> tuple[_CompanyRow, ...]:
+        """Return SEC's ticker->CIK map, cached process-wide for the TTL.
+
+        Rows missing a ticker, name, or CIK are dropped so every caller can
+        assume all three fields are present.
+        """
+        global _ticker_rows_cache
+        # Deliberately the real clock, not the injectable ``_monotonic`` used for
+        # request throttling: a test's frozen clock must not freeze this cache.
+        now = time.monotonic()
+        cached = _ticker_rows_cache
+        if cached is not None and now - cached[0] < _TICKER_CACHE_TTL_SECONDS:
+            return cached[1]
+
+        resp = self._get(_COMPANY_TICKERS_URL)
+        resp.raise_for_status()
+        rows: list[_CompanyRow] = []
+        for row in resp.json().values():
+            ticker = str(row.get("ticker", "")).upper()
+            name = str(row.get("title", "")).strip()
+            if not ticker or not name or "cik_str" not in row:
+                continue
+            rows.append(
+                _CompanyRow(cik=f"{int(row['cik_str']):010d}", ticker=ticker, name=name)
+            )
+        parsed = tuple(rows)
+        _ticker_rows_cache = (now, parsed)
+        return parsed
+
     def resolve_ciks(self, tickers: Collection[str]) -> dict[str, str]:
         """Map each ticker to its zero-padded 10-digit CIK via SEC's official file.
 
@@ -265,43 +318,37 @@ class SecEdgarProvider:
         is case-insensitive; tickers SEC does not list are omitted from the result.
         """
         wanted = {t.upper() for t in tickers}
-        resp = self._get(_COMPANY_TICKERS_URL)
-        resp.raise_for_status()
-        out: dict[str, str] = {}
-        for row in resp.json().values():
-            ticker = str(row.get("ticker", "")).upper()
-            if ticker in wanted and "cik_str" in row:
-                out[ticker] = f"{int(row['cik_str']):010d}"
-        return out
+        return {
+            row.ticker: row.cik for row in self._company_rows() if row.ticker in wanted
+        }
+
+    def search_issuers(self, query: str, limit: int = 10) -> list[IssuerResolution]:
+        """Return up to ``limit`` issuers matching a ticker or company-name query.
+
+        Ordered best match first using the same ranking as
+        :meth:`resolve_issuer`, which returns this list's head.
+        """
+        normalized_query = query.strip()
+        if not normalized_query or limit < 1:
+            return []
+
+        ranked: list[tuple[tuple[int, int], IssuerResolution]] = []
+        for row in self._company_rows():
+            rank = _company_match_rank(normalized_query, row.ticker, row.name)
+            if rank is None:
+                continue
+            ranked.append(
+                (rank, IssuerResolution(issuer_id=row.cik, ticker=row.ticker, name=row.name))
+            )
+        # Stable sort on rank alone, so equally-ranked issuers keep registry
+        # order and resolve_issuer picks the same one it always has.
+        ranked.sort(key=lambda item: item[0])
+        return [resolution for _, resolution in ranked[:limit]]
 
     def resolve_issuer(self, query: str) -> IssuerResolution | None:
         """Resolve a ticker or company-name query via SEC's official ticker map."""
-        normalized_query = query.strip()
-        if not normalized_query:
-            return None
-
-        resp = self._get(_COMPANY_TICKERS_URL)
-        resp.raise_for_status()
-
-        best: tuple[tuple[int, int], IssuerResolution] | None = None
-        for row in resp.json().values():
-            ticker = str(row.get("ticker", "")).upper()
-            name = str(row.get("title", "")).strip()
-            if not ticker or not name or "cik_str" not in row:
-                continue
-            rank = _company_match_rank(normalized_query, ticker, name)
-            if rank is None:
-                continue
-            resolution = IssuerResolution(
-                issuer_id=f"{int(row['cik_str']):010d}",
-                ticker=ticker,
-                name=name,
-            )
-            candidate = (rank, resolution)
-            if best is None or candidate[0] < best[0]:
-                best = candidate
-
-        return best[1] if best is not None else None
+        matches = self.search_issuers(query, limit=1)
+        return matches[0] if matches else None
 
     def list_recent(self, since: datetime) -> list[DocumentRef]:
         """Return refs for all CIKs in the configured watchlist since ``since``.
