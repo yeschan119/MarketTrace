@@ -75,10 +75,10 @@ _CORPUS_PER_ISSUER = 10
 _CORPUS_SINCE = datetime(2024, 1, 1, tzinfo=UTC)
 _CORPUS_MARKET_INDEX = "spy"
 
-# US validation corpus: liquid large caps across sectors, driven by TICKER. CIKs
-# are resolved from SEC's company_tickers.json at run time (no hand-curated CIKs
-# to drift), so growing this list to the blueprint's 50-100 names is just adding
-# tickers.
+# US validation corpus: 50 liquid large caps spanning all 11 GICS sectors, driven
+# by TICKER. CIKs are resolved from SEC's company_tickers.json at run time (no
+# hand-curated CIKs to drift), so growing this list further is just adding
+# tickers — every entry here is verified to resolve against that file.
 _CORPUS_US_ISSUERS: list[dict[str, str]] = [
     {"ticker": "AAPL", "name": "Apple Inc.", "industry": "Technology"},
     {"ticker": "MSFT", "name": "Microsoft Corporation", "industry": "Technology"},
@@ -100,12 +100,42 @@ _CORPUS_US_ISSUERS: list[dict[str, str]] = [
     {"ticker": "PFE", "name": "Pfizer Inc.", "industry": "Health Care"},
     {"ticker": "CVX", "name": "Chevron Corporation", "industry": "Energy"},
     {"ticker": "DIS", "name": "The Walt Disney Company", "industry": "Communication Services"},
+    {"ticker": "AVGO", "name": "Broadcom Inc.", "industry": "Technology"},
+    {"ticker": "ORCL", "name": "Oracle Corporation", "industry": "Technology"},
+    {"ticker": "CRM", "name": "Salesforce, Inc.", "industry": "Technology"},
+    {"ticker": "AMD", "name": "Advanced Micro Devices, Inc.", "industry": "Technology"},
+    {"ticker": "INTC", "name": "Intel Corporation", "industry": "Technology"},
+    {"ticker": "QCOM", "name": "QUALCOMM Incorporated", "industry": "Technology"},
+    {"ticker": "TXN", "name": "Texas Instruments Incorporated", "industry": "Technology"},
+    {"ticker": "PLTR", "name": "Palantir Technologies Inc.", "industry": "Technology"},
+    {"ticker": "NFLX", "name": "Netflix, Inc.", "industry": "Communication Services"},
+    {"ticker": "RDDT", "name": "Reddit, Inc.", "industry": "Communication Services"},
+    {"ticker": "MCD", "name": "McDonald's Corporation", "industry": "Consumer Discretionary"},
+    {"ticker": "NKE", "name": "NIKE, Inc.", "industry": "Consumer Discretionary"},
+    {"ticker": "LOW", "name": "Lowe's Companies, Inc.", "industry": "Consumer Discretionary"},
+    {"ticker": "PEP", "name": "PepsiCo, Inc.", "industry": "Consumer Staples"},
+    {"ticker": "COST", "name": "Costco Wholesale Corporation", "industry": "Consumer Staples"},
+    {"ticker": "PM", "name": "Philip Morris International Inc.", "industry": "Consumer Staples"},
+    {"ticker": "LLY", "name": "Eli Lilly and Company", "industry": "Health Care"},
+    {"ticker": "ABBV", "name": "AbbVie Inc.", "industry": "Health Care"},
+    {"ticker": "MRK", "name": "Merck & Co., Inc.", "industry": "Health Care"},
+    {"ticker": "TMO", "name": "Thermo Fisher Scientific Inc.", "industry": "Health Care"},
+    {"ticker": "MA", "name": "Mastercard Incorporated", "industry": "Financials"},
+    {"ticker": "GS", "name": "The Goldman Sachs Group, Inc.", "industry": "Financials"},
+    {"ticker": "WFC", "name": "Wells Fargo & Company", "industry": "Financials"},
+    {"ticker": "CAT", "name": "Caterpillar Inc.", "industry": "Industrials"},
+    {"ticker": "BA", "name": "The Boeing Company", "industry": "Industrials"},
+    {"ticker": "GE", "name": "GE Aerospace", "industry": "Industrials"},
+    {"ticker": "COP", "name": "ConocoPhillips", "industry": "Energy"},
+    {"ticker": "LIN", "name": "Linde plc", "industry": "Materials"},
+    {"ticker": "NEE", "name": "NextEra Energy, Inc.", "industry": "Utilities"},
+    {"ticker": "AMT", "name": "American Tower Corporation", "industry": "Real Estate"},
 ]
 
-# KR validation corpus: liquid KOSPI large caps, driven by 6-digit KRX TICKER.
-# corp_codes are resolved from OpenDART corpCode.xml at run time. OpenDART has no
-# form filter, so all recent filing types are listed and the extractor classifies
-# them.
+# KR validation corpus: 50 liquid KOSPI/KOSDAQ large caps, driven by 6-digit KRX
+# TICKER. corp_codes are resolved from OpenDART corpCode.xml at run time; every
+# entry here is verified to resolve against that file. OpenDART has no form
+# filter, so all recent filing types are listed and the extractor classifies them.
 _CORPUS_KR_ISSUERS: list[dict[str, str]] = [
     {"ticker": "005930", "name": "Samsung Electronics Co., Ltd.", "industry": "Technology"},
     {"ticker": "000660", "name": "SK hynix Inc.", "industry": "Technology"},
@@ -127,6 +157,44 @@ _CORPUS_KR_ISSUERS: list[dict[str, str]] = [
     {"ticker": "032830", "name": "Samsung Life Insurance Co., Ltd.", "industry": "Financials"},
     {"ticker": "003670", "name": "POSCO Future M Co., Ltd.", "industry": "Materials"},
     {"ticker": "017670", "name": "SK Telecom Co., Ltd.", "industry": "Communication Services"},
+    {"ticker": "066570", "name": "LG Electronics Inc.", "industry": "Technology"},
+    {"ticker": "018260", "name": "Samsung SDS Co., Ltd.", "industry": "Technology"},
+    {"ticker": "009150", "name": "Samsung Electro-Mechanics Co., Ltd.", "industry": "Technology"},
+    {"ticker": "034220", "name": "LG Display Co., Ltd.", "industry": "Technology"},
+    {"ticker": "042700", "name": "Hanmi Semiconductor Co., Ltd.", "industry": "Technology"},
+    {"ticker": "030200", "name": "KT Corporation", "industry": "Communication Services"},
+    {"ticker": "032640", "name": "LG Uplus Corp.", "industry": "Communication Services"},
+    {"ticker": "259960", "name": "KRAFTON, Inc.", "industry": "Communication Services"},
+    {"ticker": "036570", "name": "NCSOFT Corporation", "industry": "Communication Services"},
+    {"ticker": "139480", "name": "Emart Inc.", "industry": "Consumer Discretionary"},
+    {
+        "ticker": "161390",
+        "name": "Hankook Tire & Technology Co., Ltd.",
+        "industry": "Consumer Discretionary",
+    },
+    {"ticker": "018880", "name": "Hanon Systems", "industry": "Consumer Discretionary"},
+    {"ticker": "097950", "name": "CJ CheilJedang Corporation", "industry": "Consumer Staples"},
+    {"ticker": "033780", "name": "KT&G Corporation", "industry": "Consumer Staples"},
+    {"ticker": "051900", "name": "LG H&H Co., Ltd.", "industry": "Consumer Staples"},
+    {"ticker": "090430", "name": "AMOREPACIFIC Corporation", "industry": "Consumer Staples"},
+    {"ticker": "000100", "name": "Yuhan Corporation", "industry": "Health Care"},
+    {"ticker": "128940", "name": "Hanmi Pharm. Co., Ltd.", "industry": "Health Care"},
+    {"ticker": "326030", "name": "SK Biopharmaceuticals Co., Ltd.", "industry": "Health Care"},
+    {"ticker": "196170", "name": "Alteogen Inc.", "industry": "Health Care"},
+    {
+        "ticker": "000810",
+        "name": "Samsung Fire & Marine Insurance Co., Ltd.",
+        "industry": "Financials",
+    },
+    {"ticker": "086790", "name": "Hana Financial Group Inc.", "industry": "Financials"},
+    {"ticker": "316140", "name": "Woori Financial Group Inc.", "industry": "Financials"},
+    {"ticker": "071050", "name": "Korea Investment Holdings Co., Ltd.", "industry": "Financials"},
+    {"ticker": "034020", "name": "Doosan Enerbility Co., Ltd.", "industry": "Industrials"},
+    {"ticker": "012450", "name": "Hanwha Aerospace Co., Ltd.", "industry": "Industrials"},
+    {"ticker": "042660", "name": "Hanwha Ocean Co., Ltd.", "industry": "Industrials"},
+    {"ticker": "267250", "name": "HD Hyundai Co., Ltd.", "industry": "Industrials"},
+    {"ticker": "010130", "name": "Korea Zinc Co., Ltd.", "industry": "Materials"},
+    {"ticker": "096770", "name": "SK Innovation Co., Ltd.", "industry": "Energy"},
 ]
 
 

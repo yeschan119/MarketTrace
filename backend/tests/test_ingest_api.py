@@ -14,6 +14,8 @@ from sqlalchemy.pool import StaticPool
 import markettrace.api.ingest as ingest_mod
 from markettrace.api.auth import create_token, create_user_token
 from markettrace.api.ingest import (
+    _CORPUS_KR_ISSUERS,
+    _CORPUS_US_ISSUERS,
     _DEMO_FILINGS,
     _ingest_corpus_kr,
     _ingest_corpus_us,
@@ -80,6 +82,51 @@ def manager_token(monkeypatch, fake_settings: _Settings) -> str:
             updated_at=now,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Corpus universe shape (unit test — no network)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("issuers", "label"),
+    [(_CORPUS_US_ISSUERS, "US"), (_CORPUS_KR_ISSUERS, "KR")],
+)
+def test_corpus_universe_is_fifty_issuers(issuers, label) -> None:
+    assert len(issuers) == 50, f"{label} corpus drifted from 50 issuers"
+
+
+@pytest.mark.parametrize(
+    ("issuers", "label"),
+    [(_CORPUS_US_ISSUERS, "US"), (_CORPUS_KR_ISSUERS, "KR")],
+)
+def test_corpus_tickers_are_unique(issuers, label) -> None:
+    """A duplicate ticker wastes an ingest slot and double-counts in the stats."""
+    tickers = [row["ticker"] for row in issuers]
+    assert len(set(tickers)) == len(tickers), f"{label} corpus has duplicate tickers"
+
+
+@pytest.mark.parametrize(
+    ("issuers", "label"),
+    [(_CORPUS_US_ISSUERS, "US"), (_CORPUS_KR_ISSUERS, "KR")],
+)
+def test_corpus_rows_are_fully_populated(issuers, label) -> None:
+    """Every row needs ticker/name/industry — a blank field silently degrades a row."""
+    for row in issuers:
+        assert set(row) == {"ticker", "name", "industry"}, f"{label}: {row}"
+        assert all(str(value).strip() for value in row.values()), f"{label}: {row}"
+
+
+def test_kr_corpus_tickers_are_six_digit_codes() -> None:
+    """OpenDART is driven by the 6-digit KRX stock code; a stray name resolves to nothing."""
+    for row in _CORPUS_KR_ISSUERS:
+        assert row["ticker"].isdigit() and len(row["ticker"]) == 6, row
+
+
+def test_us_corpus_does_not_include_the_benchmark() -> None:
+    """SPY is seeded to market-adjust returns, not as an issuer to collect filings for."""
+    assert "SPY" not in {row["ticker"] for row in _CORPUS_US_ISSUERS}
 
 
 # ---------------------------------------------------------------------------
