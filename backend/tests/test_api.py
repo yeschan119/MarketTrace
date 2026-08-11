@@ -76,6 +76,7 @@ def seeded(ts_session: Session) -> dict:
         market="US",
         ticker="AAPL",
         name="Apple Inc.",
+        tracked_at=datetime(2024, 1, 15, tzinfo=UTC),
     )
     ts_session.add(instrument)
     ts_session.flush()
@@ -159,6 +160,45 @@ def test_list_events_returns_one_item(client: TestClient, seeded: dict) -> None:
     assert "published_at" in item
 
 
+def test_list_events_excludes_untracked_instruments(
+    client: TestClient, ts_session: Session
+) -> None:
+    instrument = Instrument(market="US", ticker="OLD", name="Old Corpus Co")
+    ts_session.add(instrument)
+    ts_session.flush()
+    document = Document(
+        source="sec_edgar",
+        external_id="old-001",
+        url="https://example.com/old",
+        title="Old Corpus Filing",
+        content_hash="oldhash",
+        market="US",
+        published_at=datetime(2024, 1, 15, tzinfo=UTC),
+        first_seen_at=_now(),
+    )
+    ts_session.add(document)
+    ts_session.flush()
+    ts_session.add(
+        Event(
+            document_id=document.id,
+            primary_instrument_id=instrument.id,
+            event_type="earnings",
+            direction="positive",
+            confidence=0.9,
+            horizon_days=5,
+            model="test",
+            model_version="v1",
+            analyzed_at=_now(),
+        )
+    )
+    ts_session.flush()
+
+    resp = client.get("/events")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 # ---------------------------------------------------------------------------
 # GET /events/{id}
 # ---------------------------------------------------------------------------
@@ -217,7 +257,12 @@ def test_list_instruments_for_review_picker(
     client: TestClient, seeded: dict, ts_session: Session
 ) -> None:
     ts_session.add(
-        Instrument(market="KR", ticker="005930", name="Samsung Electronics")
+        Instrument(
+            market="KR",
+            ticker="005930",
+            name="Samsung Electronics",
+            tracked_at=datetime(2024, 1, 16, tzinfo=UTC),
+        )
     )
     ts_session.flush()
 
@@ -235,7 +280,12 @@ def test_list_instruments_filters_by_market_and_query(
     client: TestClient, seeded: dict, ts_session: Session
 ) -> None:
     ts_session.add(
-        Instrument(market="KR", ticker="005930", name="Samsung Electronics")
+        Instrument(
+            market="KR",
+            ticker="005930",
+            name="Samsung Electronics",
+            tracked_at=datetime(2024, 1, 16, tzinfo=UTC),
+        )
     )
     ts_session.flush()
 
@@ -310,7 +360,12 @@ def test_search_instruments_flags_the_market_benchmark(
 ) -> None:
     """SPY is seeded to market-adjust returns, not to be analyzed."""
     ts_session.add(
-        Instrument(market="US", ticker="SPY", name="SPDR S&P 500 ETF Trust")
+        Instrument(
+            market="US",
+            ticker="SPY",
+            name="SPDR S&P 500 ETF Trust",
+            tracked_at=datetime(2024, 1, 16, tzinfo=UTC),
+        )
     )
     ts_session.flush()
 
@@ -479,7 +534,12 @@ def _seed_prices(
 
 
 def _add_instrument(session: Session, ticker: str, name: str) -> Instrument:
-    inst = Instrument(market="US", ticker=ticker, name=name)
+    inst = Instrument(
+        market="US",
+        ticker=ticker,
+        name=name,
+        tracked_at=datetime(2024, 1, 15, tzinfo=UTC),
+    )
     session.add(inst)
     session.flush()
     return inst

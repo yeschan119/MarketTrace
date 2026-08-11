@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -17,6 +17,9 @@ from markettrace.api.ingest import (
     _CORPUS_KR_ISSUERS,
     _CORPUS_US_ISSUERS,
     _DEMO_FILINGS,
+    _EVENT_LIMIT_PER_INSTRUMENT,
+    _TRACKED_INSTRUMENT_LIMIT_PER_MARKET,
+    _enforce_collection_limits,
     _ingest_corpus_kr,
     _ingest_corpus_us,
     _ingest_macro,
@@ -27,7 +30,7 @@ from markettrace.api.ingest import (
 )
 from markettrace.api.main import create_app
 from markettrace.api.schemas import InstrumentAnalyzeRequest
-from markettrace.db.models import AdminUser, Base, Document, Event, Instrument
+from markettrace.db.models import AdminUser, Base, Document, DocumentEntity, Event, Instrument
 from markettrace.providers.base import IssuerResolution
 
 
@@ -179,6 +182,55 @@ def test_ingest_wait_runs_foreground_and_returns_summary(
     assert resp.json() == {
         "status": "completed",
         "summary": {"documents": 2, "events": 3, "events_by_ticker": {"AAPL": 3}},
+    }
+    assert called == [True]
+
+
+def test_ingest_cleanup_no_auth_header(ingest_client: TestClient) -> None:
+    resp = ingest_client.post("/ingest/cleanup")
+    assert resp.status_code == 401
+
+
+def test_ingest_cleanup_valid_token_runs_foreground(
+    monkeypatch, ingest_client: TestClient, valid_token: str
+) -> None:
+    called: list[bool] = []
+
+    def _fake_cleanup() -> dict[str, object]:
+        called.append(True)
+        return {
+            "cleanup": {
+                "removed_untracked_instruments": 3,
+                "removed_tracked_instruments": 1,
+                "removed_events": 4,
+            },
+            "summary": {
+                "documents": 2,
+                "events": 2,
+                "events_by_ticker": {"AAPL": 2},
+            },
+        }
+
+    monkeypatch.setattr("markettrace.api.ingest.run_collection_cleanup", _fake_cleanup)
+
+    resp = ingest_client.post(
+        "/ingest/cleanup",
+        headers={"Authorization": f"Bearer {valid_token}"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "status": "completed",
+        "cleanup": {
+            "removed_untracked_instruments": 3,
+            "removed_tracked_instruments": 1,
+            "removed_events": 4,
+        },
+        "summary": {
+            "documents": 2,
+            "events": 2,
+            "events_by_ticker": {"AAPL": 2},
+        },
     }
     assert called == [True]
 
@@ -377,6 +429,194 @@ def test_ingest_one_skips_existing(monkeypatch, mem_session, fake_settings: _Set
     _ingest_one(mem_session, None, fake_settings, filing)
 
     assert not run_slice_calls, "run_slice must not be called for an already-ingested document"
+
+
+# ---------------------------------------------------------------------------
+# Collection queue limits (unit test — no network)
+# ---------------------------------------------------------------------------
+
+
+def _add_tracked_instrument(
+    session,
+    *,
+    market: str,
+    ticker: str,
+    tracked_at: datetime,
+) -> Instrument:
+    inst = Instrument(market=market, ticker=ticker, name=ticker, tracked_at=tracked_at)
+    session.add(inst)
+    session.flush()
+    return inst
+
+
+def _add_event_for_instrument(
+    session,
+    instrument: Instrument,
+    *,
+    external_id: str,
+    published_at: datetime,
+) -> Event:
+    doc = Document(
+        source="sec_edgar",
+        external_id=external_id,
+        url="https://example.com",
+        title=external_id,
+        content_hash=f"{external_id}-hash",
+        market=instrument.market,
+        published_at=published_at,
+        first_seen_at=published_at,
+    )
+    session.add(doc)
+    session.flush()
+    event = Event(
+        document_id=doc.id,
+        primary_instrument_id=instrument.id,
+        event_type="earnings",
+        direction="positive",
+        horizon_days=20,
+        confidence=0.7,
+        model="test",
+        model_version="v1",
+        analyzed_at=published_at,
+    )
+    session.add(event)
+    session.flush()
+    return event
+
+
+def test_collection_limits_keep_ten_latest_events_per_instrument(
+    mem_session,
+    fake_settings: _Settings,
+) -> None:
+    inst = _add_tracked_instrument(
+        mem_session,
+        market="US",
+        ticker="AAPL",
+        tracked_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    for i in range(_EVENT_LIMIT_PER_INSTRUMENT + 2):
+        _add_event_for_instrument(
+            mem_session,
+            inst,
+            external_id=f"acc-{i}",
+            published_at=datetime(2026, 1, i + 1, tzinfo=UTC),
+        )
+
+    cleanup = _enforce_collection_limits(mem_session, fake_settings)
+    mem_session.commit()
+
+    assert cleanup["removed_events"] == 2
+    remaining = [
+        row[0]
+        for row in mem_session.execute(
+            select(Document.external_id)
+            .join(Event, Event.document_id == Document.id)
+            .where(Event.primary_instrument_id == inst.id)
+            .order_by(Document.published_at.asc())
+        ).all()
+    ]
+    assert remaining == [f"acc-{i}" for i in range(2, 12)]
+
+
+def test_collection_limits_keep_ten_tracked_instruments_per_market(
+    mem_session,
+    fake_settings: _Settings,
+) -> None:
+    for i in range(_TRACKED_INSTRUMENT_LIMIT_PER_MARKET + 1):
+        _add_tracked_instrument(
+            mem_session,
+            market="US",
+            ticker=f"U{i:02d}",
+            tracked_at=datetime(2026, 1, i + 1, tzinfo=UTC),
+        )
+        _add_tracked_instrument(
+            mem_session,
+            market="KR",
+            ticker=f"{i:06d}",
+            tracked_at=datetime(2026, 1, i + 1, tzinfo=UTC),
+        )
+
+    cleanup = _enforce_collection_limits(mem_session, fake_settings)
+    mem_session.commit()
+
+    assert cleanup["removed_tracked_instruments"] == 2
+    us = [
+        row.ticker
+        for row in mem_session.scalars(
+            select(Instrument)
+            .where(Instrument.market == "US")
+            .order_by(Instrument.tracked_at.asc())
+        )
+    ]
+    kr = [
+        row.ticker
+        for row in mem_session.scalars(
+            select(Instrument)
+            .where(Instrument.market == "KR")
+            .order_by(Instrument.tracked_at.asc())
+        )
+    ]
+    assert us == [f"U{i:02d}" for i in range(1, 11)]
+    assert kr == [f"{i:06d}" for i in range(1, 11)]
+
+
+def test_collection_limits_remove_untracked_issuers_but_keep_benchmarks(
+    mem_session,
+    fake_settings: _Settings,
+) -> None:
+    old = Instrument(market="US", ticker="OLD", name="Old Corpus Co")
+    benchmark = Instrument(market="US", ticker="SPY", name="SPDR S&P 500 ETF Trust")
+    mem_session.add_all([old, benchmark])
+    mem_session.flush()
+    _add_event_for_instrument(
+        mem_session,
+        old,
+        external_id="old-1",
+        published_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+    cleanup = _enforce_collection_limits(mem_session, fake_settings)
+    mem_session.commit()
+
+    assert cleanup["removed_untracked_instruments"] == 1
+    assert mem_session.scalar(select(func.count()).select_from(Event)) == 0
+    assert mem_session.scalar(select(func.count()).select_from(Document)) == 0
+    assert mem_session.query(Instrument).filter_by(ticker="OLD").count() == 0
+    assert mem_session.query(Instrument).filter_by(ticker="SPY").count() == 1
+
+
+def test_collection_limits_remove_orphan_documents(
+    mem_session,
+    fake_settings: _Settings,
+) -> None:
+    inst = _add_tracked_instrument(
+        mem_session,
+        market="US",
+        ticker="AAPL",
+        tracked_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    doc = Document(
+        source="sec_edgar",
+        external_id="orphan-doc",
+        url="https://example.com/orphan",
+        title="orphan",
+        content_hash="orphan-doc-hash",
+        market="US",
+        published_at=datetime(2026, 1, 1, tzinfo=UTC),
+        first_seen_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    mem_session.add(doc)
+    mem_session.flush()
+    mem_session.add(
+        DocumentEntity(document_id=doc.id, instrument_id=inst.id, confidence=0.9)
+    )
+
+    cleanup = _enforce_collection_limits(mem_session, fake_settings)
+    mem_session.commit()
+
+    assert cleanup["removed_orphan_documents"] == 1
+    assert mem_session.scalar(select(func.count()).select_from(Document)) == 0
+    assert mem_session.scalar(select(func.count()).select_from(DocumentEntity)) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +915,12 @@ def test_corpus_kr_skipped_without_opendart_key(monkeypatch, mem_session) -> Non
 
 
 def _seed_event(session, *, ticker: str, n: int) -> None:
-    inst = Instrument(market="US", ticker=ticker, name=ticker)
+    inst = Instrument(
+        market="US",
+        ticker=ticker,
+        name=ticker,
+        tracked_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
     session.add(inst)
     session.flush()
     for i in range(n):
@@ -735,3 +980,33 @@ def test_main_summary_only_skips_ingest(monkeypatch, mem_session, fake_settings)
 
     assert rc == 0
     assert not ran, "--summary-only must not invoke run_demo_ingest"
+
+
+def test_main_cleanup_only_skips_ingest(monkeypatch) -> None:
+    """main(--cleanup-only) applies pruning without fetching filings."""
+    ran: list[bool] = []
+    cleaned: list[bool] = []
+    monkeypatch.setattr(ingest_mod, "run_demo_ingest", lambda: ran.append(True))
+
+    def _fake_cleanup() -> dict[str, object]:
+        cleaned.append(True)
+        return {
+            "cleanup": {
+                "removed_untracked_instruments": 1,
+                "removed_tracked_instruments": 0,
+                "removed_events": 2,
+            },
+            "summary": {
+                "documents": 0,
+                "events": 0,
+                "events_by_ticker": {},
+            },
+        }
+
+    monkeypatch.setattr(ingest_mod, "run_collection_cleanup", _fake_cleanup)
+
+    rc = main(["--cleanup-only"])
+
+    assert rc == 0
+    assert cleaned == [True]
+    assert not ran, "--cleanup-only must not invoke run_demo_ingest"

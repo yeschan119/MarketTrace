@@ -4,10 +4,9 @@
 task and returns ``202 {"status": "started"}`` immediately. The work uses its
 OWN DB session (the request session is closed once the response is sent) and is
 idempotent: filings already present (matched on ``(source, external_id)``) are
-skipped. It covers the two demo filings, a small validation corpus of recent
-US 8-Ks (``_CORPUS_ISSUERS``), and the macro series (FRED). Each part is
-isolated and persists incrementally, so a run cut short by the platform timeout
-resumes on the next trigger.
+skipped. Production collection is intentionally bounded to issuers the user
+explicitly analyzed through search: max 10 issuers per market, max 10 events per
+issuer. New rows behave like a queue, pruning older issuers/events.
 """
 
 from __future__ import annotations
@@ -16,19 +15,27 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, exists, func, select, update
 
 from markettrace.api.auth import require_auth, require_login
 from markettrace.api.schemas import InstrumentAnalyzeRequest, InstrumentAnalyzeResponse
 from markettrace.config import get_settings
-from markettrace.db.models import Document, Instrument
+from markettrace.db.models import (
+    Alert,
+    Document,
+    DocumentEntity,
+    EntityAlias,
+    Event,
+    EventImpact,
+    Instrument,
+    Outcome,
+    Price,
+    WatchlistItem,
+)
 from markettrace.db.session import make_engine, make_session_factory
 from markettrace.pipeline.price_refresh import DEFAULT_LOOKBACK_DAYS, refresh_recent_prices
 from markettrace.pipeline.seed import (
-    DEFAULT_WATCHLIST,
-    KR_WATCHLIST,
     seed_instrument,
-    seed_watchlist,
 )
 from markettrace.pipeline.vertical_slice import recompute_document_outcomes, run_slice
 from markettrace.providers.base import IssuerResolution
@@ -39,13 +46,18 @@ from markettrace.providers.registry import (
 )
 from markettrace.storage.object_store import ObjectStore
 
-__all__ = ["router", "run_demo_ingest", "run_instrument_ingest"]
+__all__ = ["router", "run_collection_cleanup", "run_demo_ingest", "run_instrument_ingest"]
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# The demo filings ingested by POST /ingest (one US + one KR).
+_TRACKED_INSTRUMENT_LIMIT_PER_MARKET = 10
+_EVENT_LIMIT_PER_INSTRUMENT = 10
+
+# Legacy demo/corpus helpers remain for tests/manual experimentation. The web
+# ingest path no longer calls them; production uses tracked search-requested
+# issuers only.
 _DEMO_FILINGS: list[dict[str, str]] = [
     {
         "market": "US",
@@ -64,9 +76,8 @@ _DEMO_FILINGS: list[dict[str, str]] = [
 ]
 
 # Small validation corpus (blueprint phase 4): the most recent 8-Ks for a handful
-# of US large caps, ingested by POST /ingest alongside the demo filings so the
-# backtest/eval has more than two events to work with. 8-K = material-event
-# report — short, event-dense, and cheap to extract (one gpt-4o-mini call each).
+# of US large caps. Kept out of the web ingest path; useful only for explicit
+# tests/manual runs. 8-K = material-event report — short and event-dense.
 # CIKs verified against EDGAR. Idempotent: already-ingested filings are skipped
 # (no LLM cost) and run_slice commits per filing, so a run cut short by the
 # free-tier timeout resumes where it stopped on the next /ingest.
@@ -277,6 +288,198 @@ def _ingest_one(session, store, settings, filing: dict[str, str]) -> None:
     logger.info("ingest: completed %s/%s", ref.source, ref.external_id)
 
 
+def _benchmark_tickers(settings) -> dict[str, str]:
+    """Market-index instruments are infrastructure rows, not user-tracked issuers."""
+    return {"US": "SPY", "KR": settings.kr_market_index_ticker}
+
+
+def _is_benchmark_instrument(instrument: Instrument, settings) -> bool:
+    ticker = _benchmark_tickers(settings).get(instrument.market)
+    return ticker is not None and ticker.upper() == instrument.ticker.upper()
+
+
+def _mark_instrument_tracked(
+    session,
+    *,
+    market: str,
+    ticker: str,
+    name: str,
+    industry: str | None,
+    tracked_at: datetime,
+) -> Instrument:
+    """Create/update the issuer row that the user explicitly asked to analyze."""
+    instrument, _ = seed_instrument(
+        session,
+        market=market,
+        ticker=ticker,
+        name=name,
+        industry=industry,
+    )
+    if name and instrument.name != name:
+        instrument.name = name
+    if industry is not None and instrument.industry != industry:
+        instrument.industry = industry
+    instrument.tracked_at = tracked_at
+    session.flush()
+    return instrument
+
+
+def _delete_events(session, event_ids: list[int]) -> int:
+    """Delete events and their dependent rows, then remove now-orphan documents."""
+    if not event_ids:
+        return 0
+
+    document_ids = list(
+        session.scalars(select(Event.document_id).where(Event.id.in_(event_ids)))
+    )
+
+    session.execute(delete(Alert).where(Alert.event_id.in_(event_ids)))
+    session.execute(delete(Outcome).where(Outcome.event_id.in_(event_ids)))
+    session.execute(delete(EventImpact).where(EventImpact.event_id.in_(event_ids)))
+    session.execute(delete(Event).where(Event.id.in_(event_ids)))
+
+    if document_ids:
+        orphan_document_ids = list(
+            session.scalars(
+                select(Document.id).where(
+                    Document.id.in_(document_ids),
+                    ~exists().where(Event.document_id == Document.id),
+                )
+            )
+        )
+        if orphan_document_ids:
+            session.execute(
+                delete(DocumentEntity).where(
+                    DocumentEntity.document_id.in_(orphan_document_ids)
+                )
+            )
+            session.execute(delete(Document).where(Document.id.in_(orphan_document_ids)))
+
+    return len(event_ids)
+
+
+def _delete_orphan_documents(session) -> int:
+    """Remove documents that are no longer attached to any event."""
+    document_ids = list(
+        session.scalars(
+            select(Document.id).where(~exists().where(Event.document_id == Document.id))
+        )
+    )
+    if not document_ids:
+        return 0
+    session.execute(delete(DocumentEntity).where(DocumentEntity.document_id.in_(document_ids)))
+    session.execute(delete(Document).where(Document.id.in_(document_ids)))
+    return len(document_ids)
+
+
+def _delete_instrument_tree(session, instrument_id: int) -> None:
+    """Remove one issuer and every data row that depends on it."""
+    event_ids = list(
+        session.scalars(
+            select(Event.id).where(Event.primary_instrument_id == instrument_id)
+        )
+    )
+    _delete_events(session, event_ids)
+
+    session.execute(delete(Alert).where(Alert.instrument_id == instrument_id))
+    session.execute(delete(Outcome).where(Outcome.instrument_id == instrument_id))
+    session.execute(delete(EventImpact).where(EventImpact.instrument_id == instrument_id))
+    session.execute(delete(DocumentEntity).where(DocumentEntity.instrument_id == instrument_id))
+    session.execute(delete(Price).where(Price.instrument_id == instrument_id))
+    session.execute(delete(WatchlistItem).where(WatchlistItem.instrument_id == instrument_id))
+    session.execute(delete(EntityAlias).where(EntityAlias.instrument_id == instrument_id))
+    session.execute(
+        update(Event)
+        .where(Event.original_primary_instrument_id == instrument_id)
+        .values(original_primary_instrument_id=None)
+    )
+    session.execute(delete(Instrument).where(Instrument.id == instrument_id))
+
+
+def _prune_instrument_events(
+    session,
+    instrument_id: int,
+    *,
+    event_limit: int = _EVENT_LIMIT_PER_INSTRUMENT,
+) -> int:
+    """Keep only the latest N events for one tracked issuer."""
+    stale_event_ids = list(
+        session.scalars(
+            select(Event.id)
+            .join(Document, Event.document_id == Document.id)
+            .where(Event.primary_instrument_id == instrument_id)
+            .order_by(Document.published_at.desc(), Event.id.desc())
+            .offset(event_limit)
+        )
+    )
+    return _delete_events(session, stale_event_ids)
+
+
+def _enforce_collection_limits(
+    session,
+    settings,
+    *,
+    instrument_limit_per_market: int = _TRACKED_INSTRUMENT_LIMIT_PER_MARKET,
+    event_limit_per_instrument: int = _EVENT_LIMIT_PER_INSTRUMENT,
+) -> dict[str, int]:
+    """Apply the user-facing queue contract.
+
+    Only instruments explicitly requested by the user (`tracked_at IS NOT NULL`)
+    remain as analyzable issuers. Each market keeps the newest N tracked issuers,
+    and each kept issuer keeps the newest N events.
+    """
+    removed_untracked = 0
+    removed_instruments = 0
+    removed_events = 0
+    removed_orphan_documents = 0
+
+    session.flush()
+
+    all_instruments = list(session.scalars(select(Instrument)))
+    for instrument in all_instruments:
+        if instrument.tracked_at is None and not _is_benchmark_instrument(instrument, settings):
+            _delete_instrument_tree(session, instrument.id)
+            removed_untracked += 1
+
+    markets = list(
+        session.scalars(
+            select(Instrument.market)
+            .where(Instrument.tracked_at.is_not(None))
+            .distinct()
+            .order_by(Instrument.market.asc())
+        )
+    )
+    for market in markets:
+        tracked = list(
+            session.scalars(
+                select(Instrument)
+                .where(
+                    Instrument.market == market,
+                    Instrument.tracked_at.is_not(None),
+                )
+                .order_by(Instrument.tracked_at.desc(), Instrument.id.desc())
+            )
+        )
+        for stale in tracked[instrument_limit_per_market:]:
+            _delete_instrument_tree(session, stale.id)
+            removed_instruments += 1
+        for kept in tracked[:instrument_limit_per_market]:
+            removed_events += _prune_instrument_events(
+                session,
+                kept.id,
+                event_limit=event_limit_per_instrument,
+            )
+
+    removed_orphan_documents = _delete_orphan_documents(session)
+
+    return {
+        "removed_untracked_instruments": removed_untracked,
+        "removed_tracked_instruments": removed_instruments,
+        "removed_events": removed_events,
+        "removed_orphan_documents": removed_orphan_documents,
+    }
+
+
 def _ingest_issuer_filings(
     session,
     store,
@@ -436,8 +639,22 @@ def _ingest_requested_instrument(
         )
         return 0
     industry = request.industry
+    tracked_at = datetime.now(UTC)
 
-    return _ingest_issuer_filings(
+    _mark_instrument_tracked(
+        session,
+        market=market,
+        ticker=resolution.ticker,
+        name=resolution.name or request.name or resolution.ticker,
+        industry=industry,
+        tracked_at=tracked_at,
+    )
+    cleanup = _enforce_collection_limits(session, settings)
+    session.commit()
+    if any(cleanup.values()):
+        logger.info("ad-hoc ingest: collection cleanup %s", cleanup)
+
+    ingested = _ingest_issuer_filings(
         session,
         store,
         disclosure=disclosure,
@@ -452,6 +669,11 @@ def _ingest_requested_instrument(
         forms=forms,
         limit=request.max_filings,
     )
+    cleanup = _enforce_collection_limits(session, settings)
+    session.commit()
+    if any(cleanup.values()):
+        logger.info("ad-hoc ingest: post-run collection cleanup %s", cleanup)
+    return ingested
 
 
 def run_instrument_ingest(request: InstrumentAnalyzeRequest) -> None:
@@ -615,7 +837,10 @@ def _refresh_recent_prices(
     instruments = list(
         session.scalars(
             select(Instrument)
-            .where(Instrument.delisted_at.is_(None))
+            .where(
+                Instrument.delisted_at.is_(None),
+                Instrument.tracked_at.is_not(None),
+            )
             .order_by(Instrument.market.asc(), Instrument.ticker.asc())
         )
     )
@@ -647,46 +872,103 @@ def _refresh_recent_prices(
     return inserted
 
 
-def run_demo_ingest() -> None:
-    """Background worker: seed watchlists then ingest the demo filing set.
+def _ingest_tracked_instruments(session, store, settings) -> int:
+    """Refresh disclosures only for issuers the user explicitly analyzed."""
+    tracked = list(
+        session.scalars(
+            select(Instrument)
+            .where(
+                Instrument.tracked_at.is_not(None),
+                Instrument.delisted_at.is_(None),
+            )
+            .order_by(Instrument.market.asc(), Instrument.tracked_at.desc())
+        )
+    )
+    if not tracked:
+        logger.info("ingest: no tracked instruments; skipping disclosure ingest")
+        return 0
 
-    Uses its own DB session. Each filing is wrapped in try/except so one failure
-    does not abort the others.
+    provider_cache = {}
+
+    def providers_for(market: str):
+        cached = provider_cache.get(market)
+        if cached is not None:
+            return cached
+        disclosure, price, market_index_ticker, forms = _build_ad_hoc_providers(
+            settings, market
+        )
+        cached = (disclosure, price, market_index_ticker, forms)
+        provider_cache[market] = cached
+        return cached
+
+    from markettrace.nlp.event_extractor import EventExtractor
+
+    extractor = EventExtractor()
+    total = 0
+    for instrument in tracked:
+        disclosure, price, market_index_ticker, forms = providers_for(instrument.market)
+        if disclosure is None or price is None or market_index_ticker is None:
+            logger.warning("tracked ingest: provider unavailable for %s", instrument.market)
+            continue
+        resolution = disclosure.resolve_issuer(instrument.ticker)
+        if resolution is None:
+            logger.warning(
+                "tracked ingest: no issuer resolved for %s/%s",
+                instrument.market,
+                instrument.ticker,
+            )
+            continue
+        total += _ingest_issuer_filings(
+            session,
+            store,
+            disclosure=disclosure,
+            price=price,
+            extractor=extractor,
+            market=instrument.market,
+            issuer_id=resolution.issuer_id,
+            ticker=instrument.ticker,
+            name=instrument.name,
+            industry=instrument.industry,
+            market_index_ticker=market_index_ticker,
+            forms=forms,
+            limit=_EVENT_LIMIT_PER_INSTRUMENT,
+        )
+    return total
+
+
+def run_demo_ingest() -> None:
+    """Background worker: refresh only user-requested issuer queues.
+
+    Uses its own DB session. The old broad demo/corpus path is intentionally not
+    run here; production collection is capped to directly searched instruments.
     """
     settings = get_settings()
     engine = make_engine(settings.database_url)
     session = make_session_factory(engine)()
     store = ObjectStore(settings.object_store_dir)
     try:
-        seed_watchlist(session, DEFAULT_WATCHLIST)
-        seed_watchlist(session, KR_WATCHLIST)
+        cleanup = _enforce_collection_limits(session, settings)
         session.commit()
-
-        for filing in _DEMO_FILINGS:
-            try:
-                _ingest_one(session, store, settings, filing)
-            except Exception:  # noqa: BLE001 - one filing must not abort the rest
-                session.rollback()
-                logger.exception("ingest: failed for %s/%s", filing["market"], filing["ticker"])
-
-        for corpus_ingest in (_ingest_corpus_us, _ingest_corpus_kr):
-            try:
-                corpus_ingest(session, store, settings)
-            except Exception:  # noqa: BLE001 - corpus failure must not abort the ingest
-                session.rollback()
-                logger.exception("ingest: %s failed", corpus_ingest.__name__)
+        if any(cleanup.values()):
+            logger.info("ingest: collection cleanup %s", cleanup)
 
         try:
-            _ingest_macro(session, settings)
-        except Exception:  # noqa: BLE001 - macro failure must not abort the ingest
+            ingested = _ingest_tracked_instruments(session, store, settings)
+            logger.info("ingest: tracked instruments inserted %d new filing(s)", ingested)
+        except Exception:  # noqa: BLE001 - tracked refresh must log context
             session.rollback()
-            logger.exception("ingest: macro ingest failed")
+            logger.exception("ingest: tracked instrument refresh failed")
 
         try:
             _refresh_recent_prices(session, now=datetime.now(UTC))
         except Exception:  # noqa: BLE001 - price freshness must not abort the ingest
             session.rollback()
             logger.exception("ingest: recent price refresh failed")
+
+        cleanup = _enforce_collection_limits(session, settings)
+        session.commit()
+        if any(cleanup.values()):
+            logger.info("ingest: post-run collection cleanup %s", cleanup)
 
         try:
             from markettrace.impact.alerting import generate_watchlist_alerts
@@ -701,6 +983,25 @@ def run_demo_ingest() -> None:
         session.close()
 
 
+def run_collection_cleanup() -> dict[str, object]:
+    """Apply queue limits to existing data without fetching external filings."""
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    session = make_session_factory(engine)()
+    try:
+        cleanup = _enforce_collection_limits(session, settings)
+        summary = _ingest_summary(session)
+        session.commit()
+        logger.info("ingest cleanup: collection cleanup %s", cleanup)
+        return {"cleanup": cleanup, "summary": summary}
+    except Exception:
+        session.rollback()
+        logger.exception("ingest cleanup: failed")
+        raise
+    finally:
+        session.close()
+
+
 @router.post("/ingest", status_code=202)
 def ingest(
     background_tasks: BackgroundTasks,
@@ -708,7 +1009,7 @@ def ingest(
     wait: bool = False,
     _: None = Depends(require_auth),
 ) -> dict[str, object]:
-    """Start the demo ingestion.
+    """Start tracked issuer ingestion.
 
     Default mode preserves the web UI contract: schedule a background task and
     return immediately. ``?wait=true`` runs the same idempotent ingest in the
@@ -722,6 +1023,13 @@ def ingest(
 
     background_tasks.add_task(run_demo_ingest)
     return {"status": "started"}
+
+
+@router.post("/ingest/cleanup")
+def cleanup_ingest(_: None = Depends(require_auth)) -> dict[str, object]:
+    """Prune existing DB rows to the tracked issuer queue limits."""
+    result = run_collection_cleanup()
+    return {"status": "completed", **result}
 
 
 @router.post(
@@ -766,14 +1074,30 @@ def analyze_instrument(
 
 
 def _ingest_summary(session) -> dict[str, object]:
-    """Return current corpus counts: documents, events, and events per ticker."""
-    from markettrace.db.models import Event, Instrument
-
-    documents = session.scalar(select(func.count()).select_from(Document)) or 0
-    events = session.scalar(select(func.count()).select_from(Event)) or 0
+    """Return counts for the user-requested instrument collection."""
+    documents = (
+        session.scalar(
+            select(func.count(func.distinct(Document.id)))
+            .select_from(Document)
+            .join(Event, Event.document_id == Document.id)
+            .join(Instrument, Event.primary_instrument_id == Instrument.id)
+            .where(Instrument.tracked_at.is_not(None))
+        )
+        or 0
+    )
+    events = (
+        session.scalar(
+            select(func.count())
+            .select_from(Event)
+            .join(Instrument, Event.primary_instrument_id == Instrument.id)
+            .where(Instrument.tracked_at.is_not(None))
+        )
+        or 0
+    )
     rows = session.execute(
         select(Instrument.ticker, func.count(Event.id))
         .join(Event, Event.primary_instrument_id == Instrument.id)
+        .where(Instrument.tracked_at.is_not(None))
         .group_by(Instrument.ticker)
         .order_by(func.count(Event.id).desc())
     ).all()
@@ -796,22 +1120,27 @@ def _load_ingest_summary() -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI: run the full ingest (demo + corpus + macro) synchronously to completion.
+    """CLI: refresh the tracked issuer collection synchronously to completion.
 
-    Unlike ``POST /ingest`` — which schedules a FastAPI ``BackgroundTask`` that a
-    free-tier host may kill on idle spin-down before the corpus finishes — this
-    runs the whole job in one foreground process, so it completes the corpus in a
-    single invocation (e.g. a Render one-off job or shell). Idempotent: re-runs
-    skip already-ingested filings cheaply. Honours ``DATABASE_URL`` from the
-    environment, so point it at production by exporting that URL before running.
+    Unlike ``POST /ingest`` — which schedules a FastAPI ``BackgroundTask`` — this
+    runs in one foreground process. Idempotent: re-runs skip already-ingested
+    filings cheaply and then apply the same tracked-issuer queue limits. Honours
+    ``DATABASE_URL`` from the environment, so point it at production by exporting
+    that URL before running.
     """
     import argparse
 
     parser = argparse.ArgumentParser(prog="markettrace-ingest", description=main.__doc__)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--summary-only",
         action="store_true",
-        help="Skip ingest; just print current DB corpus counts.",
+        help="Skip ingest; just print current tracked collection counts.",
+    )
+    mode.add_argument(
+        "--cleanup-only",
+        action="store_true",
+        help="Apply tracked issuer queue cleanup without fetching filings.",
     )
     args = parser.parse_args(argv)
 
@@ -820,10 +1149,15 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    if not args.summary_only:
-        run_demo_ingest()
-
-    summary = _load_ingest_summary()
+    if args.cleanup_only:
+        result = run_collection_cleanup()
+        cleanup = result["cleanup"]
+        summary = result["summary"]
+        logger.info("ingest cleanup summary: %s", cleanup)
+    else:
+        if not args.summary_only:
+            run_demo_ingest()
+        summary = _load_ingest_summary()
 
     logger.info(
         "ingest summary: %d document(s), %d event(s)",

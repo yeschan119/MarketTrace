@@ -97,6 +97,8 @@ def list_events(db: Session = Depends(get_db)) -> list[EventSummary]:
     stmt = (
         select(Event, Document)
         .join(Document, Event.document_id == Document.id)
+        .join(Instrument, Event.primary_instrument_id == Instrument.id)
+        .where(Instrument.tracked_at.is_not(None))
         .order_by(Document.published_at.desc())
     )
     rows = db.execute(stmt).all()
@@ -153,6 +155,8 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> EventDetail:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
+    if event.primary_instrument is None or event.primary_instrument.tracked_at is None:
+        raise HTTPException(status_code=404, detail="Event not found")
     return build_event_detail(db, event)
 
 
@@ -191,7 +195,7 @@ def list_instruments(
     Optional filters are intentionally lightweight; the seeded universe is small
     and the public search endpoint remains the richer user-facing entry point.
     """
-    stmt = select(Instrument)
+    stmt = select(Instrument).where(Instrument.tracked_at.is_not(None))
     if market:
         stmt = stmt.where(func.lower(Instrument.market) == market.lower())
     if q:
@@ -267,6 +271,7 @@ def search_instruments(
         select(Instrument, event_count)
         .outerjoin(Event, Event.primary_instrument_id == Instrument.id)
         .where(
+            Instrument.tracked_at.is_not(None),
             or_(
                 Instrument.ticker.ilike(like),
                 Instrument.name.ilike(like),
@@ -315,14 +320,19 @@ def get_instrument_timeline(
     instrument = db.get(Instrument, instrument_id)
     if instrument is None:
         raise HTTPException(status_code=404, detail="Instrument not found")
+    if instrument.tracked_at is None and not _is_benchmark(instrument.market, instrument.ticker):
+        raise HTTPException(status_code=404, detail="Instrument not found")
 
-    stmt = (
-        select(Event, Document)
-        .join(Document, Event.document_id == Document.id)
-        .where(Event.primary_instrument_id == instrument_id)
-        .order_by(Document.published_at.desc())
-    )
-    rows = db.execute(stmt).all()
+    if instrument.tracked_at is None:
+        rows = []
+    else:
+        stmt = (
+            select(Event, Document)
+            .join(Document, Event.document_id == Document.id)
+            .where(Event.primary_instrument_id == instrument_id)
+            .order_by(Document.published_at.desc())
+        )
+        rows = db.execute(stmt).all()
 
     return InstrumentTimeline(
         instrument=InstrumentOut(
@@ -390,7 +400,8 @@ def get_instrument_ranking(
     stmt = (
         select(Event, Document)
         .join(Document, Event.document_id == Document.id)
-        .where(Event.primary_instrument_id.is_not(None))
+        .join(Instrument, Event.primary_instrument_id == Instrument.id)
+        .where(Instrument.tracked_at.is_not(None))
     )
     inputs: list[RankingEventInput] = []
     for event, document in db.execute(stmt).all():
@@ -458,7 +469,8 @@ def get_drawdown_screener(
     rank_stmt = (
         select(Event, Document)
         .join(Document, Event.document_id == Document.id)
-        .where(Event.primary_instrument_id.is_not(None))
+        .join(Instrument, Event.primary_instrument_id == Instrument.id)
+        .where(Instrument.tracked_at.is_not(None))
     )
     inputs: list[RankingEventInput] = []
     recent_event_counts: dict[int, int] = {}
@@ -491,7 +503,10 @@ def get_drawdown_screener(
 
     rows: list[DrawdownScreenerOut] = []
     instruments = db.scalars(
-        select(Instrument).where(Instrument.delisted_at.is_(None))
+        select(Instrument).where(
+            Instrument.delisted_at.is_(None),
+            Instrument.tracked_at.is_not(None),
+        )
     ).all()
     for inst in instruments:
         price_rows = db.execute(

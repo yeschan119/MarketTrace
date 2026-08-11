@@ -40,6 +40,9 @@ class Instrument(Base):
     industry: Mapped[str | None] = mapped_column(String, nullable=True)
     listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when the user explicitly requests analysis for this issuer. Seeded
+    # benchmarks/corpus rows stay NULL and are excluded from user-facing queues.
+    tracked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     aliases: Mapped[list[EntityAlias]] = relationship(
         back_populates="instrument", cascade="all, delete-orphan"
